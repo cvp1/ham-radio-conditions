@@ -243,7 +243,7 @@ class HamRadioConditions:
             return None
 
     def get_live_activity(self):
-        """Fetch live activity data from AR-Cluster via telnet"""
+        """Fetch live activity data from multiple sources and combine results"""
         try:
             import telnetlib
             import re
@@ -257,55 +257,40 @@ class HamRadioConditions:
                 if (cache_key - self._spots_cache_time) < timedelta(minutes=5):
                     return self._spots_cache
             
-            # Connect to AR-Cluster with a shorter timeout
-            tn = telnetlib.Telnet('dxcluster.darc.de', 7300, timeout=5)
-            
-            # Read the welcome message
-            tn.read_until(b"login:", timeout=5)
-            
-            # Send login command
-            tn.write(b"set/page 50\n")
-            tn.read_until(b"set/page 50", timeout=5)
-            
-            # Send show/dx command
-            tn.write(b"show/dx\n")
-            response = tn.read_until(b"show/dx", timeout=5)
-            
-            # Parse the response
-            spots = []
+            # Initialize sets for tracking unique spots
+            all_spots = []
             active_bands = set()
             active_modes = set()
             active_dxcc = set()
             
-            # Regular expression to match spot lines
-            spot_pattern = re.compile(r'(\d{4}Z)\s+(\w+)\s+(\d+\.\d+)\s+(\w+)\s+(\w+)\s+(\w+)\s+(.*)')
+            # Get spots from RBN
+            rbn_spots = self._get_rbn_spots()
+            if rbn_spots:
+                all_spots.extend(rbn_spots)
             
-            for line in response.decode('utf-8', errors='ignore').split('\n'):
-                match = spot_pattern.search(line)
-                if match:
-                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
-                    spot = {
-                        'timestamp': timestamp,
-                        'callsign': callsign,
-                        'frequency': freq,
-                        'mode': mode,
-                        'band': band,
-                        'dxcc': dxcc,
-                        'comment': comment.strip()
-                    }
-                    spots.append(spot)
-                    active_bands.add(band)
-                    active_modes.add(mode)
-                    active_dxcc.add(dxcc)
+            # Get spots from DX Cluster
+            dx_spots = self._get_dxcluster_spots()
+            if dx_spots:
+                all_spots.extend(dx_spots)
             
-            # Close the connection
-            tn.close()
+            # Process all spots
+            for spot in all_spots:
+                active_bands.add(spot['band'])
+                active_modes.add(spot['mode'])
+                if spot.get('dxcc'):
+                    active_dxcc.add(spot['dxcc'])
+            
+            # Sort spots by timestamp (most recent first)
+            all_spots.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            # Limit to last 50 spots
+            all_spots = all_spots[:50]
             
             # Create the response structure
             result = {
-                'spots': spots,
+                'spots': all_spots,
                 'summary': {
-                    'total_spots': len(spots),
+                    'total_spots': len(all_spots),
                     'active_bands': sorted(list(active_bands)),
                     'active_modes': sorted(list(active_modes)),
                     'active_dxcc': sorted(list(active_dxcc))
@@ -332,6 +317,131 @@ class HamRadioConditions:
                     'active_dxcc': []
                 }
             }
+
+    def _get_rbn_spots(self):
+        """Fetch spots from Reverse Beacon Network"""
+        try:
+            import telnetlib
+            import re
+            from datetime import datetime
+            
+            # Connect to RBN
+            tn = telnetlib.Telnet('telnet.reversebeacon.net', 7000, timeout=5)
+            
+            # Login process
+            tn.read_until(b"login: ", timeout=5)
+            tn.write(b"guest\n")
+            tn.read_until(b"password: ", timeout=5)
+            tn.write(b"\n")
+            tn.read_until(b"Welcome to the Reverse Beacon Network", timeout=5)
+            
+            # Get recent spots
+            tn.write(b"sh/dx on\n")
+            response = tn.read_until(b"<CMD>", timeout=5).decode('utf-8', errors='ignore')
+            tn.close()
+            
+            # Process spots
+            spots = []
+            spot_pattern = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +(\d+\.\d+) +(\w+) +(\w+) +(\w+) +(.+)')
+            
+            for line in response.split('\n'):
+                match = spot_pattern.search(line)
+                if match:
+                    try:
+                        time_str, freq, mode, callsign, dxcc, comment = match.groups()
+                        freq_float = float(freq)
+                        
+                        # Convert frequency to band
+                        band = self._freq_to_band(freq_float)
+                        
+                        spot = {
+                            'timestamp': time_str,
+                            'callsign': callsign,
+                            'frequency': freq,
+                            'mode': mode,
+                            'band': band,
+                            'dxcc': dxcc,
+                            'comment': comment.strip(),
+                            'source': 'RBN'
+                        }
+                        spots.append(spot)
+                    except Exception as spot_error:
+                        print(f"Error processing RBN spot: {spot_error}")
+                        continue
+            
+            return spots
+            
+        except Exception as e:
+            print(f"Error fetching RBN spots: {e}")
+            return []
+
+    def _get_dxcluster_spots(self):
+        """Fetch spots from DX Cluster"""
+        try:
+            import telnetlib
+            import re
+            
+            # Connect to DX Cluster
+            tn = telnetlib.Telnet('dxcluster.darc.de', 7300, timeout=5)
+            
+            # Login process
+            tn.read_until(b"login:", timeout=5)
+            tn.write(b"set/page 50\n")
+            tn.read_until(b"set/page 50", timeout=5)
+            tn.write(b"show/dx\n")
+            response = tn.read_until(b"show/dx", timeout=5)
+            tn.close()
+            
+            # Process spots
+            spots = []
+            spot_pattern = re.compile(r'(\d{4}Z)\s+(\w+)\s+(\d+\.\d+)\s+(\w+)\s+(\w+)\s+(\w+)\s+(.*)')
+            
+            for line in response.decode('utf-8', errors='ignore').split('\n'):
+                match = spot_pattern.search(line)
+                if match:
+                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
+                    spot = {
+                        'timestamp': timestamp,
+                        'callsign': callsign,
+                        'frequency': freq,
+                        'mode': mode,
+                        'band': band,
+                        'dxcc': dxcc,
+                        'comment': comment.strip(),
+                        'source': 'DX Cluster'
+                    }
+                    spots.append(spot)
+            
+            return spots
+            
+        except Exception as e:
+            print(f"Error fetching DX Cluster spots: {e}")
+            return []
+
+    def _freq_to_band(self, freq):
+        """Convert frequency to band name"""
+        if freq < 1.8:
+            return '160m'
+        elif freq < 3.5:
+            return '80m'
+        elif freq < 7.0:
+            return '40m'
+        elif freq < 10.1:
+            return '30m'
+        elif freq < 14.0:
+            return '20m'
+        elif freq < 18.068:
+            return '17m'
+        elif freq < 21.0:
+            return '15m'
+        elif freq < 24.89:
+            return '12m'
+        elif freq < 28.0:
+            return '10m'
+        elif freq < 50.0:
+            return '6m'
+        else:
+            return 'VHF+'
 
     def generate_report(self):
         """Generate a comprehensive report of current conditions"""
