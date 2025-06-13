@@ -32,6 +32,11 @@
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
+    <!-- Hidden data element -->
+    <script id="data" type="application/json">
+        {{ data|tojson|safe }}
+    </script>
+
     <div class="container mx-auto px-4 py-8">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-bold mb-2">Ham Radio Conditions</h1>
@@ -77,9 +82,28 @@
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-spots"></i>Live Spots
                 </h2>
-                <div id="live-activity" class="space-y-4">
-                    <div id="activity-summary" class="mb-4"></div>
-                    <div id="activity-spots" class="overflow-x-auto">
+                <div id="live-activity">
+                    <div id="activity-summary" class="mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-gray-800 p-4 rounded-lg">
+                                <div class="text-gray-400">Total Spots</div>
+                                <div class="text-xl font-semibold">-</div>
+                            </div>
+                            <div class="bg-gray-800 p-4 rounded-lg">
+                                <div class="text-gray-400">Active Bands</div>
+                                <div class="text-xl font-semibold">-</div>
+                            </div>
+                            <div class="bg-gray-800 p-4 rounded-lg">
+                                <div class="text-gray-400">Active Modes</div>
+                                <div class="text-xl font-semibold">-</div>
+                            </div>
+                            <div class="bg-gray-800 p-4 rounded-lg">
+                                <div class="text-gray-400">Active DXCC</div>
+                                <div class="text-xl font-semibold">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
                                 <tr class="text-left">
@@ -92,7 +116,13 @@
                                     <th class="px-4 py-2">Comment</th>
                                 </tr>
                             </thead>
-                            <tbody id="spots-table-body"></tbody>
+                            <tbody id="spots-table-body">
+                                <tr>
+                                    <td colspan="7" class="px-4 py-2 text-center text-gray-400">
+                                        Loading spots data...
+                                    </td>
+                                </tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -155,16 +185,28 @@
             // Update Weather Conditions
             const weatherDiv = document.getElementById('weather-conditions');
             if (data.weather_conditions) {
-                weatherDiv.innerHTML = Object.entries(data.weather_conditions)
-                    .filter(([key]) => key !== 'source')
-                    .map(([key, value]) => `
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                            <span class="font-semibold">${value}</span>
-                        </div>
-                    `).join('');
+                weatherDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">CALLSIGN</span>
+                        <span class="font-semibold">${data.callsign || 'N/A'}</span>
+                    </div>
+                    ${Object.entries(data.weather_conditions)
+                        .filter(([key]) => key !== 'source')
+                        .map(([key, value]) => `
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
+                                <span class="font-semibold">${value}</span>
+                            </div>
+                        `).join('')}
+                `;
             } else {
-                weatherDiv.innerHTML = '<p class="text-gray-400">Weather data not available</p>';
+                weatherDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">CALLSIGN</span>
+                        <span class="font-semibold">${data.callsign || 'N/A'}</span>
+                    </div>
+                    <p class="text-gray-400">Weather data not available</p>
+                `;
             }
 
             // Update DXCC Conditions
@@ -248,40 +290,67 @@
                 console.log('No DXCC data available');  // Debug log
                 dxccDiv.innerHTML = '<p class="text-gray-400">DXCC data not available</p>';
             }
+        }
 
-            // Update Live Activity
+        // Load initial data
+        const initialData = JSON.parse(document.getElementById('data').textContent);
+        updateUI(initialData);
+
+        // Function to fetch spots data
+        async function fetchSpots() {
+            try {
+                const response = await fetch('/api/spots');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const spotsData = await response.json();
+                updateSpotsUI(spotsData);
+            } catch (error) {
+                console.error('Error fetching spots:', error);
+                document.getElementById('live-activity').innerHTML = `
+                    <div class="text-red-500">
+                        Error loading live spots: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Function to update spots UI
+        function updateSpotsUI(data) {
             const activityDiv = document.getElementById('live-activity');
-            if (data.live_activity) {
-                const activity = data.live_activity;
-                
-                // Update summary
-                const summaryDiv = document.getElementById('activity-summary');
-                const summary = activity.summary;
-                summaryDiv.innerHTML = `
+            if (!activityDiv) return;
+            
+            // Update summary
+            const summaryDiv = document.getElementById('activity-summary');
+            if (summaryDiv && data.summary) {
+                const summaryHtml = `
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Total Spots</div>
-                            <div class="text-xl font-semibold">${summary.total_spots}</div>
+                            <div class="text-xl font-semibold">${data.summary.total_spots || 0}</div>
                         </div>
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Active Bands</div>
-                            <div class="text-xl font-semibold">${summary.active_bands.join(', ') || 'None'}</div>
+                            <div class="text-xl font-semibold">${data.summary.active_bands?.join(', ') || 'None'}</div>
                         </div>
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Active Modes</div>
-                            <div class="text-xl font-semibold">${summary.active_modes.join(', ') || 'None'}</div>
+                            <div class="text-xl font-semibold">${data.summary.active_modes?.join(', ') || 'None'}</div>
                         </div>
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Active DXCC</div>
-                            <div class="text-xl font-semibold">${summary.active_dxcc.length}</div>
+                            <div class="text-xl font-semibold">${data.summary.active_dxcc?.length || 0}</div>
                         </div>
                     </div>
                 `;
-                
-                // Update spots table
-                const spotsBody = document.getElementById('spots-table-body');
-                if (activity.spots.length > 0) {
-                    spotsBody.innerHTML = activity.spots.map(spot => `
+                summaryDiv.innerHTML = summaryHtml;
+            }
+
+            // Update spots table
+            const tableBody = document.getElementById('spots-table-body');
+            if (tableBody) {
+                if (data.spots && data.spots.length > 0) {
+                    tableBody.innerHTML = data.spots.map(spot => `
                         <tr class="border-t border-gray-700 hover:bg-gray-800">
                             <td class="px-4 py-2">${spot.timestamp || '-'}</td>
                             <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
@@ -293,7 +362,7 @@
                         </tr>
                     `).join('');
                 } else {
-                    spotsBody.innerHTML = `
+                    tableBody.innerHTML = `
                         <tr>
                             <td colspan="7" class="px-4 py-2 text-center text-gray-400">
                                 No spots available at this time
@@ -301,35 +370,14 @@
                         </tr>
                     `;
                 }
-            } else {
-                activityDiv.innerHTML = `
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <p class="text-gray-400 mb-2">Live spots data not available</p>
-                        <p class="text-sm text-gray-500">This could be due to:</p>
-                        <ul class="list-disc list-inside text-sm text-gray-500 mt-2">
-                            <li>API service is temporarily unavailable</li>
-                            <li>Network connectivity issues</li>
-                            <li>No current spots data</li>
-                        </ul>
-                        <p class="text-sm text-gray-500 mt-2">The data will automatically refresh in 5 minutes.</p>
-                    </div>
-                `;
             }
         }
 
-        // Fetch data every 5 minutes
-        function fetchData() {
-            fetch('/api/conditions')
-                .then(response => response.json())
-                .then(data => updateUI(data))
-                .catch(error => console.error('Error fetching data:', error));
-        }
+        // Initial spots load
+        fetchSpots();
 
-        // Initial fetch
-        fetchData();
-
-        // Update every 5 minutes
-        setInterval(fetchData, 300000);
+        // Update spots every 5 minutes
+        setInterval(fetchSpots, 5 * 60 * 1000);
     </script>
 </body>
 </html> 
