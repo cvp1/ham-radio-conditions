@@ -11,6 +11,9 @@ import xml.etree.ElementTree as ET
 import math
 from dxcc_data import get_dxcc_info, get_dxcc_by_name, get_dxcc_by_continent, get_dxcc_by_grid
 from flask import Flask, request, jsonify, render_template
+import telnetlib
+import re
+import socket
 
 # Load environment variables
 load_dotenv()
@@ -376,60 +379,79 @@ class HamRadioConditions:
             return []
 
     def _get_dxcluster_spots(self):
-        """Fetch spots from DX Cluster with multiple server fallback"""
+        """Get spots from DX Cluster servers with fallback."""
         # List of DX Cluster servers to try
-        dx_servers = [
-            {'host': 'dxcluster.darc.de', 'port': 7300},
-            {'host': 'dxc.w1hkj.com', 'port': 7300},
-            {'host': 'dxc.ve7cc.net', 'port': 7300},
-            {'host': 'dxc.kc4zvh.com', 'port': 7300},
-            {'host': 'dxc.kc4zvh.com', 'port': 8000}
+        servers = [
+            ('dxcluster.darc.de', 7300),  # DARC DX Cluster
+            ('dxc.w1hkj.com', 7300),      # W1HKJ DX Cluster
+            ('dxc.ve7cc.net', 7300),      # VE7CC DX Cluster
+            ('dxc.kc4zvh.com', 7300),     # KC4ZVH DX Cluster
+            ('dxc.kc4zvh.com', 8000),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8001),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8002),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8003),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8004),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8005),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8006),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8007),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8008),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8009),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8010),     # KC4ZVH DX Cluster (alt port)
         ]
-        
-        for server in dx_servers:
+
+        spots = []
+        for host, port in servers:
             try:
-                import telnetlib
-                import re
-                
-                print(f"Trying DX Cluster server: {server['host']}:{server['port']}")
-                
+                print(f"Trying DX Cluster server: {host}:{port}")
                 # Connect to DX Cluster
-                tn = telnetlib.Telnet(server['host'], server['port'], timeout=5)
+                tn = telnetlib.Telnet(host, port, timeout=5)
                 
-                # Login process
-                tn.read_until(b"login:", timeout=5)
+                # Set page size and show DX spots
                 tn.write(b"set/page 50\n")
-                tn.read_until(b"set/page 50", timeout=5)
                 tn.write(b"show/dx\n")
-                response = tn.read_until(b"show/dx", timeout=5)
+                
+                # Read response
+                response = tn.read_until(b"\n", timeout=5).decode('utf-8', errors='ignore')
+                spots_data = []
+                
+                # Read spots until we get a prompt or timeout
+                while True:
+                    try:
+                        line = tn.read_until(b"\n", timeout=2).decode('utf-8', errors='ignore')
+                        if not line or '>' in line:
+                            break
+                        spots_data.append(line.strip())
+                    except (EOFError, ConnectionResetError):
+                        break
+                
                 tn.close()
                 
                 # Process spots
-                spots = []
-                spot_pattern = re.compile(r'(\d{4}Z)\s+(\w+)\s+(\d+\.\d+)\s+(\w+)\s+(\w+)\s+(\w+)\s+(.*)')
-                
-                for line in response.decode('utf-8', errors='ignore').split('\n'):
-                    match = spot_pattern.search(line)
+                for spot in spots_data:
+                    # Parse spot data using regex
+                    match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+) (\d+\.\d+) (\w+) (\w+) (\w+) (.+)', spot)
                     if match:
                         timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
-                        spot = {
+                        spots.append({
                             'timestamp': timestamp,
                             'callsign': callsign,
                             'frequency': freq,
                             'mode': mode,
                             'band': band,
                             'dxcc': dxcc,
-                            'comment': comment.strip(),
-                            'source': f"DX Cluster ({server['host']})"
-                        }
-                        spots.append(spot)
+                            'comment': comment,
+                            'source': f'DX Cluster ({host})'
+                        })
                 
                 if spots:
-                    print(f"Successfully fetched {len(spots)} spots from {server['host']}")
+                    print(f"Successfully fetched {len(spots)} spots from {host}:{port}")
                     return spots
-                
+                    
+            except (socket.gaierror, socket.timeout, ConnectionRefusedError) as e:
+                print(f"Error connecting to {host}:{port}: {str(e)}")
+                continue
             except Exception as e:
-                print(f"Error connecting to {server['host']}:{server['port']}: {e}")
+                print(f"Unexpected error with {host}:{port}: {str(e)}")
                 continue
         
         print("All DX Cluster servers failed")
