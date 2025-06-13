@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ham Radio Conditions</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .condition-good { color: #10B981; }
+        .condition-fair { color: #F59E0B; }
+        .condition-poor { color: #EF4444; }
+        
+        /* Icon colors and animations */
+        .icon-solar { color: #F59E0B; }
+        .icon-band { color: #3B82F6; }
+        .icon-weather { color: #10B981; }
+        .icon-dxcc { color: #8B5CF6; }
+        .icon-spots { color: #EC4899; }
+        
+        .section-icon {
+            transition: transform 0.2s ease-in-out;
+        }
+        .section-icon:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-2">Ham Radio Conditions</h1>
+            <p class="text-gray-400" id="timestamp"></p>
+            <p class="text-gray-400" id="location"></p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Solar Conditions -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-sun mr-2 section-icon icon-solar"></i>Solar Conditions
+                </h2>
+                <div id="solar-conditions" class="space-y-2"></div>
+            </div>
+
+            <!-- Band Conditions -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-broadcast-tower mr-2 section-icon icon-band"></i>Band Conditions
+                </h2>
+                <div id="band-conditions" class="space-y-4"></div>
+            </div>
+
+            <!-- Weather Conditions -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-cloud-sun mr-2 section-icon icon-weather"></i>Weather Conditions
+                </h2>
+                <div id="weather-conditions" class="space-y-2"></div>
+            </div>
+
+            <!-- DXCC Conditions -->
+            <div class="card rounded-lg p-6 lg:col-span-1">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-globe-americas mr-2 section-icon icon-dxcc"></i>DXCC Conditions
+                </h2>
+                <div id="dxcc-conditions" class="space-y-4"></div>
+            </div>
+
+            <!-- Live Spots -->
+            <div class="card rounded-lg p-6 lg:col-span-2">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-broadcast-tower mr-2 section-icon icon-spots"></i>Live Spots
+                </h2>
+                <div id="live-activity" class="space-y-4">
+                    <div id="activity-summary" class="mb-4"></div>
+                    <div id="activity-spots" class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="text-left">
+                                    <th class="px-4 py-2">Time</th>
+                                    <th class="px-4 py-2">Callsign</th>
+                                    <th class="px-4 py-2">Frequency</th>
+                                    <th class="px-4 py-2">Mode</th>
+                                    <th class="px-4 py-2">Band</th>
+                                    <th class="px-4 py-2">DXCC</th>
+                                    <th class="px-4 py-2">Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody id="spots-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateConditionClass(condition) {
+            condition = condition.toLowerCase();
+            if (condition.includes('good')) return 'condition-good';
+            if (condition.includes('fair')) return 'condition-fair';
+            if (condition.includes('poor')) return 'condition-poor';
+            return '';
+        }
+
+        function formatValue(key, value) {
+            if (key === 'sfi') return `${value} SFI`;
+            if (key === 'a_index') return `A-Index: ${value}`;
+            if (key === 'k_index') return `K-Index: ${value}`;
+            return value;
+        }
+
+        function updateUI(data) {
+            console.log('Updating UI with data:', data);  // Debug log
+            
+            // Update timestamp and location
+            document.getElementById('timestamp').textContent = `Last Updated: ${data.timestamp}`;
+            document.getElementById('location').textContent = `Location: ${data.location}`;
+
+            // Update Solar Conditions
+            const solarDiv = document.getElementById('solar-conditions');
+            solarDiv.innerHTML = Object.entries(data.solar_conditions)
+                .map(([key, value]) => `
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
+                        <span class="font-semibold">${formatValue(key, value)}</span>
+                    </div>
+                `).join('');
+
+            // Update Band Conditions
+            const bandDiv = document.getElementById('band-conditions');
+            bandDiv.innerHTML = Object.entries(data.band_conditions)
+                .map(([band, conditions]) => `
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold mb-2">${band}</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-gray-400">Day:</span>
+                                <span class="ml-2 ${updateConditionClass(conditions.day)}">${conditions.day}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Night:</span>
+                                <span class="ml-2 ${updateConditionClass(conditions.night)}">${conditions.night}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+            // Update Weather Conditions
+            const weatherDiv = document.getElementById('weather-conditions');
+            if (data.weather_conditions) {
+                weatherDiv.innerHTML = Object.entries(data.weather_conditions)
+                    .filter(([key]) => key !== 'source')
+                    .map(([key, value]) => `
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
+                            <span class="font-semibold">${value}</span>
+                        </div>
+                    `).join('');
+            } else {
+                weatherDiv.innerHTML = '<p class="text-gray-400">Weather data not available</p>';
+            }
+
+            // Update DXCC Conditions
+            const dxccDiv = document.getElementById('dxcc-conditions');
+            console.log('DXCC data:', data.dxcc_conditions);  // Debug log
+            
+            if (data.dxcc_conditions) {
+                let dxccHtml = '';
+                
+                // Current DXCC Entity
+                if (data.dxcc_conditions.current_dxcc) {
+                    const current = data.dxcc_conditions.current_dxcc;
+                    console.log('Current DXCC:', current);  // Debug log
+                    dxccHtml += `
+                        <div class="mb-4">
+                            <h3 class="text-lg font-semibold mb-2">Current DXCC Entity</h3>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="text-gray-400">Name:</div>
+                                <div>${current.name}</div>
+                                <div class="text-gray-400">Continent:</div>
+                                <div>${current.continent}</div>
+                                <div class="text-gray-400">ITU Zone:</div>
+                                <div>${current.itu_zone}</div>
+                                <div class="text-gray-400">CQ Zone:</div>
+                                <div>${current.cq_zone}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Nearby DXCC Entities
+                if (data.dxcc_conditions.nearby_dxcc && data.dxcc_conditions.nearby_dxcc.length > 0) {
+                    console.log('Nearby DXCC:', data.dxcc_conditions.nearby_dxcc);  // Debug log
+                    dxccHtml += `
+                        <div class="mb-4">
+                            <h3 class="text-lg font-semibold mb-2">Nearby DXCC Entities</h3>
+                            <div class="space-y-2">
+                                ${data.dxcc_conditions.nearby_dxcc
+                                    .filter(entity => entity !== null)  // Filter out null entities
+                                    .map(entity => `
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div class="text-gray-400">Name:</div>
+                                            <div>${entity.name}</div>
+                                            <div class="text-gray-400">Continent:</div>
+                                            <div>${entity.continent}</div>
+                                            <div class="text-gray-400">ITU Zone:</div>
+                                            <div>${entity.itu_zone}</div>
+                                            <div class="text-gray-400">CQ Zone:</div>
+                                            <div>${entity.cq_zone}</div>
+                                        </div>
+                                    `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Propagation Conditions
+                if (data.dxcc_conditions.propagation_conditions) {
+                    const prop = data.dxcc_conditions.propagation_conditions;
+                    console.log('Propagation conditions:', prop);  // Debug log
+                    dxccHtml += `
+                        <div class="mb-4">
+                            <h3 class="text-lg font-semibold mb-2">Propagation Conditions</h3>
+                            <div class="space-y-2">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="text-gray-400">Best Bands:</div>
+                                    <div>${prop.best_bands.join(', ')}</div>
+                                    <div class="text-gray-400">Best Times:</div>
+                                    <div>${prop.best_times.join(', ')}</div>
+                                    <div class="text-gray-400">Best Directions:</div>
+                                    <div>${prop.best_directions.join(', ')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                console.log('Generated DXCC HTML:', dxccHtml);  // Debug log
+                dxccDiv.innerHTML = dxccHtml;
+            } else {
+                console.log('No DXCC data available');  // Debug log
+                dxccDiv.innerHTML = '<p class="text-gray-400">DXCC data not available</p>';
+            }
+
+            // Update Live Activity
+            const activityDiv = document.getElementById('live-activity');
+            if (data.live_activity) {
+                const activity = data.live_activity;
+                
+                // Update summary
+                const summaryDiv = document.getElementById('activity-summary');
+                const summary = activity.summary;
+                summaryDiv.innerHTML = `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Total Spots</div>
+                            <div class="text-xl font-semibold">${summary.total_spots}</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Active Bands</div>
+                            <div class="text-xl font-semibold">${summary.active_bands.join(', ') || 'None'}</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Active Modes</div>
+                            <div class="text-xl font-semibold">${summary.active_modes.join(', ') || 'None'}</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Active DXCC</div>
+                            <div class="text-xl font-semibold">${summary.active_dxcc.length}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Update spots table
+                const spotsBody = document.getElementById('spots-table-body');
+                if (activity.spots.length > 0) {
+                    spotsBody.innerHTML = activity.spots.map(spot => `
+                        <tr class="border-t border-gray-700 hover:bg-gray-800">
+                            <td class="px-4 py-2">${spot.timestamp || '-'}</td>
+                            <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
+                            <td class="px-4 py-2 font-mono">${spot.frequency || '-'}</td>
+                            <td class="px-4 py-2">${spot.mode || '-'}</td>
+                            <td class="px-4 py-2">${spot.band || '-'}</td>
+                            <td class="px-4 py-2">${spot.dxcc || '-'}</td>
+                            <td class="px-4 py-2 text-gray-400">${spot.comment || '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    spotsBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="px-4 py-2 text-center text-gray-400">
+                                No spots available at this time
+                            </td>
+                        </tr>
+                    `;
+                }
+            } else {
+                activityDiv.innerHTML = `
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <p class="text-gray-400 mb-2">Live spots data not available</p>
+                        <p class="text-sm text-gray-500">This could be due to:</p>
+                        <ul class="list-disc list-inside text-sm text-gray-500 mt-2">
+                            <li>API service is temporarily unavailable</li>
+                            <li>Network connectivity issues</li>
+                            <li>No current spots data</li>
+                        </ul>
+                        <p class="text-sm text-gray-500 mt-2">The data will automatically refresh in 5 minutes.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Fetch data every 5 minutes
+        function fetchData() {
+            fetch('/api/conditions')
+                .then(response => response.json())
+                .then(data => updateUI(data))
+                .catch(error => console.error('Error fetching data:', error));
+        }
+
+        // Initial fetch
+        fetchData();
+
+        // Update every 5 minutes
+        setInterval(fetchData, 300000);
+    </script>
+</body>
+</html> 
