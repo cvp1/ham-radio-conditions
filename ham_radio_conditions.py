@@ -376,47 +376,64 @@ class HamRadioConditions:
             return []
 
     def _get_dxcluster_spots(self):
-        """Fetch spots from DX Cluster"""
-        try:
-            import telnetlib
-            import re
-            
-            # Connect to DX Cluster
-            tn = telnetlib.Telnet('dxcluster.darc.de', 7300, timeout=5)
-            
-            # Login process
-            tn.read_until(b"login:", timeout=5)
-            tn.write(b"set/page 50\n")
-            tn.read_until(b"set/page 50", timeout=5)
-            tn.write(b"show/dx\n")
-            response = tn.read_until(b"show/dx", timeout=5)
-            tn.close()
-            
-            # Process spots
-            spots = []
-            spot_pattern = re.compile(r'(\d{4}Z)\s+(\w+)\s+(\d+\.\d+)\s+(\w+)\s+(\w+)\s+(\w+)\s+(.*)')
-            
-            for line in response.decode('utf-8', errors='ignore').split('\n'):
-                match = spot_pattern.search(line)
-                if match:
-                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
-                    spot = {
-                        'timestamp': timestamp,
-                        'callsign': callsign,
-                        'frequency': freq,
-                        'mode': mode,
-                        'band': band,
-                        'dxcc': dxcc,
-                        'comment': comment.strip(),
-                        'source': 'DX Cluster'
-                    }
-                    spots.append(spot)
-            
-            return spots
-            
-        except Exception as e:
-            print(f"Error fetching DX Cluster spots: {e}")
-            return []
+        """Fetch spots from DX Cluster with multiple server fallback"""
+        # List of DX Cluster servers to try
+        dx_servers = [
+            {'host': 'dxcluster.darc.de', 'port': 7300},
+            {'host': 'dxc.w1hkj.com', 'port': 7300},
+            {'host': 'dxc.ve7cc.net', 'port': 7300},
+            {'host': 'dxc.kc4zvh.com', 'port': 7300},
+            {'host': 'dxc.kc4zvh.com', 'port': 8000}
+        ]
+        
+        for server in dx_servers:
+            try:
+                import telnetlib
+                import re
+                
+                print(f"Trying DX Cluster server: {server['host']}:{server['port']}")
+                
+                # Connect to DX Cluster
+                tn = telnetlib.Telnet(server['host'], server['port'], timeout=5)
+                
+                # Login process
+                tn.read_until(b"login:", timeout=5)
+                tn.write(b"set/page 50\n")
+                tn.read_until(b"set/page 50", timeout=5)
+                tn.write(b"show/dx\n")
+                response = tn.read_until(b"show/dx", timeout=5)
+                tn.close()
+                
+                # Process spots
+                spots = []
+                spot_pattern = re.compile(r'(\d{4}Z)\s+(\w+)\s+(\d+\.\d+)\s+(\w+)\s+(\w+)\s+(\w+)\s+(.*)')
+                
+                for line in response.decode('utf-8', errors='ignore').split('\n'):
+                    match = spot_pattern.search(line)
+                    if match:
+                        timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
+                        spot = {
+                            'timestamp': timestamp,
+                            'callsign': callsign,
+                            'frequency': freq,
+                            'mode': mode,
+                            'band': band,
+                            'dxcc': dxcc,
+                            'comment': comment.strip(),
+                            'source': f"DX Cluster ({server['host']})"
+                        }
+                        spots.append(spot)
+                
+                if spots:
+                    print(f"Successfully fetched {len(spots)} spots from {server['host']}")
+                    return spots
+                
+            except Exception as e:
+                print(f"Error connecting to {server['host']}:{server['port']}: {e}")
+                continue
+        
+        print("All DX Cluster servers failed")
+        return []
 
     def _freq_to_band(self, freq):
         """Convert frequency to band name"""
