@@ -1,73 +1,68 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, render_template, jsonify
 from ham_radio_conditions import HamRadioConditions
+import os
+from dotenv import load_dotenv
 import threading
 import time
 from datetime import datetime
-import os
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-reporter = HamRadioConditions(
-    grid_square=os.getenv('GRID_SQUARE', 'DM41vv'),
-    temp_unit=os.getenv('TEMP_UNIT', 'F')
-)
-current_data = {
-    'timestamp': '',
-    'location': '',
-    'solar_conditions': {},
-    'band_conditions': {},
-    'weather_conditions': {}
-}
+ham_conditions = HamRadioConditions()
 
-def update_data():
-    """Background task to update data every hour"""
-    global current_data
+# Cache for conditions data
+_conditions_cache = None
+_conditions_cache_time = None
+_conditions_lock = threading.Lock()
+
+def update_conditions_cache():
+    """Update the conditions cache in the background."""
+    global _conditions_cache, _conditions_cache_time
     while True:
         try:
-            report = reporter.generate_report()
-            if report:
-                current_data = report
-                print(f"Data updated at {datetime.now()}")
-            else:
-                print(f"Failed to update data at {datetime.now()}")
+            with _conditions_lock:
+                _conditions_cache = ham_conditions.generate_report()
+                _conditions_cache_time = time.time()
+            time.sleep(300)  # Update every 5 minutes
         except Exception as e:
-            print(f"Error updating data: {str(e)}")
-        time.sleep(3600)  # Update every hour
+            print(f"Error updating conditions cache: {e}")
+            time.sleep(60)  # Wait a minute before retrying
+
+# Start background thread for conditions updates
+conditions_thread = threading.Thread(target=update_conditions_cache, daemon=True)
+conditions_thread.start()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """Render the main page with cached conditions data."""
+    global _conditions_cache
+    if _conditions_cache is None:
+        # If no cache exists yet, generate conditions immediately
+        with _conditions_lock:
+            _conditions_cache = ham_conditions.generate_report()
+            _conditions_cache_time = time.time()
+    
+    return render_template('index.html', data=_conditions_cache)
 
-@app.route('/api/conditions')
-def get_conditions():
-    global current_data
+@app.route('/api/spots')
+def get_spots():
+    """Get live spots data."""
     try:
-        # If data is empty or more than an hour old, fetch new data
-        if not current_data.get('timestamp') or \
-           (datetime.now() - datetime.fromisoformat(current_data['timestamp'])).total_seconds() > 3600:
-            current_data = reporter.generate_report()
-        return jsonify(current_data)
+        spots_data = ham_conditions.get_live_activity()
+        return jsonify(spots_data)
     except Exception as e:
-        print(f"Error serving conditions: {str(e)}")
+        print(f"Error fetching spots: {e}")
         return jsonify({
-            'error': 'Failed to fetch conditions',
-            'timestamp': datetime.now().isoformat(),
-            'location': reporter.grid_square,
-            'solar_conditions': {},
-            'band_conditions': {},
-            'weather_conditions': {}
+            'spots': [],
+            'summary': {
+                'total_spots': 0,
+                'active_bands': [],
+                'active_modes': [],
+                'active_dxcc': []
+            }
         })
 
 if __name__ == '__main__':
-    # Generate initial data
-    try:
-        current_data = reporter.generate_report()
-        print(f"Initial data fetched at {datetime.now()}")
-    except Exception as e:
-        print(f"Error fetching initial data: {str(e)}")
-    
-    # Start the background update thread
-    update_thread = threading.Thread(target=update_data, daemon=True)
-    update_thread.start()
-    
-    # Run the Flask app
-    app.run(host='0.0.0.0', port=8087) 
+    app.run(debug=True) 

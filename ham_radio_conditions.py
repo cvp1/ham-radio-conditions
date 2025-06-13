@@ -307,11 +307,44 @@ class HamRadioConditions:
 
     def get_live_activity(self):
         """Get live activity data from RBN."""
-        # Try to get spots from RBN
-        spots = self._get_rbn_spots()
-        
-        if not spots:
-            print("No spots available from RBN")
+        try:
+            # Try to get spots from RBN
+            spots = self._get_rbn_spots()
+            
+            if not spots:
+                print("No spots available from RBN")
+                return {
+                    'spots': [],
+                    'summary': {
+                        'total_spots': 0,
+                        'active_bands': [],
+                        'active_modes': [],
+                        'active_dxcc': []
+                    }
+                }
+            
+            # Process spots to get summary
+            bands = set()
+            modes = set()
+            dxcc_entities = set()
+            
+            for spot in spots:
+                bands.add(spot['band'])
+                modes.add(spot['mode'])
+                dxcc_entities.add(spot['dxcc'])
+            
+            return {
+                'spots': spots,
+                'summary': {
+                    'total_spots': len(spots),
+                    'active_bands': sorted(list(bands)),
+                    'active_modes': sorted(list(modes)),
+                    'active_dxcc': sorted(list(dxcc_entities))
+                }
+            }
+            
+        except Exception as e:
+            print(f"Error getting live activity: {e}")
             return {
                 'spots': [],
                 'summary': {
@@ -321,45 +354,38 @@ class HamRadioConditions:
                     'active_dxcc': []
                 }
             }
-        
-        # Process spots to get summary
-        bands = set()
-        modes = set()
-        dxcc_entities = set()
-        
-        for spot in spots:
-            bands.add(spot['band'])
-            modes.add(spot['mode'])
-            dxcc_entities.add(spot['dxcc'])
-        
-        return {
-            'spots': spots,
-            'summary': {
-                'total_spots': len(spots),
-                'active_bands': sorted(list(bands)),
-                'active_modes': sorted(list(modes)),
-                'active_dxcc': sorted(list(dxcc_entities))
-            }
-        }
 
     def generate_report(self):
-        """Generate a comprehensive report of current conditions"""
-        solar = self.get_solar_conditions()
-        bands = self.get_band_conditions()
-        weather = self.get_weather_conditions()
-        dxcc = self.get_dxcc_conditions()
-        live_activity = self.get_live_activity()
-        
-        return {
-            'timestamp': datetime.now().isoformat(),
-            'location': self.grid_square,
-            'callsign': self.callsign,
-            'solar_conditions': solar,
-            'band_conditions': bands,
-            'weather_conditions': weather,
-            'dxcc_conditions': dxcc,
-            'live_activity': live_activity
-        }
+        """Generate a report of current conditions."""
+        try:
+            # Get solar conditions
+            solar_conditions = self.get_solar_conditions()
+            
+            # Get band conditions
+            band_conditions = self.get_band_conditions()
+            
+            # Get weather conditions
+            weather_conditions = self.get_weather_conditions()
+            
+            # Get DXCC conditions
+            dxcc_conditions = self.get_dxcc_conditions()
+            
+            # Generate timestamp
+            timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+            
+            return {
+                'timestamp': timestamp,
+                'location': self.grid_square,
+                'callsign': self.callsign,
+                'solar_conditions': solar_conditions,
+                'band_conditions': band_conditions,
+                'weather_conditions': weather_conditions,
+                'dxcc_conditions': dxcc_conditions
+            }
+            
+        except Exception as e:
+            print(f"Error generating report: {e}")
+            return None
 
     def print_report(self, report):
         """Print the report in a formatted table"""
