@@ -9,7 +9,14 @@ import schedule
 import time
 import xml.etree.ElementTree as ET
 import math
-from dxcc_data import get_dxcc_info, get_dxcc_by_name, get_dxcc_by_continent, get_dxcc_by_grid
+from dxcc_data import (
+    get_dxcc_info,
+    get_dxcc_by_name,
+    get_dxcc_by_continent,
+    get_dxcc_by_grid,
+    get_nearby_dxcc,
+    get_propagation_conditions
+)
 from flask import Flask, request, jsonify, render_template
 import telnetlib
 import re
@@ -218,28 +225,16 @@ class HamRadioConditions:
                 current_dxcc['itu_zone'] = itu_zone
                 current_dxcc['cq_zone'] = cq_zone
             
-            # Get nearby DXCC entities based on the current entity's continent
-            nearby_dxcc = []
-            if current_dxcc:
-                # Get all entities in the same continent
-                continent_entities = get_dxcc_by_continent(current_dxcc['continent'])
-                # Filter out the current entity and limit to 5 nearby entities
-                nearby_dxcc = [
-                    entity for entity in continent_entities 
-                    if entity.get('dxcc_number') != current_dxcc.get('dxcc_number')
-                ][:5]
+            # Get nearby DXCC entities based on distance
+            nearby_dxcc = get_nearby_dxcc(self.grid_square, max_distance=2000.0)
             
-            # Filter out any None values from the nearby_dxcc list
-            nearby_dxcc = [entity for entity in nearby_dxcc if entity is not None]
+            # Get propagation conditions
+            propagation = get_propagation_conditions(self.grid_square)
             
             return {
                 'current_dxcc': current_dxcc,
                 'nearby_dxcc': nearby_dxcc,
-                'propagation_conditions': {
-                    'best_bands': ['20m', '40m'],
-                    'best_times': ['0000-0400 UTC', '1200-1600 UTC'],
-                    'best_directions': ['Europe', 'Asia']
-                }
+                'propagation_conditions': propagation
             }
         except Exception as e:
             print(f"Error fetching DXCC conditions: {e}")
@@ -499,4 +494,4 @@ app = Flask(__name__)
 def index():
     reporter = HamRadioConditions()
     data = reporter.generate_report()
-    return render_template('index.html', data=data) 
+    return render_template('index.html', data=data)

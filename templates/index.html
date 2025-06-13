@@ -87,12 +87,86 @@
                 <div id="weather-conditions" class="space-y-2"></div>
             </div>
 
-            <!-- DXCC Conditions -->
-            <div class="card rounded-lg p-6 lg:col-span-1">
-                <h2 class="text-2xl font-semibold mb-4">
-                    <i class="fas fa-globe-americas mr-2 section-icon icon-dxcc"></i>DXCC Conditions
-                </h2>
-                <div id="dxcc-conditions" class="space-y-4"></div>
+            <!-- DXCC Information -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">DXCC Information</h2>
+                {% if data.dxcc_conditions %}
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-2">Current Location</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-gray-600">Entity:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.name }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">Continent:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.continent }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">ITU Zone:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.itu_zone }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">CQ Zone:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.cq_zone }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">Prefixes:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.prefixes|join(', ') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">Timezone:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.timezone }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-2">Nearby Entities</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="px-4 py-2 text-left">Entity</th>
+                                        <th class="px-4 py-2 text-left">Distance</th>
+                                        <th class="px-4 py-2 text-left">Continent</th>
+                                        <th class="px-4 py-2 text-left">Prefixes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entity in data.dxcc_conditions.nearby_dxcc %}
+                                    <tr class="border-t">
+                                        <td class="px-4 py-2">{{ entity.name }}</td>
+                                        <td class="px-4 py-2">{{ entity.distance }} km</td>
+                                        <td class="px-4 py-2">{{ entity.continent }}</td>
+                                        <td class="px-4 py-2">{{ entity.prefixes|join(', ') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-medium mb-2">Propagation Conditions</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <p class="text-gray-600">Best Bands:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.propagation_conditions.best_bands|join(', ') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">Best Times:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.propagation_conditions.best_times|join(', ') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600">Best Directions:</p>
+                                <p class="font-medium">{{ data.dxcc_conditions.propagation_conditions.best_directions|join(', ') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="text-gray-500">DXCC information not available</p>
+                {% endif %}
             </div>
 
             <!-- Live Spots -->
