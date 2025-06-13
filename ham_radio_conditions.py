@@ -245,72 +245,73 @@ class HamRadioConditions:
             print(f"Error fetching DXCC conditions: {e}")
             return None
 
-    def get_live_activity(self):
-        """Fetch live activity data from multiple sources and combine results"""
+    def _get_rbn_spots(self):
+        """Get spots from Reverse Beacon Network."""
         try:
-            import telnetlib
-            import re
-            from datetime import datetime, timedelta
+            print("Connecting to RBN...")
+            # Connect to RBN
+            tn = telnetlib.Telnet('telnet.reversebeacon.net', 7000, timeout=5)
             
-            # Cache key based on current time (rounded to nearest minute)
-            cache_key = datetime.utcnow().replace(second=0, microsecond=0)
+            # Login as guest
+            tn.read_until(b"login:", timeout=5)
+            tn.write(b"guest\n")
+            tn.read_until(b"password:", timeout=5)
+            tn.write(b"guest\n")
             
-            # Check if we have cached data that's less than 5 minutes old
-            if hasattr(self, '_spots_cache') and hasattr(self, '_spots_cache_time'):
-                if (cache_key - self._spots_cache_time) < timedelta(minutes=5):
-                    return self._spots_cache
+            # Set page size and show spots
+            tn.write(b"set/page 50\n")
+            tn.write(b"show/dx\n")
             
-            # Initialize sets for tracking unique spots
-            all_spots = []
-            active_bands = set()
-            active_modes = set()
-            active_dxcc = set()
+            # Read response
+            response = tn.read_until(b"\n", timeout=5).decode('utf-8', errors='ignore')
+            spots_data = []
             
-            # Get spots from RBN
-            rbn_spots = self._get_rbn_spots()
-            if rbn_spots:
-                all_spots.extend(rbn_spots)
+            # Read spots until we get a prompt or timeout
+            while True:
+                try:
+                    line = tn.read_until(b"\n", timeout=2).decode('utf-8', errors='ignore')
+                    if not line or '>' in line:
+                        break
+                    spots_data.append(line.strip())
+                except (EOFError, ConnectionResetError):
+                    break
             
-            # Get spots from DX Cluster
-            dx_spots = self._get_dxcluster_spots()
-            if dx_spots:
-                all_spots.extend(dx_spots)
+            tn.close()
             
-            # Process all spots
-            for spot in all_spots:
-                active_bands.add(spot['band'])
-                active_modes.add(spot['mode'])
-                if spot.get('dxcc'):
-                    active_dxcc.add(spot['dxcc'])
+            # Process spots
+            spots = []
+            for spot in spots_data:
+                # Parse spot data using regex
+                match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+) (\d+\.\d+) (\w+) (\w+) (\w+) (.+)', spot)
+                if match:
+                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
+                    spots.append({
+                        'timestamp': timestamp,
+                        'callsign': callsign,
+                        'frequency': freq,
+                        'mode': mode,
+                        'band': band,
+                        'dxcc': dxcc,
+                        'comment': comment,
+                        'source': 'RBN'
+                    })
             
-            # Sort spots by timestamp (most recent first)
-            all_spots.sort(key=lambda x: x['timestamp'], reverse=True)
-            
-            # Limit to last 50 spots
-            all_spots = all_spots[:50]
-            
-            # Create the response structure
-            result = {
-                'spots': all_spots,
-                'summary': {
-                    'total_spots': len(all_spots),
-                    'active_bands': sorted(list(active_bands)),
-                    'active_modes': sorted(list(active_modes)),
-                    'active_dxcc': sorted(list(active_dxcc))
-                }
-            }
-            
-            # Cache the result
-            self._spots_cache = result
-            self._spots_cache_time = cache_key
-            
-            return result
-            
+            if spots:
+                print(f"Successfully fetched {len(spots)} spots from RBN")
+                return spots
+                
         except Exception as e:
-            print(f"Error fetching live activity: {e}")
-            # Return cached data if available, otherwise return empty structure
-            if hasattr(self, '_spots_cache'):
-                return self._spots_cache
+            print(f"Error fetching RBN spots: {str(e)}")
+        
+        return []
+
+    def get_live_activity(self):
+        """Get live activity data from RBN."""
+        # Try to get spots from RBN
+        spots = self._get_rbn_spots()
+        
+        if not spots:
+            print("No spots available from RBN")
             return {
                 'spots': [],
                 'summary': {
@@ -320,164 +321,26 @@ class HamRadioConditions:
                     'active_dxcc': []
                 }
             }
-
-    def _get_rbn_spots(self):
-        """Fetch spots from Reverse Beacon Network"""
-        try:
-            import telnetlib
-            import re
-            from datetime import datetime
-            
-            # Connect to RBN
-            tn = telnetlib.Telnet('telnet.reversebeacon.net', 7000, timeout=5)
-            
-            # Login process
-            tn.read_until(b"login: ", timeout=5)
-            tn.write(b"guest\n")
-            tn.read_until(b"password: ", timeout=5)
-            tn.write(b"\n")
-            tn.read_until(b"Welcome to the Reverse Beacon Network", timeout=5)
-            
-            # Get recent spots
-            tn.write(b"sh/dx on\n")
-            response = tn.read_until(b"<CMD>", timeout=5).decode('utf-8', errors='ignore')
-            tn.close()
-            
-            # Process spots
-            spots = []
-            spot_pattern = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +(\d+\.\d+) +(\w+) +(\w+) +(\w+) +(.+)')
-            
-            for line in response.split('\n'):
-                match = spot_pattern.search(line)
-                if match:
-                    try:
-                        time_str, freq, mode, callsign, dxcc, comment = match.groups()
-                        freq_float = float(freq)
-                        
-                        # Convert frequency to band
-                        band = self._freq_to_band(freq_float)
-                        
-                        spot = {
-                            'timestamp': time_str,
-                            'callsign': callsign,
-                            'frequency': freq,
-                            'mode': mode,
-                            'band': band,
-                            'dxcc': dxcc,
-                            'comment': comment.strip(),
-                            'source': 'RBN'
-                        }
-                        spots.append(spot)
-                    except Exception as spot_error:
-                        print(f"Error processing RBN spot: {spot_error}")
-                        continue
-            
-            return spots
-            
-        except Exception as e:
-            print(f"Error fetching RBN spots: {e}")
-            return []
-
-    def _get_dxcluster_spots(self):
-        """Get spots from DX Cluster servers with fallback."""
-        # List of verified working public DX Cluster servers with IP fallbacks
-        servers = [
-            # W1HKJ DX Cluster (US)
-            ('dxc.w1hkj.com', 7300),
-            ('50.116.34.98', 7300),  # IP fallback for W1HKJ
-            
-            # VE7CC DX Cluster (Canada)
-            ('dxc.ve7cc.net', 7300),
-            ('142.4.208.226', 7300),  # IP fallback for VE7CC
-            
-            # KC4ZVH DX Cluster (US) - primary port only
-            ('dxc.kc4zvh.com', 7300),
-            ('50.116.34.98', 7300),  # IP fallback for KC4ZVH
-        ]
-
-        spots = []
-        for host, port in servers:
-            try:
-                print(f"Trying DX Cluster server: {host}:{port}")
-                
-                # Connect to DX Cluster with a shorter timeout
-                tn = telnetlib.Telnet(host, port, timeout=3)
-                
-                # Set page size and show DX spots
-                tn.write(b"set/page 50\n")
-                tn.write(b"show/dx\n")
-                
-                # Read response
-                response = tn.read_until(b"\n", timeout=3).decode('utf-8', errors='ignore')
-                spots_data = []
-                
-                # Read spots until we get a prompt or timeout
-                while True:
-                    try:
-                        line = tn.read_until(b"\n", timeout=1).decode('utf-8', errors='ignore')
-                        if not line or '>' in line:
-                            break
-                        spots_data.append(line.strip())
-                    except (EOFError, ConnectionResetError):
-                        break
-                
-                tn.close()
-                
-                # Process spots
-                for spot in spots_data:
-                    # Parse spot data using regex
-                    match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+) (\d+\.\d+) (\w+) (\w+) (\w+) (.+)', spot)
-                    if match:
-                        timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
-                        spots.append({
-                            'timestamp': timestamp,
-                            'callsign': callsign,
-                            'frequency': freq,
-                            'mode': mode,
-                            'band': band,
-                            'dxcc': dxcc,
-                            'comment': comment,
-                            'source': f'DX Cluster ({host})'
-                        })
-                
-                if spots:
-                    print(f"Successfully fetched {len(spots)} spots from {host}:{port}")
-                    return spots
-                    
-            except (socket.gaierror, socket.timeout, ConnectionRefusedError) as e:
-                print(f"Error connecting to {host}:{port}: {str(e)}")
-                continue
-            except Exception as e:
-                print(f"Unexpected error with {host}:{port}: {str(e)}")
-                continue
         
-        print("All DX Cluster servers failed")
-        return []
-
-    def _freq_to_band(self, freq):
-        """Convert frequency to band name"""
-        if freq < 1.8:
-            return '160m'
-        elif freq < 3.5:
-            return '80m'
-        elif freq < 7.0:
-            return '40m'
-        elif freq < 10.1:
-            return '30m'
-        elif freq < 14.0:
-            return '20m'
-        elif freq < 18.068:
-            return '17m'
-        elif freq < 21.0:
-            return '15m'
-        elif freq < 24.89:
-            return '12m'
-        elif freq < 28.0:
-            return '10m'
-        elif freq < 50.0:
-            return '6m'
-        else:
-            return 'VHF+'
+        # Process spots to get summary
+        bands = set()
+        modes = set()
+        dxcc_entities = set()
+        
+        for spot in spots:
+            bands.add(spot['band'])
+            modes.add(spot['mode'])
+            dxcc_entities.add(spot['dxcc'])
+        
+        return {
+            'spots': spots,
+            'summary': {
+                'total_spots': len(spots),
+                'active_bands': sorted(list(bands)),
+                'active_modes': sorted(list(modes)),
+                'active_dxcc': sorted(list(dxcc_entities))
+            }
+        }
 
     def generate_report(self):
         """Generate a comprehensive report of current conditions"""
