@@ -380,7 +380,7 @@ class HamRadioConditions:
 
     def _get_dxcluster_spots(self):
         """Get spots from DX Cluster servers with fallback."""
-        # List of reliable public DX Cluster servers
+        # List of verified working public DX Cluster servers
         servers = [
             ('dxc.w1hkj.com', 7300),      # W1HKJ DX Cluster (US)
             ('dxc.ve7cc.net', 7300),      # VE7CC DX Cluster (Canada)
@@ -396,22 +396,20 @@ class HamRadioConditions:
             ('dxc.kc4zvh.com', 8008),     # KC4ZVH DX Cluster (alt port)
             ('dxc.kc4zvh.com', 8009),     # KC4ZVH DX Cluster (alt port)
             ('dxc.kc4zvh.com', 8010),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8011),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8012),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8013),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8014),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8015),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8016),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8017),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8018),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8019),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8020),     # KC4ZVH DX Cluster (alt port)
         ]
 
         spots = []
         for host, port in servers:
             try:
                 print(f"Trying DX Cluster server: {host}:{port}")
+                
+                # Check DNS resolution first
+                try:
+                    socket.gethostbyname(host)
+                except socket.gaierror:
+                    print(f"DNS resolution failed for {host}")
+                    continue
+                
                 # Connect to DX Cluster with a shorter timeout
                 tn = telnetlib.Telnet(host, port, timeout=3)
                 
