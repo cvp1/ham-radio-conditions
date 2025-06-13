@@ -1,7 +1,7 @@
 import os
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 from tabulate import tabulate
 from dotenv import load_dotenv
@@ -10,6 +10,7 @@ import time
 import xml.etree.ElementTree as ET
 import math
 from dxcc_data import get_dxcc_info, get_dxcc_by_name, get_dxcc_by_continent, get_dxcc_by_grid
+from flask import Flask, request, jsonify, render_template
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,7 @@ class HamRadioConditions:
         self.openweather_api_key = os.getenv('OPENWEATHER_API_KEY')
         self.lat, self.lon = self.grid_to_latlon(grid_square)
         self.weather_api_key = os.getenv('WEATHER_API_KEY')
+        self.callsign = os.getenv('CALLSIGN', 'N/A')
         
     def grid_to_latlon(self, grid_square):
         """Convert Maidenhead grid square to latitude and longitude"""
@@ -241,90 +243,113 @@ class HamRadioConditions:
             return None
 
     def get_live_activity(self):
-        """Fetch live activity data from IARC"""
+        """Fetch live activity data from AR-Cluster via telnet"""
         try:
-            # Fetch data from IARC API
-            headers = {
-                'User-Agent': 'HamRadioConditions/1.0',
-                'Accept': 'application/json'
+            import telnetlib
+            import re
+            from datetime import datetime, timedelta
+            
+            # Cache key based on current time (rounded to nearest minute)
+            cache_key = datetime.utcnow().replace(second=0, microsecond=0)
+            
+            # Check if we have cached data that's less than 5 minutes old
+            if hasattr(self, '_spots_cache') and hasattr(self, '_spots_cache_time'):
+                if (cache_key - self._spots_cache_time) < timedelta(minutes=5):
+                    return self._spots_cache
+            
+            # Connect to AR-Cluster with a shorter timeout
+            tn = telnetlib.Telnet('dxcluster.darc.de', 7300, timeout=5)
+            
+            # Read the welcome message
+            tn.read_until(b"login:", timeout=5)
+            
+            # Send login command
+            tn.write(b"set/page 50\n")
+            tn.read_until(b"set/page 50", timeout=5)
+            
+            # Send show/dx command
+            tn.write(b"show/dx\n")
+            response = tn.read_until(b"show/dx", timeout=5)
+            
+            # Parse the response
+            spots = []
+            active_bands = set()
+            active_modes = set()
+            active_dxcc = set()
+            
+            # Regular expression to match spot lines
+            spot_pattern = re.compile(r'(\d{4}Z)\s+(\w+)\s+(\d+\.\d+)\s+(\w+)\s+(\w+)\s+(\w+)\s+(.*)')
+            
+            for line in response.decode('utf-8', errors='ignore').split('\n'):
+                match = spot_pattern.search(line)
+                if match:
+                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
+                    spot = {
+                        'timestamp': timestamp,
+                        'callsign': callsign,
+                        'frequency': freq,
+                        'mode': mode,
+                        'band': band,
+                        'dxcc': dxcc,
+                        'comment': comment.strip()
+                    }
+                    spots.append(spot)
+                    active_bands.add(band)
+                    active_modes.add(mode)
+                    active_dxcc.add(dxcc)
+            
+            # Close the connection
+            tn.close()
+            
+            # Create the response structure
+            result = {
+                'spots': spots,
+                'summary': {
+                    'total_spots': len(spots),
+                    'active_bands': sorted(list(active_bands)),
+                    'active_modes': sorted(list(active_modes)),
+                    'active_dxcc': sorted(list(active_dxcc))
+                }
             }
-            response = requests.get('https://holycluster.iarc.org/api/v1/spots', headers=headers)
-            response.raise_for_status()
-            data = response.json()
-
-            print(f"Received {len(data)} spots from IARC API")  # Debug log
-
-            # Process the data
-            activity_data = {
-                'timestamp': datetime.now().isoformat(),
+            
+            # Cache the result
+            self._spots_cache = result
+            self._spots_cache_time = cache_key
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error fetching live activity: {e}")
+            # Return cached data if available, otherwise return empty structure
+            if hasattr(self, '_spots_cache'):
+                return self._spots_cache
+            return {
                 'spots': [],
                 'summary': {
                     'total_spots': 0,
-                    'active_bands': set(),
-                    'active_modes': set(),
-                    'active_dxcc': set()
+                    'active_bands': [],
+                    'active_modes': [],
+                    'active_dxcc': []
                 }
             }
 
-            # Process each spot
-            for spot in data:
-                try:
-                    spot_info = {
-                        'callsign': spot.get('callsign', ''),
-                        'frequency': spot.get('frequency', ''),
-                        'mode': spot.get('mode', ''),
-                        'dxcc': spot.get('dxcc', ''),
-                        'band': spot.get('band', ''),
-                        'timestamp': spot.get('timestamp', ''),
-                        'comment': spot.get('comment', '')
-                    }
-                    
-                    activity_data['spots'].append(spot_info)
-                    
-                    # Update summary
-                    activity_data['summary']['total_spots'] += 1
-                    if spot_info['band']:
-                        activity_data['summary']['active_bands'].add(spot_info['band'])
-                    if spot_info['mode']:
-                        activity_data['summary']['active_modes'].add(spot_info['mode'])
-                    if spot_info['dxcc']:
-                        activity_data['summary']['active_dxcc'].add(spot_info['dxcc'])
-                except Exception as spot_error:
-                    print(f"Error processing spot: {spot_error}")
-                    continue
-
-            # Convert sets to lists for JSON serialization
-            activity_data['summary']['active_bands'] = sorted(list(activity_data['summary']['active_bands']))
-            activity_data['summary']['active_modes'] = sorted(list(activity_data['summary']['active_modes']))
-            activity_data['summary']['active_dxcc'] = sorted(list(activity_data['summary']['active_dxcc']))
-
-            print(f"Processed {activity_data['summary']['total_spots']} spots successfully")  # Debug log
-            return activity_data
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching live activity from IARC API: {e}")
-            if hasattr(e.response, 'text'):
-                print(f"API Response: {e.response.text}")
-            return None
-        except Exception as e:
-            print(f"Unexpected error in get_live_activity: {e}")
-            return None
-
     def generate_report(self):
-        """Generate a complete report of all conditions"""
+        """Generate a comprehensive report of current conditions"""
         solar = self.get_solar_conditions()
         bands = self.get_band_conditions()
         weather = self.get_weather_conditions()
         dxcc = self.get_dxcc_conditions()
-        activity = self.get_live_activity()
+        live_activity = self.get_live_activity()
         
         return {
             'timestamp': datetime.now().isoformat(),
             'location': self.grid_square,
+            'callsign': self.callsign,
             'solar_conditions': solar,
             'band_conditions': bands,
             'weather_conditions': weather,
             'dxcc_conditions': dxcc,
-            'live_activity': activity
+            'live_activity': live_activity
         }
 
     def print_report(self, report):
@@ -431,4 +456,12 @@ def main():
         time.sleep(1)
 
 if __name__ == "__main__":
-    main() 
+    main()
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    reporter = HamRadioConditions()
+    data = reporter.generate_report()
+    return render_template('index.html', data=data) 
