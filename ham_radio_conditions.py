@@ -380,12 +380,11 @@ class HamRadioConditions:
 
     def _get_dxcluster_spots(self):
         """Get spots from DX Cluster servers with fallback."""
-        # List of DX Cluster servers to try
+        # List of reliable public DX Cluster servers
         servers = [
-            ('dxcluster.darc.de', 7300),  # DARC DX Cluster
-            ('dxc.w1hkj.com', 7300),      # W1HKJ DX Cluster
-            ('dxc.ve7cc.net', 7300),      # VE7CC DX Cluster
-            ('dxc.kc4zvh.com', 7300),     # KC4ZVH DX Cluster
+            ('dxc.w1hkj.com', 7300),      # W1HKJ DX Cluster (US)
+            ('dxc.ve7cc.net', 7300),      # VE7CC DX Cluster (Canada)
+            ('dxc.kc4zvh.com', 7300),     # KC4ZVH DX Cluster (US)
             ('dxc.kc4zvh.com', 8000),     # KC4ZVH DX Cluster (alt port)
             ('dxc.kc4zvh.com', 8001),     # KC4ZVH DX Cluster (alt port)
             ('dxc.kc4zvh.com', 8002),     # KC4ZVH DX Cluster (alt port)
@@ -397,27 +396,37 @@ class HamRadioConditions:
             ('dxc.kc4zvh.com', 8008),     # KC4ZVH DX Cluster (alt port)
             ('dxc.kc4zvh.com', 8009),     # KC4ZVH DX Cluster (alt port)
             ('dxc.kc4zvh.com', 8010),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8011),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8012),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8013),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8014),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8015),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8016),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8017),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8018),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8019),     # KC4ZVH DX Cluster (alt port)
+            ('dxc.kc4zvh.com', 8020),     # KC4ZVH DX Cluster (alt port)
         ]
 
         spots = []
         for host, port in servers:
             try:
                 print(f"Trying DX Cluster server: {host}:{port}")
-                # Connect to DX Cluster
-                tn = telnetlib.Telnet(host, port, timeout=5)
+                # Connect to DX Cluster with a shorter timeout
+                tn = telnetlib.Telnet(host, port, timeout=3)
                 
                 # Set page size and show DX spots
                 tn.write(b"set/page 50\n")
                 tn.write(b"show/dx\n")
                 
                 # Read response
-                response = tn.read_until(b"\n", timeout=5).decode('utf-8', errors='ignore')
+                response = tn.read_until(b"\n", timeout=3).decode('utf-8', errors='ignore')
                 spots_data = []
                 
                 # Read spots until we get a prompt or timeout
                 while True:
                     try:
-                        line = tn.read_until(b"\n", timeout=2).decode('utf-8', errors='ignore')
+                        line = tn.read_until(b"\n", timeout=1).decode('utf-8', errors='ignore')
                         if not line or '>' in line:
                             break
                         spots_data.append(line.strip())
