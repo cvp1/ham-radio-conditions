@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  ham_conditions:
+    build: .
+    ports:
+      - "8087:8087"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - GRID_SQUARE=${GRID_SQUARE:-DM41vv}
+      - TEMP_UNIT=${TEMP_UNIT:-F}
+    volumes:
+      - .:/app
+    restart: unless-stopped 
