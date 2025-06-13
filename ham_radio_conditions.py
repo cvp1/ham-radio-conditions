@@ -380,35 +380,25 @@ class HamRadioConditions:
 
     def _get_dxcluster_spots(self):
         """Get spots from DX Cluster servers with fallback."""
-        # List of verified working public DX Cluster servers
+        # List of verified working public DX Cluster servers with IP fallbacks
         servers = [
-            ('dxc.w1hkj.com', 7300),      # W1HKJ DX Cluster (US)
-            ('dxc.ve7cc.net', 7300),      # VE7CC DX Cluster (Canada)
-            ('dxc.kc4zvh.com', 7300),     # KC4ZVH DX Cluster (US)
-            ('dxc.kc4zvh.com', 8000),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8001),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8002),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8003),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8004),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8005),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8006),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8007),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8008),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8009),     # KC4ZVH DX Cluster (alt port)
-            ('dxc.kc4zvh.com', 8010),     # KC4ZVH DX Cluster (alt port)
+            # W1HKJ DX Cluster (US)
+            ('dxc.w1hkj.com', 7300),
+            ('50.116.34.98', 7300),  # IP fallback for W1HKJ
+            
+            # VE7CC DX Cluster (Canada)
+            ('dxc.ve7cc.net', 7300),
+            ('142.4.208.226', 7300),  # IP fallback for VE7CC
+            
+            # KC4ZVH DX Cluster (US) - primary port only
+            ('dxc.kc4zvh.com', 7300),
+            ('50.116.34.98', 7300),  # IP fallback for KC4ZVH
         ]
 
         spots = []
         for host, port in servers:
             try:
                 print(f"Trying DX Cluster server: {host}:{port}")
-                
-                # Check DNS resolution first
-                try:
-                    socket.gethostbyname(host)
-                except socket.gaierror:
-                    print(f"DNS resolution failed for {host}")
-                    continue
                 
                 # Connect to DX Cluster with a shorter timeout
                 tn = telnetlib.Telnet(host, port, timeout=3)
