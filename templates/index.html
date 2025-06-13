@@ -29,6 +29,24 @@
         .section-icon:hover {
             transform: scale(1.1);
         }
+
+        /* Loading animation */
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid #EC4899;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -81,6 +99,7 @@
             <div class="card rounded-lg p-6 lg:col-span-2">
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-spots"></i>Live Spots
+                    <span id="spots-loading" class="loading-spinner ml-2"></span>
                 </h2>
                 <div id="live-activity">
                     <div id="activity-summary" class="mb-4">
@@ -132,24 +151,12 @@
     </div>
 
     <script>
-        function updateConditionClass(condition) {
-            condition = condition.toLowerCase();
-            if (condition.includes('good')) return 'condition-good';
-            if (condition.includes('fair')) return 'condition-fair';
-            if (condition.includes('poor')) return 'condition-poor';
-            return '';
-        }
+        // Load initial conditions data immediately
+        const initialData = JSON.parse(document.getElementById('data').textContent);
+        updateConditionsUI(initialData);
 
-        function formatValue(key, value) {
-            if (key === 'sfi') return `${value} SFI`;
-            if (key === 'a_index') return `A-Index: ${value}`;
-            if (key === 'k_index') return `K-Index: ${value}`;
-            return value;
-        }
-
-        function updateUI(data) {
-            console.log('Updating UI with data:', data);  // Debug log
-            
+        // Function to update conditions UI
+        function updateConditionsUI(data) {
             // Update timestamp and location
             document.getElementById('timestamp').textContent = `Last Updated: ${data.timestamp}`;
             document.getElementById('location').textContent = `Location: ${data.location}`;
@@ -212,15 +219,12 @@
 
             // Update DXCC Conditions
             const dxccDiv = document.getElementById('dxcc-conditions');
-            console.log('DXCC data:', data.dxcc_conditions);  // Debug log
-            
             if (data.dxcc_conditions) {
                 let dxccHtml = '';
                 
                 // Current DXCC Entity
                 if (data.dxcc_conditions.current_dxcc) {
                     const current = data.dxcc_conditions.current_dxcc;
-                    console.log('Current DXCC:', current);  // Debug log
                     dxccHtml += `
                         <div class="mb-4">
                             <h3 class="text-lg font-semibold mb-2">Current DXCC Entity</h3>
@@ -240,13 +244,12 @@
 
                 // Nearby DXCC Entities
                 if (data.dxcc_conditions.nearby_dxcc && data.dxcc_conditions.nearby_dxcc.length > 0) {
-                    console.log('Nearby DXCC:', data.dxcc_conditions.nearby_dxcc);  // Debug log
                     dxccHtml += `
                         <div class="mb-4">
                             <h3 class="text-lg font-semibold mb-2">Nearby DXCC Entities</h3>
                             <div class="space-y-2">
                                 ${data.dxcc_conditions.nearby_dxcc
-                                    .filter(entity => entity !== null)  // Filter out null entities
+                                    .filter(entity => entity !== null)
                                     .map(entity => `
                                         <div class="grid grid-cols-2 gap-2">
                                             <div class="text-gray-400">Name:</div>
@@ -267,7 +270,6 @@
                 // Propagation Conditions
                 if (data.dxcc_conditions.propagation_conditions) {
                     const prop = data.dxcc_conditions.propagation_conditions;
-                    console.log('Propagation conditions:', prop);  // Debug log
                     dxccHtml += `
                         <div class="mb-4">
                             <h3 class="text-lg font-semibold mb-2">Propagation Conditions</h3>
@@ -285,20 +287,32 @@
                     `;
                 }
 
-                console.log('Generated DXCC HTML:', dxccHtml);  // Debug log
                 dxccDiv.innerHTML = dxccHtml;
             } else {
-                console.log('No DXCC data available');  // Debug log
                 dxccDiv.innerHTML = '<p class="text-gray-400">DXCC data not available</p>';
             }
         }
 
-        // Load initial data
-        const initialData = JSON.parse(document.getElementById('data').textContent);
-        updateUI(initialData);
+        function updateConditionClass(condition) {
+            condition = condition.toLowerCase();
+            if (condition.includes('good')) return 'condition-good';
+            if (condition.includes('fair')) return 'condition-fair';
+            if (condition.includes('poor')) return 'condition-poor';
+            return '';
+        }
+
+        function formatValue(key, value) {
+            if (key === 'sfi') return `${value} SFI`;
+            if (key === 'a_index') return `A-Index: ${value}`;
+            if (key === 'k_index') return `K-Index: ${value}`;
+            return value;
+        }
 
         // Function to fetch spots data
         async function fetchSpots() {
+            const loadingSpinner = document.getElementById('spots-loading');
+            loadingSpinner.style.display = 'inline-block';
+            
             try {
                 const response = await fetch('/api/spots');
                 if (!response.ok) {
@@ -313,6 +327,8 @@
                         Error loading live spots: ${error.message}
                     </div>
                 `;
+            } finally {
+                loadingSpinner.style.display = 'none';
             }
         }
 
@@ -360,7 +376,7 @@
                             <td class="px-4 py-2">${spot.band || '-'}</td>
                             <td class="px-4 py-2">${spot.dxcc || '-'}</td>
                             <td class="px-4 py-2">
-                                <span class="px-2 py-1 rounded text-sm ${spot.source === 'RBN' ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
+                                <span class="px-2 py-1 rounded text-sm ${spot.source?.includes('RBN') ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
                                     ${spot.source || '-'}
                                 </span>
                             </td>
