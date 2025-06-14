@@ -62,6 +62,11 @@
         {{ data|tojson|safe }}
     </script>
 
+    <!-- Hidden element for initial data -->
+    <script id="initial-data" type="application/json">
+        {{ data|tojson|safe }}
+    </script>
+
     <div class="container mx-auto px-4 py-8">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-bold mb-2">Ham Radio Conditions</h1>
@@ -69,13 +74,90 @@
             <p class="text-gray-400" id="location"></p>
         </header>
 
+        <!-- Error Message -->
+        <div id="error-message" class="bg-red-500 text-white p-4 rounded-lg mb-4" style="display: none;"></div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Weather Conditions -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-cloud mr-2 section-icon icon-weather"></i>Weather Conditions
+                </h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Temperature</div>
+                            <div class="text-xl font-semibold" id="temperature">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Humidity</div>
+                            <div class="text-xl font-semibold" id="humidity">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Pressure</div>
+                            <div class="text-xl font-semibold" id="pressure">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Description</div>
+                            <div class="text-xl font-semibold" id="description">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">City</div>
+                            <div class="text-xl font-semibold" id="city">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">State</div>
+                            <div class="text-xl font-semibold" id="state">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Solar Conditions -->
             <div class="card rounded-lg p-6">
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-sun mr-2 section-icon icon-solar"></i>Solar Conditions
                 </h2>
-                <div id="solar-conditions" class="space-y-2"></div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">SFI</div>
+                            <div class="text-xl font-semibold" id="sfi">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">A-Index</div>
+                            <div class="text-xl font-semibold" id="a-index">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">K-Index</div>
+                            <div class="text-xl font-semibold" id="k-index">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Aurora</div>
+                            <div class="text-xl font-semibold" id="aurora">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">X-Ray</div>
+                            <div class="text-xl font-semibold" id="xray">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Sunspots</div>
+                            <div class="text-xl font-semibold" id="sunspots">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Proton Flux</div>
+                            <div class="text-xl font-semibold" id="proton-flux">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Electron Flux</div>
+                            <div class="text-xl font-semibold" id="electron-flux">Loading...</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg col-span-2">
+                            <div class="text-gray-400">Last Updated</div>
+                            <div class="text-xl font-semibold" id="solar-updated">Loading...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Band Conditions -->
@@ -83,15 +165,62 @@
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-band"></i>Band Conditions
                 </h2>
-                <div id="band-conditions" class="space-y-4"></div>
-            </div>
-
-            <!-- Weather Conditions -->
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4">
-                    <i class="fas fa-cloud-sun mr-2 section-icon icon-weather"></i>Weather Conditions
-                </h2>
-                <div id="weather-conditions" class="space-y-2"></div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">80m-40m</div>
+                            <div class="text-xl font-semibold" id="band-80m-40m">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-400">Day:</span>
+                                    <span class="day-condition text-green-400">Loading...</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <span class="text-gray-400">Night:</span>
+                                    <span class="night-condition text-blue-400">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">30m-20m</div>
+                            <div class="text-xl font-semibold" id="band-30m-20m">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-400">Day:</span>
+                                    <span class="day-condition text-green-400">Loading...</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <span class="text-gray-400">Night:</span>
+                                    <span class="night-condition text-blue-400">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">17m-15m</div>
+                            <div class="text-xl font-semibold" id="band-17m-15m">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-400">Day:</span>
+                                    <span class="day-condition text-green-400">Loading...</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <span class="text-gray-400">Night:</span>
+                                    <span class="night-condition text-blue-400">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">12m-10m</div>
+                            <div class="text-xl font-semibold" id="band-12m-10m">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-400">Day:</span>
+                                    <span class="day-condition text-green-400">Loading...</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <span class="text-gray-400">Night:</span>
+                                    <span class="night-condition text-blue-400">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Propagation Summary -->
@@ -99,586 +228,438 @@
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-propagation"></i>Propagation Summary
                 </h2>
-                <div id="propagation-summary" class="space-y-4">
-                    {% if data.propagation_summary %}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- Time and Day/Night -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Current Time</div>
-                            <div class="text-xl font-semibold">{{ data.propagation_summary.current_time }}</div>
-                            <div class="text-sm text-gray-400">{{ data.propagation_summary.day_night }}</div>
-                            <div class="text-sm text-gray-400">Sunrise: {{ data.propagation_summary.sunrise }}</div>
-                            <div class="text-sm text-gray-400">Sunset: {{ data.propagation_summary.sunset }}</div>
-                        </div>
+                <div id="propagation-summary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Time and Day/Night -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">Current Time</div>
+                        <div class="text-xl font-semibold" id="current-time">Loading...</div>
+                        <div class="text-sm text-gray-400" id="day-night">Loading...</div>
+                        <div class="text-sm text-gray-400">Sunrise: <span id="sunrise">Loading...</span></div>
+                        <div class="text-sm text-gray-400">Sunset: <span id="sunset">Loading...</span></div>
+                    </div>
 
-                        <!-- Solar Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Solar Conditions</div>
-                            <div class="space-y-1">
-                                <div>SFI: {{ data.propagation_summary.solar_conditions.sfi }}</div>
-                                <div>A-Index: {{ data.propagation_summary.solar_conditions.a_index }}</div>
-                                <div>K-Index: {{ data.propagation_summary.solar_conditions.k_index }}</div>
-                                <div>Aurora: {{ data.propagation_summary.solar_conditions.aurora }}</div>
-                            </div>
-                        </div>
-
-                        <!-- MUF and Best Bands -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">MUF</div>
-                            <div class="text-xl font-semibold">{{ data.propagation_summary.muf }}</div>
-                            <div class="text-gray-400 mt-2">Best Bands</div>
-                            <div class="text-lg">{{ data.propagation_summary.best_bands|join(', ') }}</div>
-                        </div>
-
-                        <!-- Propagation Quality -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Overall Quality</div>
-                            <div class="text-xl font-semibold {{ data.propagation_summary.propagation_quality|lower }}-quality">
-                                {{ data.propagation_summary.propagation_quality }}
-                            </div>
-                        </div>
-
-                        <!-- Aurora Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Aurora Conditions</div>
-                            <div class="text-lg">{{ data.propagation_summary.aurora_conditions }}</div>
-                        </div>
-
-                        <!-- Tropospheric Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Tropospheric Conditions</div>
-                            <div class="text-lg">{{ data.propagation_summary.tropo_conditions }}</div>
+                    <!-- Solar Conditions -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">Solar Conditions</div>
+                        <div class="space-y-1">
+                            <div>SFI: <span id="sfi">Loading...</span></div>
+                            <div>A-Index: <span id="a-index">Loading...</span></div>
+                            <div>K-Index: <span id="k-index">Loading...</span></div>
+                            <div>Aurora: <span id="aurora">Loading...</span></div>
                         </div>
                     </div>
 
-                    <!-- Current Band Conditions -->
-                    <div class="mt-4">
-                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {% for band, conditions in data.propagation_summary.band_conditions.items() %}
-                            <div class="bg-gray-800 p-3 rounded-lg">
-                                <div class="text-gray-400">{{ band }}</div>
-                                <div class="grid grid-cols-2 gap-2 mt-1">
-                                    <div>
-                                        <span class="text-sm text-gray-400">Day:</span>
-                                        <span class="ml-1 {{ conditions.day|lower }}-condition">{{ conditions.day }}</span>
-                                    </div>
-                                    <div>
-                                        <span class="text-sm text-gray-400">Night:</span>
-                                        <span class="ml-1 {{ conditions.night|lower }}-condition">{{ conditions.night }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
+                    <!-- MUF and Best Bands -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">MUF</div>
+                        <div class="text-xl font-semibold" id="muf">Loading...</div>
+                        <div class="text-gray-400 mt-2">Best Bands</div>
+                        <div class="text-lg" id="best-bands">Loading...</div>
                     </div>
-                    {% else %}
-                    <p class="text-gray-400">Propagation data not available</p>
-                    {% endif %}
+
+                    <!-- Propagation Quality -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">Overall Quality</div>
+                        <div class="text-xl font-semibold" id="propagation-quality">Loading...</div>
+                    </div>
+
+                    <!-- Aurora Conditions -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">Aurora Conditions</div>
+                        <div class="text-lg" id="aurora-conditions">Loading...</div>
+                    </div>
+
+                    <!-- Tropospheric Conditions -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">Tropospheric Conditions</div>
+                        <div class="text-lg" id="tropo-conditions">Loading...</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- DXCC Information -->
-            {% if data.dxcc_conditions %}
+            <!-- DXCC Conditions -->
             <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4 flex items-center">
-                    <i class="fas fa-globe-americas mr-2"></i>
-                    DXCC Information
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-globe-americas mr-2 section-icon icon-dxcc"></i>DXCC Conditions
                 </h2>
-                
-                <!-- Current Location -->
-                <div class="mb-6">
-                    <h3 class="text-lg font-medium mb-3">Current Location</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-gray-400">Name</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.name }}</p>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Name</div>
+                            <div class="text-xl font-semibold" id="dxcc-name">Loading...</div>
                         </div>
-                        <div>
-                            <p class="text-gray-400">Continent</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.continent }}</p>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Continent</div>
+                            <div class="text-xl font-semibold" id="dxcc-continent">Loading...</div>
                         </div>
-                        <div>
-                            <p class="text-gray-400">ITU Zone</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.itu_zone }}</p>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">ITU Zone</div>
+                            <div class="text-xl font-semibold" id="dxcc-itu-zone">Loading...</div>
                         </div>
-                        <div>
-                            <p class="text-gray-400">CQ Zone</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.cq_zone }}</p>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">CQ Zone</div>
+                            <div class="text-xl font-semibold" id="dxcc-cq-zone">Loading...</div>
                         </div>
-                        <div>
-                            <p class="text-gray-400">Prefixes</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.prefixes|join(', ') }}</p>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Prefixes</div>
+                            <div class="text-xl font-semibold" id="dxcc-prefixes">Loading...</div>
                         </div>
-                        <div>
-                            <p class="text-gray-400">Timezone</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.timezone }}</p>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Timezone</div>
+                            <div class="text-xl font-semibold" id="dxcc-timezone">Loading...</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Nearby Entities -->
-                {% if data.dxcc_conditions.nearby %}
-                <div class="mb-6">
-                    <h3 class="text-lg font-medium mb-3">Nearby Entities</h3>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="text-gray-400">
-                                    <th class="text-left py-2">Name</th>
-                                    <th class="text-left py-2">Distance</th>
-                                    <th class="text-left py-2">Continent</th>
-                                    <th class="text-left py-2">Prefixes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for entity in data.dxcc_conditions.nearby %}
-                                <tr class="border-t border-gray-700">
-                                    <td class="py-2">{{ entity.name }}</td>
-                                    <td class="py-2">{{ entity.distance }} km</td>
-                                    <td class="py-2">{{ entity.continent }}</td>
-                                    <td class="py-2">{{ entity.prefixes|join(', ') }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Propagation Conditions -->
-                {% if data.dxcc_conditions.propagation %}
-                <div>
-                    <h3 class="text-lg font-medium mb-3">Propagation Conditions</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-gray-400">Best Bands</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_bands|join(', ') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Best Times</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_times|join(', ') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Best Directions</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_directions|join(', ') }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
             </div>
-            {% else %}
-            <div class="card rounded-lg p-6">
-                <p class="text-gray-400">DXCC information not available</p>
-            </div>
-            {% endif %}
 
             <!-- Live Spots -->
-            <div class="card rounded-lg p-6 lg:col-span-2">
+            <div class="card rounded-lg p-6">
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-spots"></i>Live Spots
-                    <span id="spots-loading" class="loading-spinner ml-2"></span>
                 </h2>
-                <div id="live-activity">
-                    <div id="activity-summary" class="mb-4">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div class="bg-gray-800 p-4 rounded-lg">
-                                <div class="text-gray-400">Total Spots</div>
-                                <div class="text-xl font-semibold">-</div>
-                            </div>
-                            <div class="bg-gray-800 p-4 rounded-lg">
-                                <div class="text-gray-400">Active Bands</div>
-                                <div class="text-xl font-semibold">-</div>
-                            </div>
-                            <div class="bg-gray-800 p-4 rounded-lg">
-                                <div class="text-gray-400">Active Modes</div>
-                                <div class="text-xl font-semibold">-</div>
-                            </div>
-                            <div class="bg-gray-800 p-4 rounded-lg">
-                                <div class="text-gray-400">Active DXCC</div>
-                                <div class="text-xl font-semibold">-</div>
-                            </div>
-                        </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <button onclick="querySpots()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh Spots
+                        </button>
+                        <div class="text-sm text-gray-400" id="spots-last-updated">Last updated: Never</div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="text-left">
-                                    <th class="px-4 py-2">Time</th>
-                                    <th class="px-4 py-2">Callsign</th>
-                                    <th class="px-4 py-2">Frequency</th>
-                                    <th class="px-4 py-2">Mode</th>
-                                    <th class="px-4 py-2">Band</th>
-                                    <th class="px-4 py-2">DXCC</th>
-                                    <th class="px-4 py-2">Source</th>
-                                    <th class="px-4 py-2">Comment</th>
-                                </tr>
-                            </thead>
-                            <tbody id="spots-table-body">
-                                <tr>
-                                    <td colspan="8" class="px-4 py-2 text-center text-gray-400">
-                                        Loading spots data...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div id="spots-container">
+                        <!-- Band Statistics -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-semibold mb-3">Band Activity</h3>
+                            <div id="band-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                        </div>
+                        
+                        <!-- Map Container -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-semibold mb-3">Spot Map</h3>
+                            <div id="spots-map" class="h-96 bg-gray-800 rounded-lg"></div>
+                        </div>
+
+                        <!-- Spots List -->
+                        <div>
+                            <h3 class="text-lg font-semibold mb-3">Recent Spots</h3>
+                            <div id="spots-list" class="space-y-2"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Load initial conditions data immediately
-        const initialData = JSON.parse(document.getElementById('data').textContent);
-        updateConditionsUI(initialData);
+    <!-- Add Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-        // Function to update conditions UI
-        function updateConditionsUI(data) {
+    <script>
+        // Initialize data with server-provided values
+        const initialData = JSON.parse(document.getElementById('initial-data').textContent);
+        let data = initialData;
+
+        // Initialize map
+        let spotsMap = null;
+        let markers = [];
+
+        function initMap() {
+            if (spotsMap) {
+                spotsMap.remove();
+            }
+            
+            spotsMap = L.map('spots-map').setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(spotsMap);
+        }
+
+        // Function to update the page content
+        function updateContent() {
+            fetch('/api/conditions')
+                .then(response => response.json())
+                .then(newData => {
+                    data = newData;
+                    updateUI();
+                })
+                .catch(error => {
+                    console.error('Error fetching conditions:', error);
+                    document.getElementById('last-updated').textContent = 'Error updating data';
+                });
+        }
+
+        // Function to update UI elements
+        function updateUI() {
+            if (data.error) {
+                // Show error message
+                document.getElementById('error-message').textContent = data.error;
+                document.getElementById('error-message').style.display = 'block';
+                return;
+            }
+
+            // Hide error message if it exists
+            const errorElement = document.getElementById('error-message');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+
             // Update timestamp and location
             document.getElementById('timestamp').textContent = `Last Updated: ${data.timestamp}`;
             document.getElementById('location').textContent = `Location: ${data.location}`;
 
-            // Update Solar Conditions
-            const solarDiv = document.getElementById('solar-conditions');
-            solarDiv.innerHTML = Object.entries(data.solar_conditions)
-                .map(([key, value]) => `
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                        <span class="font-semibold">${formatValue(key, value)}</span>
-                    </div>
-                `).join('');
+            // Update propagation summary
+            const summary = data.propagation_summary;
+            if (summary) {
+                document.getElementById('current-time').textContent = summary.current_time;
+                document.getElementById('day-night').textContent = summary.day_night;
+                document.getElementById('sunrise').textContent = summary.sunrise;
+                document.getElementById('sunset').textContent = summary.sunset;
+                document.getElementById('muf').textContent = summary.muf;
+                document.getElementById('best-bands').textContent = summary.best_bands.join(', ');
+                document.getElementById('propagation-quality').textContent = summary.propagation_quality;
+                document.getElementById('aurora-conditions').textContent = summary.aurora_conditions;
+                document.getElementById('tropo-conditions').textContent = summary.tropo_conditions;
 
-            // Update Band Conditions
-            const bandDiv = document.getElementById('band-conditions');
-            bandDiv.innerHTML = Object.entries(data.band_conditions)
-                .map(([band, conditions]) => `
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold mb-2">${band}</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <span class="text-gray-400">Day:</span>
-                                <span class="ml-2 ${updateConditionClass(conditions.day)}">${conditions.day}</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400">Night:</span>
-                                <span class="ml-2 ${updateConditionClass(conditions.night)}">${conditions.night}</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-            // Update Weather Conditions
-            const weatherDiv = document.getElementById('weather-conditions');
-            if (data.weather_conditions) {
-                weatherDiv.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-400">CALLSIGN</span>
-                        <span class="font-semibold">${data.callsign || 'N/A'}</span>
-                    </div>
-                    ${data.weather_conditions.city && data.weather_conditions.state ? `
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">LOCATION</span>
-                            <span class="font-semibold">${data.weather_conditions.city}, ${data.weather_conditions.state}</span>
-                        </div>
-                    ` : ''}
-                    ${Object.entries(data.weather_conditions)
-                        .filter(([key]) => !['source', 'city', 'state'].includes(key))
-                        .map(([key, value]) => `
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                                <span class="font-semibold">${value}</span>
-                            </div>
-                        `).join('')}
-                    <div class="flex justify-between items-center text-sm text-gray-400">
-                        <span>Source:</span>
-                        <span>${data.weather_conditions.source}</span>
-                    </div>
-                `;
-            } else {
-                weatherDiv.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-400">CALLSIGN</span>
-                        <span class="font-semibold">${data.callsign || 'N/A'}</span>
-                    </div>
-                    <p class="text-gray-400">Weather data not available</p>
-                `;
+                // Update solar conditions from propagation summary
+                if (summary.solar_conditions) {
+                    document.getElementById('sfi').textContent = summary.solar_conditions.sfi;
+                    document.getElementById('a-index').textContent = summary.solar_conditions.a_index;
+                    document.getElementById('k-index').textContent = summary.solar_conditions.k_index;
+                    document.getElementById('aurora').textContent = summary.solar_conditions.aurora;
+                }
+            }
+            
+            // Update weather conditions
+            const weather = data.weather_conditions;
+            if (weather) {
+                document.getElementById('temperature').textContent = weather.temperature;
+                document.getElementById('humidity').textContent = weather.humidity;
+                document.getElementById('pressure').textContent = weather.pressure;
+                document.getElementById('description').textContent = weather.description;
+                document.getElementById('city').textContent = weather.city;
+                document.getElementById('state').textContent = weather.state;
+            }
+            
+            // Update solar conditions
+            const solar = data.solar_conditions;
+            if (solar) {
+                document.getElementById('sfi').textContent = solar.sfi;
+                document.getElementById('a-index').textContent = solar.a_index;
+                document.getElementById('k-index').textContent = solar.k_index;
+                document.getElementById('aurora').textContent = solar.aurora;
+                document.getElementById('xray').textContent = solar.xray;
+                document.getElementById('sunspots').textContent = solar.sunspots;
+                document.getElementById('proton-flux').textContent = solar.proton_flux;
+                document.getElementById('electron-flux').textContent = solar.electron_flux;
+                document.getElementById('solar-updated').textContent = solar.updated;
             }
 
-            // Update Propagation Summary
-            const propagationDiv = document.getElementById('propagation-summary');
-            if (data.propagation_summary) {
-                const summary = data.propagation_summary;
-                propagationDiv.innerHTML = `
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- Time and Day/Night -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Current Time</div>
-                            <div class="text-xl font-semibold">${summary.current_time}</div>
-                            <div class="text-sm text-gray-400">${summary.day_night}</div>
-                            <div class="text-sm text-gray-400">Sunrise: ${summary.sunrise}</div>
-                            <div class="text-sm text-gray-400">Sunset: ${summary.sunset}</div>
-                        </div>
-
-                        <!-- Solar Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Solar Conditions</div>
-                            <div class="space-y-1">
-                                <div>SFI: ${summary.solar_conditions.sfi}</div>
-                                <div>A-Index: ${summary.solar_conditions.a_index}</div>
-                                <div>K-Index: ${summary.solar_conditions.k_index}</div>
-                                <div>Aurora: ${summary.solar_conditions.aurora}</div>
-                            </div>
-                        </div>
-
-                        <!-- MUF and Best Bands -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">MUF</div>
-                            <div class="text-xl font-semibold">${summary.muf}</div>
-                            <div class="text-gray-400 mt-2">Best Bands</div>
-                            <div class="text-lg">${summary.best_bands.join(', ')}</div>
-                        </div>
-
-                        <!-- Propagation Quality -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Overall Quality</div>
-                            <div class="text-xl font-semibold ${getPropagationQualityClass(summary.propagation_quality)}">
-                                ${summary.propagation_quality}
-                            </div>
-                        </div>
-
-                        <!-- Aurora Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Aurora Conditions</div>
-                            <div class="text-lg">${summary.aurora_conditions}</div>
-                        </div>
-
-                        <!-- Tropospheric Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Tropospheric Conditions</div>
-                            <div class="text-lg">${summary.tropo_conditions}</div>
-                        </div>
-                    </div>
-
-                    <!-- Current Band Conditions -->
-                    <div class="mt-4">
-                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            ${Object.entries(summary.band_conditions)
-                                .map(([band, condition]) => `
-                                    <div class="bg-gray-800 p-3 rounded-lg">
-                                        <div class="text-gray-400">${band}</div>
-                                        <div class="grid grid-cols-2 gap-2 mt-1">
-                                            <div>
-                                                <span class="text-sm text-gray-400">Day:</span>
-                                                <span class="ml-1 ${updateConditionClass(condition)}">${condition}</span>
-                                            </div>
-                                            <div>
-                                                <span class="text-sm text-gray-400">Night:</span>
-                                                <span class="ml-1 ${updateConditionClass(condition)}">${condition}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                        </div>
-                    </div>
-                `;
-            } else {
-                propagationDiv.innerHTML = '<p class="text-gray-400">Propagation data not available</p>';
+            // Update band conditions
+            const bands = data.band_conditions;
+            if (bands) {
+                Object.entries(bands).forEach(([band, conditions]) => {
+                    const element = document.getElementById(`band-${band}`);
+                    if (element) {
+                        const dayCondition = element.querySelector('.day-condition');
+                        const nightCondition = element.querySelector('.night-condition');
+                        
+                        // Set day condition with color
+                        dayCondition.textContent = conditions.day;
+                        dayCondition.className = `day-condition ${getConditionColor(conditions.day)}`;
+                        
+                        // Set night condition with color
+                        nightCondition.textContent = conditions.night;
+                        nightCondition.className = `night-condition ${getConditionColor(conditions.night)}`;
+                    }
+                });
             }
 
-            // Update DXCC Conditions
-            const dxccDiv = document.getElementById('dxcc-conditions');
-            if (data.dxcc_conditions) {
-                let dxccHtml = '';
+            // Update DXCC conditions
+            const dxcc = data.dxcc_conditions;
+            if (dxcc && dxcc.current) {
+                document.getElementById('dxcc-name').textContent = dxcc.current.name;
+                document.getElementById('dxcc-continent').textContent = dxcc.current.continent;
+                document.getElementById('dxcc-itu-zone').textContent = dxcc.current.itu_zone;
+                document.getElementById('dxcc-cq-zone').textContent = dxcc.current.cq_zone;
+                document.getElementById('dxcc-prefixes').textContent = dxcc.current.prefixes.join(', ');
+                document.getElementById('dxcc-timezone').textContent = dxcc.current.timezone;
+            }
+            
+            // Update last updated time
+            document.getElementById('last-updated').textContent = new Date().toLocaleString();
+        }
+
+        // Function to get color class based on condition
+        function getConditionColor(condition) {
+            switch(condition.toLowerCase()) {
+                case 'excellent':
+                    return 'text-green-400';
+                case 'good':
+                    return 'text-green-300';
+                case 'fair':
+                    return 'text-yellow-400';
+                case 'poor':
+                    return 'text-red-400';
+                default:
+                    return 'text-gray-400';
+            }
+        }
+
+        // Function to query spots
+        function querySpots() {
+            const spotsContainer = document.getElementById('spots-container');
+            const spotsList = document.getElementById('spots-list');
+            const bandStats = document.getElementById('band-stats');
+            const spotsLastUpdated = document.getElementById('spots-last-updated');
+            
+            // Show loading state
+            spotsList.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div><div class="mt-2 text-gray-400">Loading spots...</div></div>';
+            bandStats.innerHTML = '';
+            
+            // Initialize map if not already done
+            if (!spotsMap) {
+                initMap();
+            }
+            
+            fetch('/api/query_spots', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Received spots data:', data);
                 
-                // Current DXCC Entity
-                if (data.dxcc_conditions.current_dxcc) {
-                    const current = data.dxcc_conditions.current_dxcc;
-                    dxccHtml += `
-                        <div class="mb-4">
-                            <h3 class="text-lg font-semibold mb-2">Current DXCC Entity</h3>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div class="text-gray-400">Name:</div>
-                                <div>${current.name}</div>
-                                <div class="text-gray-400">Continent:</div>
-                                <div>${current.continent}</div>
-                                <div class="text-gray-400">ITU Zone:</div>
-                                <div>${current.itu_zone}</div>
-                                <div class="text-gray-400">CQ Zone:</div>
-                                <div>${current.cq_zone}</div>
-                            </div>
+                // Clear existing markers
+                markers.forEach(marker => marker.remove());
+                markers = [];
+                
+                // Update band statistics
+                const bandCounts = {};
+                data.spots.forEach(spot => {
+                    bandCounts[spot.band] = (bandCounts[spot.band] || 0) + 1;
+                });
+                
+                bandStats.innerHTML = Object.entries(bandCounts)
+                    .map(([band, count]) => `
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">${band}</div>
+                            <div class="text-xl font-semibold">${count} spots</div>
                         </div>
-                    `;
-                }
-
-                // Nearby DXCC Entities
-                if (data.dxcc_conditions.nearby_dxcc && data.dxcc_conditions.nearby_dxcc.length > 0) {
-                    dxccHtml += `
-                        <div class="mb-4">
-                            <h3 class="text-lg font-semibold mb-2">Nearby DXCC Entities</h3>
-                            <div class="space-y-2">
-                                ${data.dxcc_conditions.nearby_dxcc
-                                    .filter(entity => entity !== null)
-                                    .map(entity => `
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <div class="text-gray-400">Name:</div>
-                                            <div>${entity.name}</div>
-                                            <div class="text-gray-400">Continent:</div>
-                                            <div>${entity.continent}</div>
-                                            <div class="text-gray-400">ITU Zone:</div>
-                                            <div>${entity.itu_zone}</div>
-                                            <div class="text-gray-400">CQ Zone:</div>
-                                            <div>${entity.cq_zone}</div>
-                                        </div>
-                                    `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                // Propagation Conditions
-                if (data.dxcc_conditions.propagation) {
-                    const prop = data.dxcc_conditions.propagation;
-                    dxccHtml += `
-                        <div class="mb-4">
-                            <h3 class="text-lg font-semibold mb-2">Propagation Conditions</h3>
-                            <div class="space-y-2">
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div class="text-gray-400">Best Bands:</div>
-                                    <div>${prop.best_bands.join(', ')}</div>
-                                    <div class="text-gray-400">Best Times:</div>
-                                    <div>${prop.best_times.join(', ')}</div>
-                                    <div class="text-gray-400">Best Directions:</div>
-                                    <div>${prop.best_directions.join(', ')}</div>
+                    `).join('');
+                
+                // Update spots list and map
+                spotsList.innerHTML = '';
+                if (data.spots && data.spots.length > 0) {
+                    data.spots.forEach(spot => {
+                        // Add spot to list
+                        const spotElement = document.createElement('div');
+                        spotElement.className = 'spot-item bg-gray-800 p-4 rounded-lg';
+                        spotElement.innerHTML = `
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <div class="text-gray-400">Time</div>
+                                    <div class="text-lg">${spot.timestamp}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">Callsign</div>
+                                    <div class="text-lg">${spot.callsign}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">Frequency</div>
+                                    <div class="text-lg">${spot.frequency} MHz</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">Mode</div>
+                                    <div class="text-lg">${spot.mode}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">Band</div>
+                                    <div class="text-lg">${spot.band}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">DXCC</div>
+                                    <div class="text-lg">${spot.dxcc}</div>
+                                </div>
+                                <div class="col-span-2">
+                                    <div class="text-gray-400">Comment</div>
+                                    <div class="text-lg">${spot.comment}</div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                }
+                        `;
+                        spotsList.appendChild(spotElement);
 
-                dxccDiv.innerHTML = dxccHtml;
-            } else {
-                dxccDiv.innerHTML = '<p class="text-gray-400">DXCC data not available</p>';
-            }
-        }
+                        // Add spot to map if coordinates are available
+                        if (spot.source_lat && spot.source_lon && spot.dest_lat && spot.dest_lon) {
+                            // Add source marker
+                            const sourceMarker = L.marker([spot.source_lat, spot.source_lon])
+                                .bindPopup(`Source: ${spot.callsign}<br>Band: ${spot.band}<br>Mode: ${spot.mode}`);
+                            sourceMarker.addTo(spotsMap);
+                            markers.push(sourceMarker);
 
-        function updateConditionClass(condition) {
-            condition = condition.toLowerCase();
-            if (condition.includes('good')) return 'condition-good';
-            if (condition.includes('fair')) return 'condition-fair';
-            if (condition.includes('poor')) return 'condition-poor';
-            return '';
-        }
+                            // Add destination marker
+                            const destMarker = L.marker([spot.dest_lat, spot.dest_lon])
+                                .bindPopup(`Destination: ${spot.dxcc}<br>Band: ${spot.band}<br>Mode: ${spot.mode}`);
+                            destMarker.addTo(spotsMap);
+                            markers.push(destMarker);
 
-        function getPropagationQualityClass(quality) {
-            quality = quality.toLowerCase();
-            if (quality === 'excellent') return 'propagation-excellent';
-            if (quality === 'good') return 'propagation-good';
-            if (quality === 'fair') return 'propagation-fair';
-            if (quality === 'poor') return 'propagation-poor';
-            return '';
-        }
+                            // Add line between points
+                            const line = L.polyline([[spot.source_lat, spot.source_lon], [spot.dest_lat, spot.dest_lon]], {
+                                color: getBandColor(spot.band),
+                                weight: 2,
+                                opacity: 0.7
+                            }).addTo(spotsMap);
+                            markers.push(line);
+                        }
+                    });
 
-        function formatValue(key, value) {
-            if (key === 'sfi') return `${value} SFI`;
-            if (key === 'a_index') return `A-Index: ${value}`;
-            if (key === 'k_index') return `K-Index: ${value}`;
-            return value;
-        }
-
-        // Function to fetch spots data
-        async function fetchSpots() {
-            const loadingSpinner = document.getElementById('spots-loading');
-            loadingSpinner.style.display = 'inline-block';
-            
-            try {
-                const response = await fetch('/api/spots');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const spotsData = await response.json();
-                updateSpotsUI(spotsData);
-            } catch (error) {
-                console.error('Error fetching spots:', error);
-                document.getElementById('live-activity').innerHTML = `
-                    <div class="text-red-500">
-                        Error loading live spots: ${error.message}
-                    </div>
-                `;
-            } finally {
-                loadingSpinner.style.display = 'none';
-            }
-        }
-
-        // Function to update spots UI
-        function updateSpotsUI(data) {
-            const activityDiv = document.getElementById('live-activity');
-            if (!activityDiv) return;
-            
-            // Update summary
-            const summaryDiv = document.getElementById('activity-summary');
-            if (summaryDiv && data.summary) {
-                const summaryHtml = `
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Total Spots</div>
-                            <div class="text-xl font-semibold">${data.summary.total_spots || 0}</div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Active Bands</div>
-                            <div class="text-xl font-semibold">${data.summary.active_bands?.join(', ') || 'None'}</div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Active Modes</div>
-                            <div class="text-xl font-semibold">${data.summary.active_modes?.join(', ') || 'None'}</div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Active DXCC</div>
-                            <div class="text-xl font-semibold">${data.summary.active_dxcc?.length || 0}</div>
-                        </div>
-                    </div>
-                `;
-                summaryDiv.innerHTML = summaryHtml;
-            }
-            
-            // Update spots table
-            const tableBody = document.getElementById('spots-table-body');
-            if (tableBody) {
-                if (data.spots && data.spots.length > 0) {
-                    tableBody.innerHTML = data.spots.map(spot => `
-                        <tr class="border-t border-gray-700 hover:bg-gray-800">
-                            <td class="px-4 py-2">${spot.timestamp || '-'}</td>
-                            <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
-                            <td class="px-4 py-2 font-mono">${spot.frequency || '-'}</td>
-                            <td class="px-4 py-2">${spot.mode || '-'}</td>
-                            <td class="px-4 py-2">${spot.band || '-'}</td>
-                            <td class="px-4 py-2">${spot.dxcc || '-'}</td>
-                            <td class="px-4 py-2">
-                                <span class="px-2 py-1 rounded text-sm ${spot.source?.includes('RBN') ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
-                                    ${spot.source || '-'}
-                                </span>
-                            </td>
-                            <td class="px-4 py-2 text-gray-400">${spot.comment || '-'}</td>
-                        </tr>
-                    `).join('');
+                    // Fit map to show all markers
+                    if (markers.length > 0) {
+                        const group = new L.featureGroup(markers);
+                        spotsMap.fitBounds(group.getBounds().pad(0.1));
+                    }
                 } else {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="8" class="px-4 py-2 text-center text-gray-400">
-                                No spots available at this time
-                            </td>
-                        </tr>
-                    `;
+                    spotsList.innerHTML = '<div class="text-center text-gray-400 py-4">No spots available</div>';
                 }
-            }
+
+                // Update last updated time
+                spotsLastUpdated.textContent = `Last updated: ${new Date().toLocaleString()}`;
+            })
+            .catch(error => {
+                console.error('Error fetching spots:', error);
+                spotsList.innerHTML = '<div class="text-center text-red-500 py-4">Error loading spots: ' + error.message + '</div>';
+                bandStats.innerHTML = '';
+            });
         }
 
-        // Initial spots load
-        fetchSpots();
+        // Function to get color based on band
+        function getBandColor(band) {
+            const colors = {
+                '160m': '#FF0000',
+                '80m': '#FF7F00',
+                '40m': '#FFFF00',
+                '30m': '#00FF00',
+                '20m': '#0000FF',
+                '17m': '#4B0082',
+                '15m': '#9400D3',
+                '12m': '#FF1493',
+                '10m': '#00FFFF'
+            };
+            return colors[band] || '#FFFFFF';
+        }
 
-        // Update spots every 5 minutes
-        setInterval(fetchSpots, 5 * 60 * 1000);
+        // Initial spots query
+        querySpots();
+
+        // Update content every 5 minutes
+        setInterval(updateContent, 5 * 60 * 1000);
+        
+        // Initial update
+        updateUI();
     </script>
 </body>
 </html> 

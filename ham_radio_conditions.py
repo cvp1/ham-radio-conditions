@@ -21,7 +21,7 @@ from flask import Flask, request, jsonify, render_template
 import telnetlib
 import re
 import socket
-from typing import Dict
+from typing import Dict, Optional, Union, List
 import pytz
 import logging
 from flask_caching import Cache
@@ -37,11 +37,150 @@ logger.addHandler(handler)
 # Load environment variables
 load_dotenv()
 
+class PSKReporterAPI:
+    """PSKReporter API client"""
+    
+    BASE_URL = "https://retrieve.pskreporter.info/query"
+    
+    def __init__(self, timeout: int = 30):
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'PSKReporter-Python-Client/1.0'
+        })
+    
+    def get_spots(self, 
+                  callsign: Optional[str] = None,
+                  receiving_callsign: Optional[str] = None,
+                  time_low: Optional[Union[int, datetime]] = None,
+                  time_high: Optional[Union[int, datetime]] = None,
+                  freq_low: Optional[int] = None,
+                  freq_high: Optional[int] = None,
+                  mode: Optional[str] = None,
+                  rronly: bool = True,
+                  format_type: str = "json") -> Dict:
+        """Get spots from PSKReporter"""
+        params = {}
+        
+        # Add callsign filters
+        if callsign:
+            params['callsign'] = callsign.upper()
+        if receiving_callsign:
+            params['rrcallsign'] = receiving_callsign.upper()
+            
+        # Handle time parameters
+        if time_low:
+            if isinstance(time_low, datetime):
+                params['timeLow'] = int(time_low.timestamp())
+            else:
+                params['timeLow'] = time_low
+                
+        if time_high:
+            if isinstance(time_high, datetime):
+                params['timeHigh'] = int(time_high.timestamp())
+            else:
+                params['timeHigh'] = time_high
+                
+        # Add frequency filters
+        if freq_low:
+            params['fLow'] = freq_low
+        if freq_high:
+            params['fHigh'] = freq_high
+            
+        # Add mode filter
+        if mode:
+            params['mode'] = mode.upper()
+            
+        # Add other parameters
+        if rronly:
+            params['rronly'] = 1
+            
+        params['format'] = format_type
+        
+        try:
+            response = self.session.get(
+                self.BASE_URL, 
+                params=params, 
+                timeout=self.timeout
+            )
+            
+            response.raise_for_status()
+            
+            if not response.text.strip():
+                logger.warning("Empty response from API")
+                return {'receptionReport': []}
+            
+            # Check if response is XML
+            content_type = response.headers.get('content-type', '').lower()
+            if 'xml' in content_type or response.text.strip().startswith('<?xml'):
+                logger.info("Parsing XML response")
+                return self._parse_xml_response(response.text)
+            elif format_type.lower() == 'json':
+                logger.info("Parsing JSON response")
+                try:
+                    return response.json()
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON decode error: {e}")
+                    # Try parsing as XML if JSON fails
+                    return self._parse_xml_response(response.text)
+            else:
+                return {'raw_data': response.text}
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {e}")
+            raise
+    
+    def _parse_xml_response(self, xml_text: str) -> Dict:
+        """Parse XML response from PSKReporter API"""
+        try:
+            root = ET.fromstring(xml_text)
+            reports = []
+            
+            for report in root.findall('receptionReport'):
+                report_data = {
+                    'receiverCallsign': report.get('receiverCallsign', ''),
+                    'transmitterCallsign': report.get('senderCallsign', ''),
+                    'receiverLocator': report.get('receiverLocator', ''),
+                    'transmitterLocator': report.get('senderLocator', ''),
+                    'frequency': int(report.get('frequency', 0)),
+                    'flowStartSeconds': int(report.get('flowStartSeconds', 0)),
+                    'mode': report.get('mode', ''),
+                    'sNR': int(report.get('sNR', 0)) if report.get('sNR') else None,
+                }
+                reports.append(report_data)
+            
+            return {'receptionReport': reports}
+            
+        except ET.ParseError as e:
+            logger.error(f"XML parsing error: {e}")
+            return {'receptionReport': []}
+
+    def parse_spots(self, response_data: Dict) -> List[Dict]:
+        """Parse the API response and extract spot information"""
+        spots = []
+        
+        if 'receptionReport' in response_data:
+            for report in response_data['receptionReport']:
+                spot = {
+                    'transmitter_callsign': report.get('transmitterCallsign', ''),
+                    'receiver_callsign': report.get('receiverCallsign', ''),
+                    'frequency': report.get('frequency', 0),
+                    'mode': report.get('mode', ''),
+                    'snr': report.get('sNR', None),
+                    'timestamp': datetime.fromtimestamp(report.get('flowStartSeconds', 0)),
+                    'transmitter_locator': report.get('transmitterLocator', ''),
+                    'receiver_locator': report.get('receiverLocator', ''),
+                }
+                spots.append(spot)
+        
+        return spots
+
 class HamRadioConditions:
     def __init__(self, zip_code=None):
         self.openweather_api_key = os.getenv('OPENWEATHER_API_KEY')
         self.callsign = os.getenv('CALLSIGN', 'N/A')
         self.temp_unit = os.getenv('TEMP_UNIT', 'F')
+        self.psk_api = PSKReporterAPI()
         
         # Initialize with default values
         self.grid_square = 'DM41vv'  # Default to Los Angeles
@@ -133,9 +272,6 @@ class HamRadioConditions:
             # Get tropospheric conditions
             tropo_conditions = self._get_tropo_conditions()
             
-            # Get band conditions
-            band_conditions = self.get_band_conditions()
-            
             return {
                 'current_time': current_time,
                 'day_night': 'Day' if sun_info['is_day'] else 'Night',
@@ -151,8 +287,7 @@ class HamRadioConditions:
                 'best_bands': best_bands,
                 'propagation_quality': propagation_quality,
                 'aurora_conditions': aurora_conditions,
-                'tropo_conditions': tropo_conditions,
-                'band_conditions': band_conditions
+                'tropo_conditions': tropo_conditions
             }
         except Exception as e:
             logger.error(f"Error generating propagation summary: {e}")
@@ -172,8 +307,7 @@ class HamRadioConditions:
                 'best_bands': ['Unknown'],
                 'propagation_quality': 'Unknown',
                 'aurora_conditions': 'Unknown',
-                'tropo_conditions': 'Unknown',
-                'band_conditions': {}
+                'tropo_conditions': 'Unknown'
             }
 
     def grid_to_latlon(self, grid_square):
@@ -525,74 +659,23 @@ class HamRadioConditions:
         # Ensure zone is between 1 and 40
         return max(1, min(base_zone, 40))
 
-    def _get_rbn_spots(self):
-        """Get spots from Reverse Beacon Network."""
-        try:
-            print("Connecting to RBN...")
-            # Connect to RBN
-            tn = telnetlib.Telnet('telnet.reversebeacon.net', 7000, timeout=5)
-            
-            # Login as guest
-            tn.read_until(b"login:", timeout=5)
-            tn.write(b"guest\n")
-            tn.read_until(b"password:", timeout=5)
-            tn.write(b"guest\n")
-            
-            # Set page size and show spots
-            tn.write(b"set/page 50\n")
-            tn.write(b"show/dx\n")
-            
-            # Read response
-            response = tn.read_until(b"\n", timeout=5).decode('utf-8', errors='ignore')
-            spots_data = []
-            
-            # Read spots until we get a prompt or timeout
-            while True:
-                try:
-                    line = tn.read_until(b"\n", timeout=2).decode('utf-8', errors='ignore')
-                    if not line or '>' in line:
-                        break
-                    spots_data.append(line.strip())
-                except (EOFError, ConnectionResetError):
-                    break
-            
-            tn.close()
-            
-            # Process spots
-            spots = []
-            for spot in spots_data:
-                # Parse spot data using regex
-                match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+) (\d+\.\d+) (\w+) (\w+) (\w+) (.+)', spot)
-                if match:
-                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
-                    spots.append({
-                        'timestamp': timestamp,
-                        'callsign': callsign,
-                        'frequency': freq,
-                        'mode': mode,
-                        'band': band,
-                        'dxcc': dxcc,
-                        'comment': comment,
-                        'source': 'RBN'
-                    })
-            
-            if spots:
-                print(f"Successfully fetched {len(spots)} spots from RBN")
-                return spots
-                
-        except Exception as e:
-            print(f"Error fetching RBN spots: {str(e)}")
-        
-        return []
-
     def get_live_activity(self):
-        """Get live activity data from RBN."""
+        """Get live activity data from PSK Reporter."""
         try:
-            # Try to get spots from RBN
-            spots = self._get_rbn_spots()
+            # Get spots from the last hour
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=1)
+            
+            response = self.psk_api.get_spots(
+                receiving_callsign=self.callsign,
+                time_low=start_time,
+                time_high=end_time
+            )
+            
+            spots = self.psk_api.parse_spots(response)
             
             if not spots:
-                print("No spots available from RBN")
+                logger.warning("No spots available from PSK Reporter")
                 return {
                     'spots': [],
                     'summary': {
@@ -608,15 +691,32 @@ class HamRadioConditions:
             modes = set()
             dxcc_entities = set()
             
+            formatted_spots = []
             for spot in spots:
-                bands.add(spot['band'])
+                # Convert frequency to band
+                freq_mhz = spot['frequency'] / 1000000
+                band = self._frequency_to_band(freq_mhz)
+                
+                formatted_spot = {
+                    'timestamp': spot['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                    'callsign': spot['transmitter_callsign'],
+                    'frequency': f"{freq_mhz:.3f}",
+                    'mode': spot['mode'],
+                    'band': band,
+                    'dxcc': spot.get('transmitter_locator', '')[:2],  # Use first two chars of locator as DXCC
+                    'comment': f"SNR: {spot['snr']} dB" if spot['snr'] is not None else "SNR: N/A",
+                    'source': 'PSK Reporter'
+                }
+                formatted_spots.append(formatted_spot)
+                
+                bands.add(band)
                 modes.add(spot['mode'])
-                dxcc_entities.add(spot['dxcc'])
+                dxcc_entities.add(formatted_spot['dxcc'])
             
             return {
-                'spots': spots,
+                'spots': formatted_spots,
                 'summary': {
-                    'total_spots': len(spots),
+                    'total_spots': len(formatted_spots),
                     'active_bands': sorted(list(bands)),
                     'active_modes': sorted(list(modes)),
                     'active_dxcc': sorted(list(dxcc_entities))
@@ -624,7 +724,8 @@ class HamRadioConditions:
             }
             
         except Exception as e:
-            print(f"Error getting live activity: {e}")
+            logger.error(f"Error getting live activity: {e}")
+            logger.exception("Full traceback:")
             return {
                 'spots': [],
                 'summary': {
@@ -634,6 +735,29 @@ class HamRadioConditions:
                     'active_dxcc': []
                 }
             }
+
+    def _frequency_to_band(self, freq_mhz):
+        """Convert frequency in MHz to amateur band name."""
+        bands = {
+            (1.8, 2.0): '160m',
+            (3.5, 4.0): '80m',
+            (7.0, 7.3): '40m',
+            (10.1, 10.15): '30m',
+            (14.0, 14.35): '20m',
+            (18.068, 18.168): '17m',
+            (21.0, 21.45): '15m',
+            (24.89, 24.99): '12m',
+            (28.0, 29.7): '10m',
+            (50.0, 54.0): '6m',
+            (144.0, 148.0): '2m',
+            (222.0, 225.0): '1.25m',
+            (420.0, 450.0): '70cm'
+        }
+        
+        for (lower, upper), band in bands.items():
+            if lower <= freq_mhz <= upper:
+                return band
+        return 'Unknown'
 
     def _calculate_muf(self, solar_data):
         """Calculate Maximum Usable Frequency based on SFI and time of day."""
