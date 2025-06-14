@@ -100,7 +100,81 @@
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-propagation"></i>Propagation Summary
                 </h2>
                 <div id="propagation-summary" class="space-y-4">
-                    <!-- Content will be populated by JavaScript -->
+                    {% if data.propagation_summary %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Time and Day/Night -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Current Time</div>
+                            <div class="text-xl font-semibold">{{ data.propagation_summary.current_time }}</div>
+                            <div class="text-sm text-gray-400">{{ data.propagation_summary.day_night }}</div>
+                            <div class="text-sm text-gray-400">Sunrise: {{ data.propagation_summary.sunrise }}</div>
+                            <div class="text-sm text-gray-400">Sunset: {{ data.propagation_summary.sunset }}</div>
+                        </div>
+
+                        <!-- Solar Conditions -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Solar Conditions</div>
+                            <div class="space-y-1">
+                                <div>SFI: {{ data.propagation_summary.solar_conditions.sfi }}</div>
+                                <div>A-Index: {{ data.propagation_summary.solar_conditions.a_index }}</div>
+                                <div>K-Index: {{ data.propagation_summary.solar_conditions.k_index }}</div>
+                                <div>Aurora: {{ data.propagation_summary.solar_conditions.aurora }}</div>
+                            </div>
+                        </div>
+
+                        <!-- MUF and Best Bands -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">MUF</div>
+                            <div class="text-xl font-semibold">{{ data.propagation_summary.muf }}</div>
+                            <div class="text-gray-400 mt-2">Best Bands</div>
+                            <div class="text-lg">{{ data.propagation_summary.best_bands|join(', ') }}</div>
+                        </div>
+
+                        <!-- Propagation Quality -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Overall Quality</div>
+                            <div class="text-xl font-semibold {{ data.propagation_summary.propagation_quality|lower }}-quality">
+                                {{ data.propagation_summary.propagation_quality }}
+                            </div>
+                        </div>
+
+                        <!-- Aurora Conditions -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Aurora Conditions</div>
+                            <div class="text-lg">{{ data.propagation_summary.aurora_conditions }}</div>
+                        </div>
+
+                        <!-- Tropospheric Conditions -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Tropospheric Conditions</div>
+                            <div class="text-lg">{{ data.propagation_summary.tropo_conditions }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Current Band Conditions -->
+                    <div class="mt-4">
+                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {% for band, conditions in data.propagation_summary.band_conditions.items() %}
+                            <div class="bg-gray-800 p-3 rounded-lg">
+                                <div class="text-gray-400">{{ band }}</div>
+                                <div class="grid grid-cols-2 gap-2 mt-1">
+                                    <div>
+                                        <span class="text-sm text-gray-400">Day:</span>
+                                        <span class="ml-1 {{ conditions.day|lower }}-condition">{{ conditions.day }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-sm text-gray-400">Night:</span>
+                                        <span class="ml-1 {{ conditions.night|lower }}-condition">{{ conditions.night }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-400">Propagation data not available</p>
+                    {% endif %}
                 </div>
             </div>
 
@@ -394,7 +468,16 @@
                                 .map(([band, condition]) => `
                                     <div class="bg-gray-800 p-3 rounded-lg">
                                         <div class="text-gray-400">${band}</div>
-                                        <div class="text-lg ${updateConditionClass(condition)}">${condition}</div>
+                                        <div class="grid grid-cols-2 gap-2 mt-1">
+                                            <div>
+                                                <span class="text-sm text-gray-400">Day:</span>
+                                                <span class="ml-1 ${updateConditionClass(condition)}">${condition}</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-sm text-gray-400">Night:</span>
+                                                <span class="ml-1 ${updateConditionClass(condition)}">${condition}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 `).join('')}
                         </div>
@@ -488,6 +571,15 @@
             return '';
         }
 
+        function getPropagationQualityClass(quality) {
+            quality = quality.toLowerCase();
+            if (quality === 'excellent') return 'propagation-excellent';
+            if (quality === 'good') return 'propagation-good';
+            if (quality === 'fair') return 'propagation-fair';
+            if (quality === 'poor') return 'propagation-poor';
+            return '';
+        }
+
         function formatValue(key, value) {
             if (key === 'sfi') return `${value} SFI`;
             if (key === 'a_index') return `A-Index: ${value}`;
@@ -549,7 +641,7 @@
                 `;
                 summaryDiv.innerHTML = summaryHtml;
             }
-
+            
             // Update spots table
             const tableBody = document.getElementById('spots-table-body');
             if (tableBody) {
@@ -587,16 +679,6 @@
 
         // Update spots every 5 minutes
         setInterval(fetchSpots, 5 * 60 * 1000);
-
-        // Add new helper function
-        function getPropagationQualityClass(quality) {
-            quality = quality.toLowerCase();
-            if (quality === 'excellent') return 'propagation-excellent';
-            if (quality === 'good') return 'propagation-good';
-            if (quality === 'fair') return 'propagation-fair';
-            if (quality === 'poor') return 'propagation-poor';
-            return '';
-        }
     </script>
 </body>
 </html> 

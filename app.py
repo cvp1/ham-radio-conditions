@@ -17,7 +17,7 @@ TEMP_UNIT = os.getenv('TEMP_UNIT', 'F')
 CALLSIGN = os.getenv('CALLSIGN', 'N/A')
 
 # Initialize HamRadioConditions with configured ZIP code
-ham_conditions = HamRadioConditions(zip_code=ZIP_CODE, temp_unit=TEMP_UNIT)
+ham_conditions = HamRadioConditions(zip_code=ZIP_CODE)
 
 # Cache for conditions data
 _conditions_cache = None
