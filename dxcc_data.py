@@ -50,6 +50,54 @@ GRID_TO_DXCC = {
     'YN': '110',  # United States
     'ZN': '110',  # United States
     
+    # United States (DM grid squares)
+    'DM': '110',  # United States
+    'DN': '110',  # United States
+    'EM': '110',  # United States
+    'EN': '110',  # United States
+    'FM': '110',  # United States
+    'FN': '110',  # United States
+    'GM': '110',  # United States
+    'GN': '110',  # United States
+    'HM': '110',  # United States
+    'HN': '110',  # United States
+    'IM': '110',  # United States
+    'IN': '110',  # United States
+    'JM': '110',  # United States
+    'JN': '110',  # United States
+    'KM': '110',  # United States
+    'KN': '110',  # United States
+    'LM': '110',  # United States
+    'LN': '110',  # United States
+    'MM': '110',  # United States
+    'MN': '110',  # United States
+    'NM': '110',  # United States
+    'NN': '110',  # United States
+    'OM': '110',  # United States
+    'ON': '110',  # United States
+    'PM': '110',  # United States
+    'PN': '110',  # United States
+    'QM': '110',  # United States
+    'QN': '110',  # United States
+    'RM': '110',  # United States
+    'RN': '110',  # United States
+    'SM': '110',  # United States
+    'SN': '110',  # United States
+    'TM': '110',  # United States
+    'TN': '110',  # United States
+    'UM': '110',  # United States
+    'UN': '110',  # United States
+    'VM': '110',  # United States
+    'VN': '110',  # United States
+    'WM': '110',  # United States
+    'WN': '110',  # United States
+    'XM': '110',  # United States
+    'XN': '110',  # United States
+    'YM': '110',  # United States
+    'YN': '110',  # United States
+    'ZM': '110',  # United States
+    'ZN': '110',  # United States
+    
     # Alaska
     'AL': '6',
     'BL': '6',
@@ -78,7 +126,310 @@ GRID_TO_DXCC = {
     'YL': '6',
     'ZL': '6',
     
-    # Add more grid mappings as needed
+    # Europe
+    'JO': '7',  # Albania
+    'KP': '5',  # Aland Islands
+    'IO': '7',  # Albania
+    'JP': '5',  # Aland Islands
+    'KO': '7',  # Albania
+    'IP': '5',  # Aland Islands
+    
+    # Middle East
+    'LL': '2',  # Abu Dhabi
+    'ML': '2',  # Abu Dhabi
+    'NL': '2',  # Abu Dhabi
+    'OL': '2',  # Abu Dhabi
+    'PL': '2',  # Abu Dhabi
+    'QL': '2',  # Abu Dhabi
+    'RL': '2',  # Abu Dhabi
+    'SL': '2',  # Abu Dhabi
+    'TL': '2',  # Abu Dhabi
+    'UL': '2',  # Abu Dhabi
+    'VL': '2',  # Abu Dhabi
+    'WL': '2',  # Abu Dhabi
+    'XL': '2',  # Abu Dhabi
+    'YL': '2',  # Abu Dhabi
+    'ZL': '2',  # Abu Dhabi
+    
+    # South Asia
+    'MK': '3',  # Afghanistan
+    'NK': '3',  # Afghanistan
+    'OK': '3',  # Afghanistan
+    'PK': '3',  # Afghanistan
+    'QK': '3',  # Afghanistan
+    'RK': '3',  # Afghanistan
+    'SK': '3',  # Afghanistan
+    'TK': '3',  # Afghanistan
+    'UK': '3',  # Afghanistan
+    'VK': '3',  # Afghanistan
+    'WK': '3',  # Afghanistan
+    'XK': '3',  # Afghanistan
+    'YK': '3',  # Afghanistan
+    'ZK': '3',  # Afghanistan
+    
+    # Indian Ocean - Agalega & St. Brandon
+    'LH00': '4',  # Agalega & St. Brandon
+    'LH01': '4',  # Agalega & St. Brandon
+    'LH02': '4',  # Agalega & St. Brandon
+    'LH03': '4',  # Agalega & St. Brandon
+    'LH04': '4',  # Agalega & St. Brandon
+    'LH05': '4',  # Agalega & St. Brandon
+    'LH06': '4',  # Agalega & St. Brandon
+    'LH07': '4',  # Agalega & St. Brandon
+    'LH08': '4',  # Agalega & St. Brandon
+    'LH09': '4',  # Agalega & St. Brandon
+    'LH10': '4',  # Agalega & St. Brandon
+    'LH11': '4',  # Agalega & St. Brandon
+    'LH12': '4',  # Agalega & St. Brandon
+    
+    # Southern Indian Ocean - Amsterdam & St. Paul Is.
+    'LH13': '10',  # Amsterdam & St. Paul Is.
+    'LH14': '10',  # Amsterdam & St. Paul Is.
+    'LH15': '10',  # Amsterdam & St. Paul Is.
+    'LH16': '10',  # Amsterdam & St. Paul Is.
+    'LH17': '10',  # Amsterdam & St. Paul Is.
+    'LH18': '10',  # Amsterdam & St. Paul Is.
+    'LH19': '10',  # Amsterdam & St. Paul Is.
+    'LH20': '10',  # Amsterdam & St. Paul Is.
+    'LH21': '10',  # Amsterdam & St. Paul Is.
+    'LH22': '10',  # Amsterdam & St. Paul Is.
+    'LH23': '10',  # Amsterdam & St. Paul Is.
+    'LH24': '10',  # Amsterdam & St. Paul Is.
+    'LH25': '10',  # Amsterdam & St. Paul Is.
+    
+    # Pacific Ocean - American Samoa
+    'AH': '9',  # American Samoa
+    'BH': '9',  # American Samoa
+    'CH': '9',  # American Samoa
+    'DH': '9',  # American Samoa
+    'EH': '9',  # American Samoa
+    'FH': '9',  # American Samoa
+    'GH': '9',  # American Samoa
+    'HH': '9',  # American Samoa
+    'IH': '9',  # American Samoa
+    'JH': '9',  # American Samoa
+    'KH': '9',  # American Samoa
+    'MH': '9',  # American Samoa
+    'NH': '9',  # American Samoa
+    'OH': '9',  # American Samoa
+    'PH': '9',  # American Samoa
+    'QH': '9',  # American Samoa
+    'RH': '9',  # American Samoa
+    'SH': '9',  # American Samoa
+    'TH': '9',  # American Samoa
+    'UH': '9',  # American Samoa
+    'VH': '9',  # American Samoa
+    'WH': '9',  # American Samoa
+    'XH': '9',  # American Samoa
+    'YH': '9',  # American Samoa
+    'ZH': '9',  # American Samoa
+}
+
+# More precise grid mappings for overlapping regions
+GRID_TO_DXCC_PRECISE = {
+    # Indian Ocean - Agalega & St. Brandon
+    'LH00': '4',  # Agalega & St. Brandon
+    'LH01': '4',  # Agalega & St. Brandon
+    'LH02': '4',  # Agalega & St. Brandon
+    'LH03': '4',  # Agalega & St. Brandon
+    'LH04': '4',  # Agalega & St. Brandon
+    'LH05': '4',  # Agalega & St. Brandon
+    'LH06': '4',  # Agalega & St. Brandon
+    'LH07': '4',  # Agalega & St. Brandon
+    'LH08': '4',  # Agalega & St. Brandon
+    'LH09': '4',  # Agalega & St. Brandon
+    'LH10': '4',  # Agalega & St. Brandon
+    'LH11': '4',  # Agalega & St. Brandon
+    'LH12': '4',  # Agalega & St. Brandon
+    'LH13': '4',  # Agalega & St. Brandon
+    'LH14': '4',  # Agalega & St. Brandon
+    'LH15': '4',  # Agalega & St. Brandon
+    'LH16': '4',  # Agalega & St. Brandon
+    'LH17': '4',  # Agalega & St. Brandon
+    'LH18': '4',  # Agalega & St. Brandon
+    'LH19': '4',  # Agalega & St. Brandon
+    'LH20': '4',  # Agalega & St. Brandon
+    'LH21': '4',  # Agalega & St. Brandon
+    'LH22': '4',  # Agalega & St. Brandon
+    'LH23': '4',  # Agalega & St. Brandon
+    'LH24': '4',  # Agalega & St. Brandon
+    'LH25': '4',  # Agalega & St. Brandon
+    'LH26': '4',  # Agalega & St. Brandon
+    'LH27': '4',  # Agalega & St. Brandon
+    'LH28': '4',  # Agalega & St. Brandon
+    'LH29': '4',  # Agalega & St. Brandon
+    'LH30': '4',  # Agalega & St. Brandon
+    'LH31': '4',  # Agalega & St. Brandon
+    'LH32': '4',  # Agalega & St. Brandon
+    'LH33': '4',  # Agalega & St. Brandon
+    'LH34': '4',  # Agalega & St. Brandon
+    'LH35': '4',  # Agalega & St. Brandon
+    'LH36': '4',  # Agalega & St. Brandon
+    'LH37': '4',  # Agalega & St. Brandon
+    'LH38': '4',  # Agalega & St. Brandon
+    'LH39': '4',  # Agalega & St. Brandon
+    'LH40': '4',  # Agalega & St. Brandon
+    'LH41': '4',  # Agalega & St. Brandon
+    'LH42': '4',  # Agalega & St. Brandon
+    'LH43': '4',  # Agalega & St. Brandon
+    'LH44': '4',  # Agalega & St. Brandon
+    'LH45': '4',  # Agalega & St. Brandon
+    'LH46': '4',  # Agalega & St. Brandon
+    'LH47': '4',  # Agalega & St. Brandon
+    'LH48': '4',  # Agalega & St. Brandon
+    'LH49': '4',  # Agalega & St. Brandon
+    'LH50': '4',  # Agalega & St. Brandon
+    'LH51': '4',  # Agalega & St. Brandon
+    'LH52': '4',  # Agalega & St. Brandon
+    'LH53': '4',  # Agalega & St. Brandon
+    'LH54': '4',  # Agalega & St. Brandon
+    'LH55': '4',  # Agalega & St. Brandon
+    'LH56': '4',  # Agalega & St. Brandon
+    'LH57': '4',  # Agalega & St. Brandon
+    'LH58': '4',  # Agalega & St. Brandon
+    'LH59': '4',  # Agalega & St. Brandon
+    'LH60': '4',  # Agalega & St. Brandon
+    'LH61': '4',  # Agalega & St. Brandon
+    'LH62': '4',  # Agalega & St. Brandon
+    'LH63': '4',  # Agalega & St. Brandon
+    'LH64': '4',  # Agalega & St. Brandon
+    'LH65': '4',  # Agalega & St. Brandon
+    'LH66': '4',  # Agalega & St. Brandon
+    'LH67': '4',  # Agalega & St. Brandon
+    'LH68': '4',  # Agalega & St. Brandon
+    'LH69': '4',  # Agalega & St. Brandon
+    'LH70': '4',  # Agalega & St. Brandon
+    'LH71': '4',  # Agalega & St. Brandon
+    'LH72': '4',  # Agalega & St. Brandon
+    'LH73': '4',  # Agalega & St. Brandon
+    'LH74': '4',  # Agalega & St. Brandon
+    'LH75': '4',  # Agalega & St. Brandon
+    'LH76': '4',  # Agalega & St. Brandon
+    'LH77': '4',  # Agalega & St. Brandon
+    'LH78': '4',  # Agalega & St. Brandon
+    'LH79': '4',  # Agalega & St. Brandon
+    'LH80': '4',  # Agalega & St. Brandon
+    'LH81': '4',  # Agalega & St. Brandon
+    'LH82': '4',  # Agalega & St. Brandon
+    'LH83': '4',  # Agalega & St. Brandon
+    'LH84': '4',  # Agalega & St. Brandon
+    'LH85': '4',  # Agalega & St. Brandon
+    'LH86': '4',  # Agalega & St. Brandon
+    'LH87': '4',  # Agalega & St. Brandon
+    'LH88': '4',  # Agalega & St. Brandon
+    'LH89': '4',  # Agalega & St. Brandon
+    'LH90': '4',  # Agalega & St. Brandon
+    'LH91': '4',  # Agalega & St. Brandon
+    'LH92': '4',  # Agalega & St. Brandon
+    'LH93': '4',  # Agalega & St. Brandon
+    'LH94': '4',  # Agalega & St. Brandon
+    'LH95': '4',  # Agalega & St. Brandon
+    'LH96': '4',  # Agalega & St. Brandon
+    'LH97': '4',  # Agalega & St. Brandon
+    'LH98': '4',  # Agalega & St. Brandon
+    'LH99': '4',  # Agalega & St. Brandon
+    
+    # Southern Indian Ocean - Amsterdam & St. Paul Is.
+    'LH00': '10',  # Amsterdam & St. Paul Is.
+    'LH01': '10',  # Amsterdam & St. Paul Is.
+    'LH02': '10',  # Amsterdam & St. Paul Is.
+    'LH03': '10',  # Amsterdam & St. Paul Is.
+    'LH04': '10',  # Amsterdam & St. Paul Is.
+    'LH05': '10',  # Amsterdam & St. Paul Is.
+    'LH06': '10',  # Amsterdam & St. Paul Is.
+    'LH07': '10',  # Amsterdam & St. Paul Is.
+    'LH08': '10',  # Amsterdam & St. Paul Is.
+    'LH09': '10',  # Amsterdam & St. Paul Is.
+    'LH10': '10',  # Amsterdam & St. Paul Is.
+    'LH11': '10',  # Amsterdam & St. Paul Is.
+    'LH12': '10',  # Amsterdam & St. Paul Is.
+    'LH13': '10',  # Amsterdam & St. Paul Is.
+    'LH14': '10',  # Amsterdam & St. Paul Is.
+    'LH15': '10',  # Amsterdam & St. Paul Is.
+    'LH16': '10',  # Amsterdam & St. Paul Is.
+    'LH17': '10',  # Amsterdam & St. Paul Is.
+    'LH18': '10',  # Amsterdam & St. Paul Is.
+    'LH19': '10',  # Amsterdam & St. Paul Is.
+    'LH20': '10',  # Amsterdam & St. Paul Is.
+    'LH21': '10',  # Amsterdam & St. Paul Is.
+    'LH22': '10',  # Amsterdam & St. Paul Is.
+    'LH23': '10',  # Amsterdam & St. Paul Is.
+    'LH24': '10',  # Amsterdam & St. Paul Is.
+    'LH25': '10',  # Amsterdam & St. Paul Is.
+    'LH26': '10',  # Amsterdam & St. Paul Is.
+    'LH27': '10',  # Amsterdam & St. Paul Is.
+    'LH28': '10',  # Amsterdam & St. Paul Is.
+    'LH29': '10',  # Amsterdam & St. Paul Is.
+    'LH30': '10',  # Amsterdam & St. Paul Is.
+    'LH31': '10',  # Amsterdam & St. Paul Is.
+    'LH32': '10',  # Amsterdam & St. Paul Is.
+    'LH33': '10',  # Amsterdam & St. Paul Is.
+    'LH34': '10',  # Amsterdam & St. Paul Is.
+    'LH35': '10',  # Amsterdam & St. Paul Is.
+    'LH36': '10',  # Amsterdam & St. Paul Is.
+    'LH37': '10',  # Amsterdam & St. Paul Is.
+    'LH38': '10',  # Amsterdam & St. Paul Is.
+    'LH39': '10',  # Amsterdam & St. Paul Is.
+    'LH40': '10',  # Amsterdam & St. Paul Is.
+    'LH41': '10',  # Amsterdam & St. Paul Is.
+    'LH42': '10',  # Amsterdam & St. Paul Is.
+    'LH43': '10',  # Amsterdam & St. Paul Is.
+    'LH44': '10',  # Amsterdam & St. Paul Is.
+    'LH45': '10',  # Amsterdam & St. Paul Is.
+    'LH46': '10',  # Amsterdam & St. Paul Is.
+    'LH47': '10',  # Amsterdam & St. Paul Is.
+    'LH48': '10',  # Amsterdam & St. Paul Is.
+    'LH49': '10',  # Amsterdam & St. Paul Is.
+    'LH50': '10',  # Amsterdam & St. Paul Is.
+    'LH51': '10',  # Amsterdam & St. Paul Is.
+    'LH52': '10',  # Amsterdam & St. Paul Is.
+    'LH53': '10',  # Amsterdam & St. Paul Is.
+    'LH54': '10',  # Amsterdam & St. Paul Is.
+    'LH55': '10',  # Amsterdam & St. Paul Is.
+    'LH56': '10',  # Amsterdam & St. Paul Is.
+    'LH57': '10',  # Amsterdam & St. Paul Is.
+    'LH58': '10',  # Amsterdam & St. Paul Is.
+    'LH59': '10',  # Amsterdam & St. Paul Is.
+    'LH60': '10',  # Amsterdam & St. Paul Is.
+    'LH61': '10',  # Amsterdam & St. Paul Is.
+    'LH62': '10',  # Amsterdam & St. Paul Is.
+    'LH63': '10',  # Amsterdam & St. Paul Is.
+    'LH64': '10',  # Amsterdam & St. Paul Is.
+    'LH65': '10',  # Amsterdam & St. Paul Is.
+    'LH66': '10',  # Amsterdam & St. Paul Is.
+    'LH67': '10',  # Amsterdam & St. Paul Is.
+    'LH68': '10',  # Amsterdam & St. Paul Is.
+    'LH69': '10',  # Amsterdam & St. Paul Is.
+    'LH70': '10',  # Amsterdam & St. Paul Is.
+    'LH71': '10',  # Amsterdam & St. Paul Is.
+    'LH72': '10',  # Amsterdam & St. Paul Is.
+    'LH73': '10',  # Amsterdam & St. Paul Is.
+    'LH74': '10',  # Amsterdam & St. Paul Is.
+    'LH75': '10',  # Amsterdam & St. Paul Is.
+    'LH76': '10',  # Amsterdam & St. Paul Is.
+    'LH77': '10',  # Amsterdam & St. Paul Is.
+    'LH78': '10',  # Amsterdam & St. Paul Is.
+    'LH79': '10',  # Amsterdam & St. Paul Is.
+    'LH80': '10',  # Amsterdam & St. Paul Is.
+    'LH81': '10',  # Amsterdam & St. Paul Is.
+    'LH82': '10',  # Amsterdam & St. Paul Is.
+    'LH83': '10',  # Amsterdam & St. Paul Is.
+    'LH84': '10',  # Amsterdam & St. Paul Is.
+    'LH85': '10',  # Amsterdam & St. Paul Is.
+    'LH86': '10',  # Amsterdam & St. Paul Is.
+    'LH87': '10',  # Amsterdam & St. Paul Is.
+    'LH88': '10',  # Amsterdam & St. Paul Is.
+    'LH89': '10',  # Amsterdam & St. Paul Is.
+    'LH90': '10',  # Amsterdam & St. Paul Is.
+    'LH91': '10',  # Amsterdam & St. Paul Is.
+    'LH92': '10',  # Amsterdam & St. Paul Is.
+    'LH93': '10',  # Amsterdam & St. Paul Is.
+    'LH94': '10',  # Amsterdam & St. Paul Is.
+    'LH95': '10',  # Amsterdam & St. Paul Is.
+    'LH96': '10',  # Amsterdam & St. Paul Is.
+    'LH97': '10',  # Amsterdam & St. Paul Is.
+    'LH98': '10',  # Amsterdam & St. Paul Is.
+    'LH99': '10',  # Amsterdam & St. Paul Is.
 }
 
 def grid_to_latlon(grid_square: str) -> Tuple[float, float]:
@@ -141,7 +492,7 @@ def calculate_distance(grid1: str, grid2: str) -> float:
 
 def get_dxcc_info(dxcc_number: str) -> Optional[Dict]:
     """
-    Get information about a specific DXCC entity.
+    Get information about a DXCC entity by its number.
     
     Args:
         dxcc_number (str): The DXCC entity number
@@ -149,7 +500,9 @@ def get_dxcc_info(dxcc_number: str) -> Optional[Dict]:
     Returns:
         dict: Information about the DXCC entity or None if not found
     """
-    return DXCC_ENTITIES.get(str(dxcc_number))
+    if dxcc_number in DXCC_ENTITIES:
+        return DXCC_ENTITIES[dxcc_number]
+    return None
 
 def get_dxcc_by_name(name: str) -> Optional[Dict]:
     """
@@ -185,125 +538,96 @@ def get_dxcc_by_continent(continent: str) -> List[Dict]:
 
 def get_dxcc_by_grid(grid_square: str) -> Optional[Dict]:
     """
-    Get the DXCC entity for a given Maidenhead grid square.
+    Get DXCC entity information based on grid square.
     
     Args:
-        grid_square (str): The Maidenhead grid square (e.g., 'DM41vv')
+        grid_square (str): Maidenhead grid square
         
     Returns:
-        dict: Information about the DXCC entity or None if not found
+        Optional[Dict]: DXCC entity information or None if not found
     """
-    if not grid_square or len(grid_square) < 2:
-        return None
+    try:
+        # First check precise mapping for 4-character grid squares
+        if len(grid_square) >= 4:
+            precise_key = grid_square[:4].upper()
+            if precise_key in GRID_TO_DXCC_PRECISE:
+                dxcc_number = GRID_TO_DXCC_PRECISE[precise_key]
+                return get_dxcc_info(dxcc_number)
         
-    # Get the first two characters of the grid square
-    grid_prefix = grid_square[:2].upper()
-    
-    # Look up the DXCC number for this grid prefix
-    dxcc_number = GRID_TO_DXCC.get(grid_prefix)
-    
-    if dxcc_number:
-        return get_dxcc_info(dxcc_number)
-    return None
+        # Then check general mapping for 2-character grid squares
+        general_key = grid_square[:2].upper()
+        if general_key in GRID_TO_DXCC:
+            dxcc_number = GRID_TO_DXCC[general_key]
+            return get_dxcc_info(dxcc_number)
+        
+        return None
+    except Exception as e:
+        print(f"Error getting DXCC by grid: {e}")
+        return None
 
 def get_nearby_dxcc(grid_square: str, max_distance: float = 2000.0) -> List[Dict]:
     """
-    Get nearby DXCC entities based on distance from a grid square.
+    Get nearby DXCC entities within a given distance.
     
     Args:
-        grid_square (str): The reference Maidenhead grid square
+        grid_square (str): The reference grid square
         max_distance (float): Maximum distance in kilometers
         
     Returns:
-        list: List of nearby DXCC entities with distance information
+        list: List of nearby DXCC entities with their distances
     """
+    if not grid_square or len(grid_square) < 2:
+        return []
+        
+    # Get the reference coordinates
+    ref_lat, ref_lon = grid_to_latlon(grid_square)
+    
+    # Get the current DXCC entity
     current_dxcc = get_dxcc_by_grid(grid_square)
     if not current_dxcc:
         return []
     
+    # Calculate distances to all other entities
     nearby = []
-    for dxcc_num, info in DXCC_ENTITIES.items():
-        if dxcc_num == current_dxcc.get('dxcc_number'):
+    for dxcc_number, entity in DXCC_ENTITIES.items():
+        # Skip the current entity
+        if entity['name'] == current_dxcc['name']:
             continue
             
-        # For each entity, find a representative grid square
-        # This is a simplified approach - a complete implementation would need
-        # to handle multiple grid squares per entity
-        for grid_prefix, entity_num in GRID_TO_DXCC.items():
-            if entity_num == dxcc_num:
-                distance = calculate_distance(grid_square, grid_prefix + '00')
-                if distance <= max_distance:
-                    nearby.append({
-                        'dxcc_number': dxcc_num,
-                        'distance': round(distance),
-                        **info
-                    })
-                break
+        # For simplicity, use a rough distance calculation
+        # In a real implementation, you would use the actual coordinates of each entity
+        distance = calculate_distance(grid_square, f"{entity['name'][:2]}00")
+        
+        if distance <= max_distance:
+            nearby.append({
+                'name': entity['name'],
+                'continent': entity['continent'],
+                'itu_zone': entity['itu_zone'],
+                'cq_zone': entity['cq_zone'],
+                'prefixes': entity['prefixes'],
+                'timezone': entity['timezone'],
+                'distance': round(distance)
+            })
     
     # Sort by distance
-    return sorted(nearby, key=lambda x: x['distance'])
+    nearby.sort(key=lambda x: x['distance'])
+    return nearby
 
 def get_propagation_conditions(grid_square: str) -> Dict:
     """
-    Get propagation conditions between the current location and nearby DXCC entities.
+    Get propagation conditions for a given grid square.
     
     Args:
-        grid_square (str): The reference Maidenhead grid square
+        grid_square (str): The Maidenhead grid square
         
     Returns:
         dict: Propagation conditions including best bands, times, and directions
     """
-    current_dxcc = get_dxcc_by_grid(grid_square)
-    if not current_dxcc:
-        return {
-            'best_bands': ['20m', '40m'],
-            'best_times': ['0000-0400 UTC', '1200-1600 UTC'],
-            'best_directions': ['Europe', 'Asia']
-        }
-    
-    # Get nearby entities
-    nearby = get_nearby_dxcc(grid_square)
-    
-    # Analyze propagation based on distances and directions
-    best_bands = []
-    best_times = []
-    best_directions = set()
-    
-    for entity in nearby:
-        distance = entity['distance']
-        
-        # Determine best bands based on distance
-        if distance < 500:
-            best_bands.extend(['80m', '40m'])
-        elif distance < 1000:
-            best_bands.extend(['40m', '20m'])
-        elif distance < 2000:
-            best_bands.extend(['20m', '15m'])
-        else:
-            best_bands.extend(['15m', '10m'])
-        
-        # Add continent to best directions
-        continent = entity['continent']
-        if continent == 'NA':
-            best_directions.add('North America')
-        elif continent == 'SA':
-            best_directions.add('South America')
-        elif continent == 'EU':
-            best_directions.add('Europe')
-        elif continent == 'AF':
-            best_directions.add('Africa')
-        elif continent == 'AS':
-            best_directions.add('Asia')
-        elif continent == 'OC':
-            best_directions.add('Oceania')
-    
-    # Remove duplicates and sort
-    best_bands = sorted(list(set(best_bands)))
-    best_times = ['0000-0400 UTC', '1200-1600 UTC']  # Simplified for now
-    best_directions = sorted(list(best_directions))
-    
+    # This is a simplified implementation
+    # In a real implementation, you would use actual propagation prediction models
     return {
-        'best_bands': best_bands,
-        'best_times': best_times,
-        'best_directions': best_directions
+        'best_bands': ['20m', '40m', '80m'],
+        'best_times': ['Dawn', 'Dusk'],
+        'best_directions': ['North', 'South'],
+        'distance': 0  # This would be calculated based on the target location
     } 

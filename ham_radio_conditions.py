@@ -21,6 +21,7 @@ from flask import Flask, request, jsonify, render_template
 import telnetlib
 import re
 import socket
+from typing import Dict
 
 # Load environment variables
 load_dotenv()
@@ -52,6 +53,10 @@ class HamRadioConditions:
             if len(grid_square) >= 6:
                 lon += (ord(grid_square[4].upper()) - ord('A')) * (2/24)
                 lat += (ord(grid_square[5].upper()) - ord('A')) * (1/24)
+            
+            # Add half a grid square to center the coordinates
+            lon += 1
+            lat += 0.5
             
             return lat, lon
         except Exception as e:
@@ -206,39 +211,125 @@ class HamRadioConditions:
         cq_zone = int((lon + 180) / 10) + 1
         return str(cq_zone)
 
-    def get_dxcc_conditions(self):
-        """Get DXCC information for the current location"""
+    def get_dxcc_conditions(self, grid_square: str) -> Dict:
+        """
+        Get DXCC conditions for the current location.
+        
+        Args:
+            grid_square (str): The Maidenhead grid square
+            
+        Returns:
+            dict: DXCC conditions including current entity and nearby entities
+        """
         try:
-            # Get the current DXCC entity based on the grid square
-            current_dxcc = get_dxcc_by_grid(self.grid_square)
-            
-            # If we can't determine the current DXCC, use a default
+            # Get current DXCC entity
+            current_dxcc = get_dxcc_by_grid(grid_square)
             if not current_dxcc:
-                current_dxcc = get_dxcc_info('110')  # Default to United States
+                # Calculate ITU and CQ zones based on grid square coordinates
+                lat, lon = self.grid_to_latlon(grid_square)
+                itu_zone = self._calculate_itu_zone(lat, lon)
+                cq_zone = self._calculate_cq_zone(lat, lon)
+                
+                current_dxcc = {
+                    'name': 'Unknown',
+                    'continent': 'Unknown',
+                    'itu_zone': str(itu_zone),
+                    'cq_zone': str(cq_zone),
+                    'prefixes': [],
+                    'timezone': 'UTC'
+                }
+            else:
+                # Calculate ITU and CQ zones based on grid square coordinates
+                lat, lon = self.grid_to_latlon(grid_square)
+                itu_zone = self._calculate_itu_zone(lat, lon)
+                cq_zone = self._calculate_cq_zone(lat, lon)
+                
+                # Update current DXCC with calculated zones
+                current_dxcc['itu_zone'] = str(itu_zone)
+                current_dxcc['cq_zone'] = str(cq_zone)
             
-            # Calculate actual ITU and CQ zones based on coordinates
-            itu_zone = self.get_itu_zone(self.lat, self.lon)
-            cq_zone = self.get_cq_zone(self.lat, self.lon)
-            
-            # Update the current DXCC with actual zones
-            if current_dxcc:
-                current_dxcc['itu_zone'] = itu_zone
-                current_dxcc['cq_zone'] = cq_zone
-            
-            # Get nearby DXCC entities based on distance
-            nearby_dxcc = get_nearby_dxcc(self.grid_square, max_distance=2000.0)
+            # Get nearby DXCC entities
+            nearby_entities = get_nearby_dxcc(grid_square)
             
             # Get propagation conditions
-            propagation = get_propagation_conditions(self.grid_square)
+            propagation = get_propagation_conditions(grid_square)
             
             return {
-                'current_dxcc': current_dxcc,
-                'nearby_dxcc': nearby_dxcc,
-                'propagation_conditions': propagation
+                'current': current_dxcc,
+                'nearby': nearby_entities,
+                'propagation': propagation
             }
         except Exception as e:
-            print(f"Error fetching DXCC conditions: {e}")
-            return None
+            print(f"Error getting DXCC conditions: {str(e)}")
+            return {
+                'current': {
+                    'name': 'Unknown',
+                    'continent': 'Unknown',
+                    'itu_zone': 'Unknown',
+                    'cq_zone': 'Unknown',
+                    'prefixes': [],
+                    'timezone': 'UTC'
+                },
+                'nearby': [],
+                'propagation': {
+                    'best_bands': [],
+                    'best_times': [],
+                    'best_directions': [],
+                    'distance': 0
+                }
+            }
+
+    def _calculate_itu_zone(self, lat: float, lon: float) -> int:
+        """
+        Calculate ITU zone based on latitude and longitude.
+        
+        Args:
+            lat (float): Latitude in degrees
+            lon (float): Longitude in degrees
+            
+        Returns:
+            int: ITU zone number
+        """
+        # ITU zones are based on longitude, with zone 1 starting at 180°W
+        # Each zone is 20° wide
+        # Normalize longitude to 0-360
+        lon = (lon + 360) % 360
+        # Adjust for zone 1 starting at 180°W
+        itu_zone = int((lon + 180) / 20) + 1
+        if itu_zone > 90:
+            itu_zone = 1
+        return max(1, min(itu_zone, 90))  # Ensure zone is between 1 and 90
+
+    def _calculate_cq_zone(self, lat: float, lon: float) -> int:
+        """
+        Calculate CQ zone based on latitude and longitude.
+        
+        Args:
+            lat (float): Latitude in degrees
+            lon (float): Longitude in degrees
+            
+        Returns:
+            int: CQ zone number
+        """
+        # CQ zones are based on the official CQ zone map
+        # Zone 1 starts at 180°W, 0°N
+        # Each zone is 10° wide in longitude
+        # Zones 1-18 are in the Northern Hemisphere
+        # Zones 19-40 are in the Southern Hemisphere
+        
+        # Normalize longitude to 0-360
+        lon = (lon + 360) % 360
+        # Adjust for zone 1 starting at 180°W
+        base_zone = int((lon + 180) / 10) + 1
+        if base_zone > 18:
+            base_zone = 1
+        
+        # Adjust for Southern Hemisphere
+        if lat < 0:
+            base_zone += 18
+            
+        # Ensure zone is between 1 and 40
+        return max(1, min(base_zone, 40))
 
     def _get_rbn_spots(self):
         """Get spots from Reverse Beacon Network."""
@@ -353,31 +444,24 @@ class HamRadioConditions:
     def generate_report(self):
         """Generate a report of current conditions."""
         try:
-            # Get solar conditions
-            solar_conditions = self.get_solar_conditions()
-            
-            # Get band conditions
-            band_conditions = self.get_band_conditions()
-            
-            # Get weather conditions
-            weather_conditions = self.get_weather_conditions()
-            
-            # Get DXCC conditions
-            dxcc_conditions = self.get_dxcc_conditions()
-            
-            # Generate timestamp
-            timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+            # Get all conditions
+            solar = self.get_solar_conditions()
+            bands = self.get_band_conditions()
+            weather = self.get_weather_conditions()
+            dxcc = self.get_dxcc_conditions(self.grid_square)  # Use the instance's grid square
             
             return {
-                'timestamp': timestamp,
-                'location': self.grid_square,
-                'callsign': self.callsign,
-                'solar_conditions': solar_conditions,
-                'band_conditions': band_conditions,
-                'weather_conditions': weather_conditions,
-                'dxcc_conditions': dxcc_conditions
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'location': {
+                    'grid_square': self.grid_square,
+                    'latitude': self.lat,
+                    'longitude': self.lon
+                },
+                'solar_conditions': solar,
+                'band_conditions': bands,
+                'weather_conditions': weather,
+                'dxcc_conditions': dxcc
             }
-            
         except Exception as e:
             print(f"Error generating report: {e}")
             return None
@@ -386,7 +470,7 @@ class HamRadioConditions:
         """Print the report in a formatted table"""
         print("\n=== Ham Radio Conditions Report ===")
         print(f"Generated at: {report['timestamp']}")
-        print(f"Location: {report['location']}\n")
+        print(f"Location: {report['location']['grid_square']}\n")
 
         # Solar Conditions
         print("Solar Conditions:")
@@ -418,20 +502,20 @@ class HamRadioConditions:
             print("DXCC Conditions:")
             dxcc = report['dxcc_conditions']
             
-            if dxcc['current_dxcc']:
-                print(f"\nCurrent DXCC Entity: {dxcc['current_dxcc']['name']}")
+            if dxcc['current']:
+                print(f"\nCurrent DXCC Entity: {dxcc['current']['name']}")
             
-            if dxcc['nearby_dxcc']:
+            if dxcc['nearby']:
                 print("\nNearby DXCC Entities:")
                 nearby_data = [[d['name'], d['continent'], d['itu_zone'], d['cq_zone']] 
-                             for d in dxcc['nearby_dxcc']]
+                             for d in dxcc['nearby']]
                 print(tabulate(nearby_data, 
                              headers=['Name', 'Continent', 'ITU Zone', 'CQ Zone'], 
                              tablefmt='grid'))
             
-            if dxcc['propagation_conditions']:
+            if dxcc['propagation']:
                 print("\nPropagation Conditions:")
-                prop_data = [[k, v] for k, v in dxcc['propagation_conditions'].items()]
+                prop_data = [[k, v] for k, v in dxcc['propagation'].items()]
                 print(tabulate(prop_data, headers=['Parameter', 'Value'], tablefmt='grid'))
             print()
 
