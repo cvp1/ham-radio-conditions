@@ -1,29 +1,26 @@
+# Use Python 3.9 slim image
 FROM python:3.9-slim
 
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
+ENV TEMP_UNIT=F
+
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first to leverage Docker cache
+# Copy requirements file
 COPY requirements.txt .
+
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir flask gunicorn
 
 # Copy application code
 COPY . .
 
-# Create templates directory if it doesn't exist
-RUN mkdir -p templates
-
 # Expose port
 EXPOSE 8087
 
-# Set environment variables
-ENV FLASK_APP=app.py
-ENV FLASK_ENV=production
-
-# Run the application using gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8087", "app:app"] 
+# Run the application using gunicorn with optimized settings
+CMD ["gunicorn", "--bind", "0.0.0.0:8087", "--workers", "2", "--threads", "2", "--timeout", "30", "app:app"] 

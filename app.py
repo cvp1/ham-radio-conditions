@@ -10,7 +10,14 @@ from datetime import datetime
 load_dotenv()
 
 app = Flask(__name__)
-ham_conditions = HamRadioConditions()
+
+# Get configuration from environment variables
+ZIP_CODE = os.getenv('ZIP_CODE')
+TEMP_UNIT = os.getenv('TEMP_UNIT', 'F')
+CALLSIGN = os.getenv('CALLSIGN', 'N/A')
+
+# Initialize HamRadioConditions with configured ZIP code
+ham_conditions = HamRadioConditions(zip_code=ZIP_CODE)
 
 # Cache for conditions data
 _conditions_cache = None

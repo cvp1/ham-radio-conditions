@@ -22,19 +22,160 @@ import telnetlib
 import re
 import socket
 from typing import Dict
+import pytz
+import logging
+from flask_caching import Cache
+from flask_cors import CORS
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 
 # Load environment variables
 load_dotenv()
 
 class HamRadioConditions:
-    def __init__(self, grid_square='DM41vv', temp_unit='F'):
-        self.grid_square = grid_square
-        self.temp_unit = temp_unit.upper()  # Store as uppercase
+    def __init__(self, zip_code=None):
         self.openweather_api_key = os.getenv('OPENWEATHER_API_KEY')
-        self.lat, self.lon = self.grid_to_latlon(grid_square)
-        self.weather_api_key = os.getenv('WEATHER_API_KEY')
         self.callsign = os.getenv('CALLSIGN', 'N/A')
+        self.temp_unit = os.getenv('TEMP_UNIT', 'F')
         
+        # Initialize with default values
+        self.grid_square = 'DM41vv'  # Default to Los Angeles
+        self.lat = 34.0522
+        self.lon = -118.2437
+        self.timezone = pytz.timezone('America/Los_Angeles')
+        
+        # If ZIP code is provided, get coordinates and grid square
+        if zip_code:
+            try:
+                lat, lon = self.zip_to_latlon(zip_code)
+                if lat and lon:
+                    self.lat = lat
+                    self.lon = lon
+                    self.grid_square = self.latlon_to_grid(lat, lon)
+                    # Get timezone from coordinates
+                    self.timezone = self._get_timezone_from_coords(lat, lon)
+            except Exception as e:
+                print(f"Error initializing with ZIP code: {e}")
+
+    def _get_timezone_from_coords(self, lat, lon):
+        """Get timezone from coordinates using timezonefinder"""
+        try:
+            # Use a simple approximation based on longitude
+            # Each 15 degrees of longitude represents roughly 1 hour
+            hours_offset = round(lon / 15)
+            if hours_offset >= 0:
+                return pytz.timezone(f'Etc/GMT-{hours_offset}')
+            else:
+                return pytz.timezone(f'Etc/GMT+{abs(hours_offset)}')
+        except Exception as e:
+            print(f"Error getting timezone: {e}")
+            return pytz.UTC
+
+    def _calculate_sunrise_sunset(self):
+        """Calculate sunrise and sunset times for the current location"""
+        try:
+            # Use a simple approximation for sunrise/sunset
+            # This is a basic calculation and could be improved with more accurate algorithms
+            now = datetime.now(self.timezone)
+            sunrise = now.replace(hour=6, minute=0, second=0, microsecond=0)
+            sunset = now.replace(hour=18, minute=0, second=0, microsecond=0)
+            
+            # Adjust for seasonal variations (simplified)
+            day_of_year = now.timetuple().tm_yday
+            seasonal_offset = math.sin((day_of_year - 80) * 2 * math.pi / 365) * 2  # 2 hours max variation
+            
+            sunrise = sunrise + timedelta(hours=seasonal_offset)
+            sunset = sunset - timedelta(hours=seasonal_offset)
+            
+            return {
+                'sunrise': sunrise.strftime('%I:%M %p'),
+                'sunset': sunset.strftime('%I:%M %p'),
+                'is_day': sunrise <= now <= sunset
+            }
+        except Exception as e:
+            print(f"Error calculating sunrise/sunset: {e}")
+            return {
+                'sunrise': 'N/A',
+                'sunset': 'N/A',
+                'is_day': True
+            }
+
+    def get_propagation_summary(self):
+        """Generate a comprehensive propagation summary"""
+        try:
+            # Get current time in local timezone
+            now = datetime.now(self.timezone)
+            current_time = now.strftime('%I:%M %p %Z')
+            
+            # Get sunrise/sunset information
+            sun_info = self._calculate_sunrise_sunset()
+            
+            # Get solar conditions
+            solar_data = self.get_solar_conditions()
+            
+            # Calculate MUF
+            muf = self._calculate_muf(solar_data)
+            
+            # Determine best bands
+            best_bands = self._determine_best_bands(solar_data, sun_info['is_day'])
+            
+            # Calculate propagation quality
+            propagation_quality = self._calculate_propagation_quality(solar_data, sun_info['is_day'])
+            
+            # Get aurora conditions
+            aurora_conditions = self._get_aurora_conditions(solar_data)
+            
+            # Get tropospheric conditions
+            tropo_conditions = self._get_tropo_conditions()
+            
+            # Get band conditions
+            band_conditions = self.get_band_conditions()
+            
+            return {
+                'current_time': current_time,
+                'day_night': 'Day' if sun_info['is_day'] else 'Night',
+                'sunrise': sun_info['sunrise'],
+                'sunset': sun_info['sunset'],
+                'solar_conditions': {
+                    'sfi': solar_data.get('sfi', 'N/A'),
+                    'a_index': solar_data.get('a_index', 'N/A'),
+                    'k_index': solar_data.get('k_index', 'N/A'),
+                    'aurora': solar_data.get('aurora', 'N/A')
+                },
+                'muf': muf,
+                'best_bands': best_bands,
+                'propagation_quality': propagation_quality,
+                'aurora_conditions': aurora_conditions,
+                'tropo_conditions': tropo_conditions,
+                'band_conditions': band_conditions
+            }
+        except Exception as e:
+            logger.error(f"Error generating propagation summary: {e}")
+            # Return a default structure instead of None
+            return {
+                'current_time': datetime.now(self.timezone).strftime('%I:%M %p %Z'),
+                'day_night': 'Unknown',
+                'sunrise': 'N/A',
+                'sunset': 'N/A',
+                'solar_conditions': {
+                    'sfi': 'N/A',
+                    'a_index': 'N/A',
+                    'k_index': 'N/A',
+                    'aurora': 'N/A'
+                },
+                'muf': 'N/A',
+                'best_bands': ['Unknown'],
+                'propagation_quality': 'Unknown',
+                'aurora_conditions': 'Unknown',
+                'tropo_conditions': 'Unknown',
+                'band_conditions': {}
+            }
+
     def grid_to_latlon(self, grid_square):
         """Convert Maidenhead grid square to latitude and longitude"""
         try:
@@ -63,7 +204,56 @@ class HamRadioConditions:
             print(f"Error converting grid square {grid_square}: {e}")
             # Fallback to DM41vv coordinates (approximately 40.0°N, 105.0°W)
             return 40.0, -105.0
-        
+
+    def zip_to_latlon(self, zip_code):
+        """Convert ZIP code to latitude and longitude using OpenWeather API"""
+        if not self.openweather_api_key:
+            print("OpenWeather API key not configured")
+            return 40.0, -105.0  # Default to DM41vv coordinates
+
+        try:
+            url = f"http://api.openweathermap.org/geo/1.0/zip?zip={zip_code},US&appid={self.openweather_api_key}"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            return data['lat'], data['lon']
+        except Exception as e:
+            print(f"Error converting ZIP code {zip_code}: {e}")
+            return 40.0, -105.0  # Default to DM41vv coordinates
+
+    def latlon_to_grid(self, lat, lon):
+        """Convert latitude and longitude to Maidenhead grid square"""
+        try:
+            # Normalize longitude to -180 to 180
+            lon = ((lon + 180) % 360) - 180
+            
+            # Calculate first two characters (A-R)
+            lon_field = int((lon + 180) / 20)
+            lat_field = int((lat + 90) / 10)
+            
+            # Calculate next two characters (0-9)
+            lon_square = int(((lon + 180) % 20) / 2)
+            lat_square = int(((lat + 90) % 10))
+            
+            # Calculate last two characters (a-x)
+            lon_sub = int((((lon + 180) % 20) % 2) * 12)
+            lat_sub = int((((lat + 90) % 10) % 1) * 24)
+            
+            # Convert to characters
+            grid = (
+                chr(ord('A') + lon_field) +
+                chr(ord('A') + lat_field) +
+                str(lon_square) +
+                str(lat_square) +
+                chr(ord('a') + lon_sub) +
+                chr(ord('a') + lat_sub)
+            )
+            
+            return grid
+        except Exception as e:
+            print(f"Error converting lat/lon to grid square: {e}")
+            return 'DM41vv'  # Default grid square
+
     def get_solar_conditions(self):
         """Fetch current solar conditions from HamQSL XML feed"""
         try:
@@ -153,6 +343,8 @@ class HamRadioConditions:
                 'humidity': f"{data['main']['humidity']}%",
                 'pressure': f"{data['main']['pressure']} hPa",
                 'description': data['weather'][0]['description'].capitalize(),
+                'city': data['name'],
+                'state': data.get('sys', {}).get('country', ''),
                 'source': 'OpenWeather'
             }
         except Exception as e:
@@ -180,6 +372,8 @@ class HamRadioConditions:
                 'humidity': f"{current['relativeHumidity']['value']}%",
                 'pressure': f"{current['pressure']['value']} hPa",
                 'description': current['shortForecast'],
+                'city': grid_data['properties']['relativeLocation']['properties']['city'],
+                'state': grid_data['properties']['relativeLocation']['properties']['state'],
                 'source': 'National Weather Service'
             }
         except Exception as e:
@@ -441,36 +635,161 @@ class HamRadioConditions:
                 }
             }
 
+    def _calculate_muf(self, solar_data):
+        """Calculate Maximum Usable Frequency based on SFI and time of day."""
+        try:
+            # Basic MUF calculation
+            base_muf = 15.0  # Base MUF in MHz
+            
+            # Adjust for SFI
+            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
+            sfi_factor = (sfi - 70) / 100  # Normalize SFI impact
+            
+            # Adjust for day/night
+            sun_info = self._calculate_sunrise_sunset()
+            time_factor = 1.5 if sun_info['is_day'] else 0.5
+            
+            # Calculate final MUF
+            muf = base_muf * (1 + sfi_factor) * time_factor
+            
+            return max(3.5, min(muf, 30.0))  # Limit between 3.5 and 30 MHz
+        except Exception as e:
+            print(f"Error calculating MUF: {e}")
+            return 15.0  # Default MUF
+
+    def _determine_best_bands(self, solar_data, is_daytime):
+        """Determine best bands based on current conditions."""
+        try:
+            best_bands = []
+            
+            # Define band frequencies
+            bands = {
+                '160m': 1.8,
+                '80m': 3.5,
+                '40m': 7.0,
+                '20m': 14.0,
+                '15m': 21.0,
+                '10m': 28.0
+            }
+            
+            # Add bands based on MUF
+            for band, freq in bands.items():
+                if freq <= self._calculate_muf(solar_data):
+                    best_bands.append(band)
+            
+            # Prioritize bands based on time of day
+            if is_daytime:
+                best_bands = [b for b in best_bands if b in ['20m', '15m', '10m']]
+            else:
+                best_bands = [b for b in best_bands if b in ['160m', '80m', '40m']]
+            
+            return best_bands
+        except Exception as e:
+            print(f"Error determining best bands: {e}")
+            return ['20m', '40m']  # Default bands
+
+    def _calculate_propagation_quality(self, solar_data, is_daytime):
+        """Calculate overall propagation quality score."""
+        try:
+            # Convert k_index to number
+            k_index = solar_data.get('k_index', '0')
+            k = float(k_index.replace('K-Index: ', ''))
+            
+            # Calculate quality score (0-100)
+            sfi_score = min(100, (float(solar_data.get('sfi', '0').replace(' SFI', '')) - 70) * 5)  # SFI impact
+            k_score = max(0, 100 - (k * 20))  # K-index impact
+            
+            # Combine scores
+            quality = (sfi_score * 0.7 + k_score * 0.3)
+            
+            # Convert to descriptive rating
+            if quality >= 80:
+                return "Excellent"
+            elif quality >= 60:
+                return "Good"
+            elif quality >= 40:
+                return "Fair"
+            else:
+                return "Poor"
+        except Exception as e:
+            print(f"Error calculating propagation quality: {e}")
+            return "Unknown"
+
+    def _get_aurora_conditions(self, solar_data):
+        """Get aurora conditions based on aurora level."""
+        try:
+            aurora_level = solar_data.get('aurora', '0')
+            level = float(aurora_level.replace('Aurora: ', ''))
+            if level >= 7:
+                return "Strong aurora activity - HF propagation affected"
+            elif level >= 5:
+                return "Moderate aurora activity - Some HF bands affected"
+            elif level >= 3:
+                return "Light aurora activity - Minimal impact"
+            else:
+                return "No significant aurora activity"
+        except Exception as e:
+            print(f"Error getting aurora conditions: {e}")
+            return "Unknown aurora conditions"
+
+    def _get_tropo_conditions(self):
+        """Get tropospheric conditions based on weather data."""
+        weather = self.get_weather_conditions()
+        if not weather:
+            return "Weather data unavailable"
+            
+        try:
+            # Check for favorable conditions
+            temp = float(weather.get('temperature', '0').replace('°F', ''))
+            humidity = float(weather.get('humidity', '0').replace('%', ''))
+            
+            if temp > 70 and humidity > 60:
+                return "Favorable conditions for tropospheric propagation"
+            elif temp > 60 and humidity > 50:
+                return "Moderate conditions for tropospheric propagation"
+            else:
+                return "Poor conditions for tropospheric propagation"
+        except Exception as e:
+            print(f"Error getting tropo conditions: {e}")
+            return "Unknown tropospheric conditions"
+
     def generate_report(self):
-        """Generate a report of current conditions."""
+        """Generate a comprehensive report of all conditions."""
         try:
             # Get all conditions
-            solar = self.get_solar_conditions()
-            bands = self.get_band_conditions()
-            weather = self.get_weather_conditions()
-            dxcc = self.get_dxcc_conditions(self.grid_square)  # Use the instance's grid square
-            
+            weather_conditions = self.get_weather_conditions()
+            solar_conditions = self.get_solar_conditions()
+            band_conditions = self.get_band_conditions()
+            dxcc_conditions = self.get_dxcc_conditions(self.grid_square)
+            propagation_summary = self.get_propagation_summary()
+
+            # Format location string
+            location = f"{weather_conditions.get('city', 'Unknown')}, {weather_conditions.get('state', 'Unknown')}"
+
             return {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
-                'location': {
-                    'grid_square': self.grid_square,
-                    'latitude': self.lat,
-                    'longitude': self.lon
-                },
-                'solar_conditions': solar,
-                'band_conditions': bands,
-                'weather_conditions': weather,
-                'dxcc_conditions': dxcc
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'location': location,
+                'callsign': self.callsign,
+                'weather_conditions': weather_conditions,
+                'solar_conditions': solar_conditions,
+                'band_conditions': band_conditions,
+                'dxcc_conditions': dxcc_conditions,
+                'propagation_summary': propagation_summary
             }
         except Exception as e:
-            print(f"Error generating report: {e}")
-            return None
+            logger.error(f"Error generating report: {str(e)}")
+            return {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'location': 'Unknown',
+                'callsign': self.callsign,
+                'error': str(e)
+            }
 
     def print_report(self, report):
         """Print the report in a formatted table"""
         print("\n=== Ham Radio Conditions Report ===")
         print(f"Generated at: {report['timestamp']}")
-        print(f"Location: {report['location']['grid_square']}\n")
+        print(f"Location: {report['location']}\n")
 
         # Solar Conditions
         print("Solar Conditions:")
