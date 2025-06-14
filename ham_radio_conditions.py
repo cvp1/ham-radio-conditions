@@ -292,12 +292,12 @@ class HamRadioConditions:
         """
         # ITU zones are based on longitude, with zone 1 starting at 180°W
         # Each zone is 20° wide
-        # Normalize longitude to 0-360
-        lon = (lon + 360) % 360
-        # Adjust for zone 1 starting at 180°W
-        itu_zone = int((lon + 180) / 20) + 1
-        if itu_zone > 90:
-            itu_zone = 1
+        # Normalize longitude to -180 to 180
+        lon = ((lon + 180) % 360) - 180
+        # Calculate zone (1-90)
+        itu_zone = int((lon + 180) / 20)
+        if itu_zone == 0:
+            itu_zone = 90
         return max(1, min(itu_zone, 90))  # Ensure zone is between 1 and 90
 
     def _calculate_cq_zone(self, lat: float, lon: float) -> int:
@@ -317,12 +317,12 @@ class HamRadioConditions:
         # Zones 1-18 are in the Northern Hemisphere
         # Zones 19-40 are in the Southern Hemisphere
         
-        # Normalize longitude to 0-360
-        lon = (lon + 360) % 360
-        # Adjust for zone 1 starting at 180°W
-        base_zone = int((lon + 180) / 10) + 1
-        if base_zone > 18:
-            base_zone = 1
+        # Normalize longitude to -180 to 180
+        lon = ((lon + 180) % 360) - 180
+        # Calculate base zone (1-18 for Northern Hemisphere)
+        base_zone = int((lon + 180) / 10)
+        if base_zone == 0:
+            base_zone = 18
         
         # Adjust for Southern Hemisphere
         if lat < 0:
