@@ -22,6 +22,7 @@
         .icon-weather { color: #10B981; }
         .icon-dxcc { color: #8B5CF6; }
         .icon-spots { color: #EC4899; }
+        .icon-propagation { color: #8B5CF6; }
         
         .section-icon {
             transition: transform 0.2s ease-in-out;
@@ -47,6 +48,12 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Add to existing styles */
+        .propagation-excellent { color: #10B981; }
+        .propagation-good { color: #3B82F6; }
+        .propagation-fair { color: #F59E0B; }
+        .propagation-poor { color: #EF4444; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -87,87 +94,110 @@
                 <div id="weather-conditions" class="space-y-2"></div>
             </div>
 
+            <!-- Propagation Summary -->
+            <div class="card rounded-lg p-6 lg:col-span-2">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-broadcast-tower mr-2 section-icon icon-propagation"></i>Propagation Summary
+                </h2>
+                <div id="propagation-summary" class="space-y-4">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+
             <!-- DXCC Information -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-xl font-semibold mb-4">DXCC Information</h2>
-                {% if data.dxcc_conditions %}
-                    <div class="mb-6">
-                        <h3 class="text-lg font-medium mb-2">Current Location</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-600">Entity:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.name }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">Continent:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.continent }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">ITU Zone:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.itu_zone }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">CQ Zone:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.cq_zone }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">Prefixes:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.prefixes|join(', ') }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">Timezone:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.current_dxcc.timezone }}</p>
-                            </div>
+            {% if data.dxcc_conditions %}
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-globe-americas mr-2"></i>
+                    DXCC Information
+                </h2>
+                
+                <!-- Current Location -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-3">Current Location</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-gray-400">Name</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.current.name }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Continent</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.current.continent }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">ITU Zone</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.current.itu_zone }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">CQ Zone</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.current.cq_zone }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Prefixes</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.current.prefixes|join(', ') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Timezone</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.current.timezone }}</p>
                         </div>
                     </div>
+                </div>
 
-                    <div class="mb-6">
-                        <h3 class="text-lg font-medium mb-2">Nearby Entities</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full">
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th class="px-4 py-2 text-left">Entity</th>
-                                        <th class="px-4 py-2 text-left">Distance</th>
-                                        <th class="px-4 py-2 text-left">Continent</th>
-                                        <th class="px-4 py-2 text-left">Prefixes</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for entity in data.dxcc_conditions.nearby_dxcc %}
-                                    <tr class="border-t">
-                                        <td class="px-4 py-2">{{ entity.name }}</td>
-                                        <td class="px-4 py-2">{{ entity.distance }} km</td>
-                                        <td class="px-4 py-2">{{ entity.continent }}</td>
-                                        <td class="px-4 py-2">{{ entity.prefixes|join(', ') }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                <!-- Nearby Entities -->
+                {% if data.dxcc_conditions.nearby %}
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-3">Nearby Entities</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="text-gray-400">
+                                    <th class="text-left py-2">Name</th>
+                                    <th class="text-left py-2">Distance</th>
+                                    <th class="text-left py-2">Continent</th>
+                                    <th class="text-left py-2">Prefixes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entity in data.dxcc_conditions.nearby %}
+                                <tr class="border-t border-gray-700">
+                                    <td class="py-2">{{ entity.name }}</td>
+                                    <td class="py-2">{{ entity.distance }} km</td>
+                                    <td class="py-2">{{ entity.continent }}</td>
+                                    <td class="py-2">{{ entity.prefixes|join(', ') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
+                </div>
+                {% endif %}
 
-                    <div>
-                        <h3 class="text-lg font-medium mb-2">Propagation Conditions</h3>
-                        <div class="grid grid-cols-3 gap-4">
-                            <div>
-                                <p class="text-gray-600">Best Bands:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.propagation_conditions.best_bands|join(', ') }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">Best Times:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.propagation_conditions.best_times|join(', ') }}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-600">Best Directions:</p>
-                                <p class="font-medium">{{ data.dxcc_conditions.propagation_conditions.best_directions|join(', ') }}</p>
-                            </div>
+                <!-- Propagation Conditions -->
+                {% if data.dxcc_conditions.propagation %}
+                <div>
+                    <h3 class="text-lg font-medium mb-3">Propagation Conditions</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-gray-400">Best Bands</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_bands|join(', ') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Best Times</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_times|join(', ') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Best Directions</p>
+                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_directions|join(', ') }}</p>
                         </div>
                     </div>
-                {% else %}
-                    <p class="text-gray-500">DXCC information not available</p>
+                </div>
                 {% endif %}
             </div>
+            {% else %}
+            <div class="card rounded-lg p-6">
+                <p class="text-gray-400">DXCC information not available</p>
+            </div>
+            {% endif %}
 
             <!-- Live Spots -->
             <div class="card rounded-lg p-6 lg:col-span-2">
@@ -272,14 +302,24 @@
                         <span class="text-gray-400">CALLSIGN</span>
                         <span class="font-semibold">${data.callsign || 'N/A'}</span>
                     </div>
+                    ${data.weather_conditions.city && data.weather_conditions.state ? `
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">LOCATION</span>
+                            <span class="font-semibold">${data.weather_conditions.city}, ${data.weather_conditions.state}</span>
+                        </div>
+                    ` : ''}
                     ${Object.entries(data.weather_conditions)
-                        .filter(([key]) => key !== 'source')
+                        .filter(([key]) => !['source', 'city', 'state'].includes(key))
                         .map(([key, value]) => `
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
                                 <span class="font-semibold">${value}</span>
                             </div>
                         `).join('')}
+                    <div class="flex justify-between items-center text-sm text-gray-400">
+                        <span>Source:</span>
+                        <span>${data.weather_conditions.source}</span>
+                    </div>
                 `;
             } else {
                 weatherDiv.innerHTML = `
@@ -289,6 +329,79 @@
                     </div>
                     <p class="text-gray-400">Weather data not available</p>
                 `;
+            }
+
+            // Update Propagation Summary
+            const propagationDiv = document.getElementById('propagation-summary');
+            if (data.propagation_summary) {
+                const summary = data.propagation_summary;
+                propagationDiv.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Time and Day/Night -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Current Time</div>
+                            <div class="text-xl font-semibold">${summary.current_time}</div>
+                            <div class="text-sm text-gray-400">${summary.day_night}</div>
+                            <div class="text-sm text-gray-400">Sunrise: ${summary.sunrise}</div>
+                            <div class="text-sm text-gray-400">Sunset: ${summary.sunset}</div>
+                        </div>
+
+                        <!-- Solar Conditions -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Solar Conditions</div>
+                            <div class="space-y-1">
+                                <div>SFI: ${summary.solar_conditions.sfi}</div>
+                                <div>A-Index: ${summary.solar_conditions.a_index}</div>
+                                <div>K-Index: ${summary.solar_conditions.k_index}</div>
+                                <div>Aurora: ${summary.solar_conditions.aurora}</div>
+                            </div>
+                        </div>
+
+                        <!-- MUF and Best Bands -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">MUF</div>
+                            <div class="text-xl font-semibold">${summary.muf}</div>
+                            <div class="text-gray-400 mt-2">Best Bands</div>
+                            <div class="text-lg">${summary.best_bands.join(', ')}</div>
+                        </div>
+
+                        <!-- Propagation Quality -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Overall Quality</div>
+                            <div class="text-xl font-semibold ${getPropagationQualityClass(summary.propagation_quality)}">
+                                ${summary.propagation_quality}
+                            </div>
+                        </div>
+
+                        <!-- Aurora Conditions -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Aurora Conditions</div>
+                            <div class="text-lg">${summary.aurora_conditions}</div>
+                        </div>
+
+                        <!-- Tropospheric Conditions -->
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Tropospheric Conditions</div>
+                            <div class="text-lg">${summary.tropo_conditions}</div>
+                        </div>
+                    </div>
+
+                    <!-- Current Band Conditions -->
+                    <div class="mt-4">
+                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            ${Object.entries(summary.band_conditions)
+                                .map(([band, condition]) => `
+                                    <div class="bg-gray-800 p-3 rounded-lg">
+                                        <div class="text-gray-400">${band}</div>
+                                        <div class="text-lg ${updateConditionClass(condition)}">${condition}</div>
+                                    </div>
+                                `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                propagationDiv.innerHTML = '<p class="text-gray-400">Propagation data not available</p>';
             }
 
             // Update DXCC Conditions
@@ -342,8 +455,8 @@
                 }
 
                 // Propagation Conditions
-                if (data.dxcc_conditions.propagation_conditions) {
-                    const prop = data.dxcc_conditions.propagation_conditions;
+                if (data.dxcc_conditions.propagation) {
+                    const prop = data.dxcc_conditions.propagation;
                     dxccHtml += `
                         <div class="mb-4">
                             <h3 class="text-lg font-semibold mb-2">Propagation Conditions</h3>
@@ -474,6 +587,16 @@
 
         // Update spots every 5 minutes
         setInterval(fetchSpots, 5 * 60 * 1000);
+
+        // Add new helper function
+        function getPropagationQualityClass(quality) {
+            quality = quality.toLowerCase();
+            if (quality === 'excellent') return 'propagation-excellent';
+            if (quality === 'good') return 'propagation-good';
+            if (quality === 'fair') return 'propagation-fair';
+            if (quality === 'poor') return 'propagation-poor';
+            return '';
+        }
     </script>
 </body>
 </html> 

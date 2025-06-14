@@ -7,8 +7,9 @@ services:
       - FLASK_APP=app.py
       - FLASK_ENV=production
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
-      - GRID_SQUARE=${GRID_SQUARE:-DM41vv}
+      - ZIP_CODE=${ZIP_CODE}
       - TEMP_UNIT=${TEMP_UNIT:-F}
+      - CALLSIGN=${CALLSIGN}
     volumes:
       - .:/app
     restart: unless-stopped 
