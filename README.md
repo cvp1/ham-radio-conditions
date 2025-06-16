@@ -20,10 +20,21 @@ pip install -r requirements.txt
 
 2. Create a `.env` file in the project root and add your API keys and configuration:
 ```
-WEATHER_API_KEY=your_weather_api_key
-GRID_SQUARE=your_grid_square  # e.g., DM41vv
+# Weather API Configuration
+OPENWEATHER_API_KEY=your_weather_api_key
+ZIP_CODE=your_zip_code
+TEMP_UNIT=F  # or C for Celsius
+
+# Ham Radio Configuration
+CALLSIGN=your_callsign
+
+# QRZ XML Database API Configuration
 QRZ_USERNAME=your_qrz_username  # Your QRZ.com login username
 QRZ_PASSWORD=your_qrz_password  # Your QRZ.com login password
+
+# Flask Configuration
+FLASK_APP=app.py
+FLASK_ENV=production
 ```
 
 3. Run the application:
@@ -40,7 +51,7 @@ python app.py
 docker-compose up --build
 ```
 
-The application will be available at http://localhost:5000
+The application will be available at http://localhost:8087
 
 ## Features
 
