@@ -17,15 +17,12 @@ from dxcc_data import (
     get_nearby_dxcc,
     get_propagation_conditions
 )
-from flask import Flask, request, jsonify, render_template
 import telnetlib
 import re
 import socket
 from typing import Dict
 import pytz
 import logging
-from flask_caching import Cache
-from flask_cors import CORS
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -525,116 +522,6 @@ class HamRadioConditions:
         # Ensure zone is between 1 and 40
         return max(1, min(base_zone, 40))
 
-    def _get_rbn_spots(self):
-        """Get spots from Reverse Beacon Network."""
-        try:
-            print("Connecting to RBN...")
-            # Connect to RBN
-            tn = telnetlib.Telnet('telnet.reversebeacon.net', 7000, timeout=5)
-            
-            # Login as guest
-            tn.read_until(b"login:", timeout=5)
-            tn.write(b"guest\n")
-            tn.read_until(b"password:", timeout=5)
-            tn.write(b"guest\n")
-            
-            # Set page size and show spots
-            tn.write(b"set/page 50\n")
-            tn.write(b"show/dx\n")
-            
-            # Read response
-            response = tn.read_until(b"\n", timeout=5).decode('utf-8', errors='ignore')
-            spots_data = []
-            
-            # Read spots until we get a prompt or timeout
-            while True:
-                try:
-                    line = tn.read_until(b"\n", timeout=2).decode('utf-8', errors='ignore')
-                    if not line or '>' in line:
-                        break
-                    spots_data.append(line.strip())
-                except (EOFError, ConnectionResetError):
-                    break
-            
-            tn.close()
-            
-            # Process spots
-            spots = []
-            for spot in spots_data:
-                # Parse spot data using regex
-                match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+) (\d+\.\d+) (\w+) (\w+) (\w+) (.+)', spot)
-                if match:
-                    timestamp, callsign, freq, mode, band, dxcc, comment = match.groups()
-                    spots.append({
-                        'timestamp': timestamp,
-                        'callsign': callsign,
-                        'frequency': freq,
-                        'mode': mode,
-                        'band': band,
-                        'dxcc': dxcc,
-                        'comment': comment,
-                        'source': 'RBN'
-                    })
-            
-            if spots:
-                print(f"Successfully fetched {len(spots)} spots from RBN")
-                return spots
-                
-        except Exception as e:
-            print(f"Error fetching RBN spots: {str(e)}")
-        
-        return []
-
-    def get_live_activity(self):
-        """Get live activity data from RBN."""
-        try:
-            # Try to get spots from RBN
-            spots = self._get_rbn_spots()
-            
-            if not spots:
-                print("No spots available from RBN")
-                return {
-                    'spots': [],
-                    'summary': {
-                        'total_spots': 0,
-                        'active_bands': [],
-                        'active_modes': [],
-                        'active_dxcc': []
-                    }
-                }
-            
-            # Process spots to get summary
-            bands = set()
-            modes = set()
-            dxcc_entities = set()
-            
-            for spot in spots:
-                bands.add(spot['band'])
-                modes.add(spot['mode'])
-                dxcc_entities.add(spot['dxcc'])
-            
-            return {
-                'spots': spots,
-                'summary': {
-                    'total_spots': len(spots),
-                    'active_bands': sorted(list(bands)),
-                    'active_modes': sorted(list(modes)),
-                    'active_dxcc': sorted(list(dxcc_entities))
-                }
-            }
-            
-        except Exception as e:
-            print(f"Error getting live activity: {e}")
-            return {
-                'spots': [],
-                'summary': {
-                    'total_spots': 0,
-                    'active_bands': [],
-                    'active_modes': [],
-                    'active_dxcc': []
-                }
-            }
-
     def _calculate_muf(self, solar_data):
         """Calculate Maximum Usable Frequency based on SFI and time of day."""
         try:
@@ -733,54 +620,389 @@ class HamRadioConditions:
             return "Unknown aurora conditions"
 
     def _get_tropo_conditions(self):
-        """Get tropospheric conditions based on weather data."""
-        weather = self.get_weather_conditions()
-        if not weather:
-            return "Weather data unavailable"
-            
+        """Get tropospheric conditions based on weather data"""
         try:
-            # Check for favorable conditions
-            temp = float(weather.get('temperature', '0').replace('°F', ''))
-            humidity = float(weather.get('humidity', '0').replace('%', ''))
+            weather = self.get_weather_conditions()
+            if not weather:
+                return "Unknown"
             
-            if temp > 70 and humidity > 60:
-                return "Favorable conditions for tropospheric propagation"
-            elif temp > 60 and humidity > 50:
-                return "Moderate conditions for tropospheric propagation"
+            # Simple tropospheric conditions based on weather
+            if weather.get('clouds', 0) < 30:
+                return "Excellent"
+            elif weather.get('clouds', 0) < 70:
+                return "Good"
             else:
-                return "Poor conditions for tropospheric propagation"
+                return "Poor"
         except Exception as e:
-            print(f"Error getting tropo conditions: {e}")
-            return "Unknown tropospheric conditions"
+            logger.error(f"Error getting tropospheric conditions: {e}")
+            return "Unknown"
+
+    # NEW LIVE ACTIVITY METHODS ADDED HERE
+    def get_live_activity(self):
+        """Get live activity data from DXCluster spots"""
+        try:
+            print("🔍 Fetching live DX spots...")
+            
+            # Try multiple methods to get spots
+            spots = self._get_dxsummit_spots() or self._get_dxwatch_spots() or self._get_telnet_spots()
+            
+            if not spots:
+                print("⚠️ No spots available from any source")
+                return {
+                    'spots': [],
+                    'summary': {
+                        'total_spots': 0,
+                        'active_bands': [],
+                        'active_modes': [],
+                        'active_dxcc': [],
+                        'source': 'None - all sources failed'
+                    }
+                }
+            
+            # Process spots to get summary
+            bands = set()
+            modes = set()
+            dxcc_entities = set()
+            
+            for spot in spots:
+                if spot.get('band'):
+                    bands.add(spot['band'])
+                if spot.get('mode'):
+                    modes.add(spot['mode'])
+                if spot.get('dxcc'):
+                    dxcc_entities.add(spot['dxcc'])
+            
+            summary = {
+                'total_spots': len(spots),
+                'active_bands': sorted(list(bands)),
+                'active_modes': sorted(list(modes)),
+                'active_dxcc': sorted(list(dxcc_entities))[:20],  # Limit to 20 for display
+                'source': spots[0].get('source', 'Unknown') if spots else 'None'
+            }
+            
+            print(f"✅ Retrieved {len(spots)} spots from {summary['source']}")
+            
+            return {
+                'spots': spots[:50],  # Limit to 50 most recent spots
+                'summary': summary
+            }
+            
+        except Exception as e:
+            print(f"❌ Error getting live activity: {e}")
+            return {
+                'spots': [],
+                'summary': {
+                    'total_spots': 0,
+                    'active_bands': [],
+                    'active_modes': [],
+                    'active_dxcc': [],
+                    'source': 'Error',
+                    'error': str(e)
+                }
+            }
+    
+    def _get_dxsummit_spots(self):
+        """Get spots from DXSummit.fi API"""
+        try:
+            print("📡 Trying DXSummit API...")
+            
+            url = "https://www.dxsummit.fi/api/v1/spots"
+            params = {
+                'limit': 50,
+                'format': 'json'
+            }
+            
+            headers = {
+                'User-Agent': 'HamRadioConditions/1.0',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                print(f"❌ DXSummit API error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            
+            if not isinstance(data, list):
+                print(f"❌ DXSummit: Unexpected response format")
+                return None
+            
+            spots = []
+            for item in data:
+                try:
+                    spot = {
+                        'timestamp': item.get('time', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+                        'callsign': item.get('dx', ''),
+                        'frequency': str(item.get('freq', '')),
+                        'spotter': item.get('de', ''),
+                        'comment': item.get('comment', ''),
+                        'mode': self._extract_mode_from_comment(item.get('comment', '')),
+                        'band': self._freq_to_band(item.get('freq', 0)),
+                        'dxcc': item.get('dxcc', ''),
+                        'source': 'DXSummit'
+                    }
+                    spots.append(spot)
+                except Exception as e:
+                    print(f"⚠️ Error parsing DXSummit spot: {e}")
+                    continue
+            
+            print(f"✅ DXSummit: Retrieved {len(spots)} spots")
+            return spots
+            
+        except requests.exceptions.Timeout:
+            print("⏰ DXSummit API timeout")
+            return None
+        except Exception as e:
+            print(f"❌ DXSummit error: {e}")
+            return None
+    
+    def _get_dxwatch_spots(self):
+        """Get spots from DXWatch API"""
+        try:
+            print("📡 Trying DXWatch API...")
+            
+            url = "https://dxwatch.com/dxsd1/s.php"
+            params = {
+                't': 'dx',
+                's': '0',
+                'e': '50'
+            }
+            
+            headers = {
+                'User-Agent': 'HamRadioConditions/1.0',
+                'Accept': 'text/plain'
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                print(f"❌ DXWatch API error: {response.status_code}")
+                return None
+            
+            spots = []
+            lines = response.text.strip().split('\n')
+            
+            for line in lines:
+                try:
+                    # Parse DXWatch format: freq dx spotter time comment
+                    parts = line.split()
+                    if len(parts) < 4:
+                        continue
+                    
+                    freq = float(parts[0])
+                    dx_call = parts[1]
+                    spotter = parts[2]
+                    time_str = parts[3]
+                    comment = ' '.join(parts[4:]) if len(parts) > 4 else ''
+                    
+                    spot = {
+                        'timestamp': time_str,
+                        'callsign': dx_call,
+                        'frequency': str(freq),
+                        'spotter': spotter,
+                        'comment': comment,
+                        'mode': self._extract_mode_from_comment(comment),
+                        'band': self._freq_to_band(freq),
+                        'dxcc': '',
+                        'source': 'DXWatch'
+                    }
+                    spots.append(spot)
+                    
+                except Exception as e:
+                    print(f"⚠️ Error parsing DXWatch spot: {e}")
+                    continue
+            
+            print(f"✅ DXWatch: Retrieved {len(spots)} spots")
+            return spots
+            
+        except Exception as e:
+            print(f"❌ DXWatch error: {e}")
+            return None
+    
+    def _get_telnet_spots(self):
+        """Get spots from DXCluster via telnet (fallback)"""
+        try:
+            print("📡 Trying DXCluster telnet...")
+            
+            # List of DXCluster nodes to try
+            nodes = [
+                ('dxc.nc7j.com', 23),
+                ('cluster.w6cua.org', 23),
+                ('w6yx.stanford.edu', 23)
+            ]
+            
+            for host, port in nodes:
+                try:
+                    print(f"🔌 Connecting to {host}:{port}...")
+                    
+                    tn = telnetlib.Telnet(host, port, timeout=10)
+                    
+                    # Wait for login prompt
+                    tn.read_until(b"login:", timeout=5)
+                    tn.write(b"GUEST\n")
+                    
+                    # Send commands
+                    tn.write(b"set/page 0\n")
+                    tn.write(b"show/dx 30\n")
+                    
+                    # Read spots
+                    spots_data = []
+                    for _ in range(40):  # Read up to 40 lines
+                        try:
+                            line = tn.read_until(b"\n", timeout=2).decode('utf-8', errors='ignore').strip()
+                            if not line or line.endswith('>'):
+                                break
+                            spots_data.append(line)
+                        except:
+                            break
+                    
+                    tn.close()
+                    
+                    # Parse spots
+                    spots = []
+                    for line in spots_data:
+                        try:
+                            # Parse DXCluster format: DX de CALL: freq DX info
+                            match = re.match(r'DX de (\w+):\s+(\d+\.?\d*)\s+(\w+)\s+(.+)', line)
+                            if match:
+                                spotter, freq, dx_call, info = match.groups()
+                                
+                                spot = {
+                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                    'callsign': dx_call,
+                                    'frequency': freq,
+                                    'spotter': spotter,
+                                    'comment': info,
+                                    'mode': self._extract_mode_from_comment(info),
+                                    'band': self._freq_to_band(float(freq)),
+                                    'dxcc': '',
+                                    'source': f'DXCluster-{host}'
+                                }
+                                spots.append(spot)
+                        except Exception as e:
+                            print(f"⚠️ Error parsing telnet spot: {e}")
+                            continue
+                    
+                    if spots:
+                        print(f"✅ DXCluster {host}: Retrieved {len(spots)} spots")
+                        return spots
+                    
+                except Exception as e:
+                    print(f"❌ Failed to connect to {host}: {e}")
+                    continue
+            
+            print("❌ All DXCluster nodes failed")
+            return None
+            
+        except Exception as e:
+            print(f"❌ Telnet spots error: {e}")
+            return None
+    
+    def _freq_to_band(self, freq):
+        """Convert frequency to amateur radio band"""
+        try:
+            freq = float(freq)
+            if 1800 <= freq <= 2000:
+                return '160m'
+            elif 3500 <= freq <= 4000:
+                return '80m'
+            elif 7000 <= freq <= 7300:
+                return '40m'
+            elif 10100 <= freq <= 10150:
+                return '30m'
+            elif 14000 <= freq <= 14350:
+                return '20m'
+            elif 18068 <= freq <= 18168:
+                return '17m'
+            elif 21000 <= freq <= 21450:
+                return '15m'
+            elif 24890 <= freq <= 24990:
+                return '12m'
+            elif 28000 <= freq <= 29700:
+                return '10m'
+            elif 50000 <= freq <= 54000:
+                return '6m'
+            elif 144000 <= freq <= 148000:
+                return '2m'
+            else:
+                return 'Unknown'
+        except:
+            return 'Unknown'
+    
+    def _extract_mode_from_comment(self, comment):
+        """Extract operating mode from spot comment"""
+        if not comment:
+            return 'Unknown'
+        
+        comment_upper = comment.upper()
+        
+        # Check for specific modes
+        if 'FT8' in comment_upper:
+            return 'FT8'
+        elif 'FT4' in comment_upper:
+            return 'FT4'
+        elif 'CW' in comment_upper:
+            return 'CW'
+        elif any(mode in comment_upper for mode in ['SSB', 'LSB', 'USB', 'PHONE']):
+            return 'SSB'
+        elif 'RTTY' in comment_upper:
+            return 'RTTY'
+        elif 'PSK' in comment_upper:
+            return 'PSK'
+        elif 'JT65' in comment_upper:
+            return 'JT65'
+        elif 'JT9' in comment_upper:
+            return 'JT9'
+        elif 'MFSK' in comment_upper:
+            return 'MFSK'
+        elif 'OLIVIA' in comment_upper:
+            return 'OLIVIA'
+        elif 'CONTESTIA' in comment_upper:
+            return 'CONTESTIA'
+        elif any(mode in comment_upper for mode in ['DIGITAL', 'DATA']):
+            return 'Digital'
+        else:
+            return 'Unknown'
 
     def generate_report(self):
-        """Generate a comprehensive report of all conditions."""
+        """Generate a comprehensive report of all conditions"""
         try:
-            # Get all conditions
-            weather_conditions = self.get_weather_conditions()
+            # Get current timestamp
+            timestamp = datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')
+            
+            # Get all condition data
             solar_conditions = self.get_solar_conditions()
             band_conditions = self.get_band_conditions()
-            dxcc_conditions = self.get_dxcc_conditions(self.grid_square)
+            weather_conditions = self.get_weather_conditions()
             propagation_summary = self.get_propagation_summary()
-
-            # Format location string
-            location = f"{weather_conditions.get('city', 'Unknown')}, {weather_conditions.get('state', 'Unknown')}"
-
-            return {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'location': location,
+            dxcc_conditions = self.get_dxcc_conditions(self.grid_square)
+            
+            # Add live activity data
+            live_activity = self.get_live_activity()
+            
+            # Compile the report
+            report = {
+                'timestamp': timestamp,
+                'location': f"{self.grid_square} ({self.lat:.4f}°N, {self.lon:.4f}°W)",
                 'callsign': self.callsign,
-                'weather_conditions': weather_conditions,
                 'solar_conditions': solar_conditions,
                 'band_conditions': band_conditions,
+                'weather_conditions': weather_conditions,
+                'propagation_summary': propagation_summary,
                 'dxcc_conditions': dxcc_conditions,
-                'propagation_summary': propagation_summary
+                'live_activity': live_activity
             }
+            
+            return report
+            
         except Exception as e:
-            logger.error(f"Error generating report: {str(e)}")
+            logger.error(f"Error generating report: {e}")
+            # Return a minimal report with error information
             return {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'location': 'Unknown',
+                'timestamp': datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z'),
+                'location': f"{self.grid_square} ({self.lat:.4f}°N, {self.lon:.4f}°W)",
                 'callsign': self.callsign,
                 'error': str(e)
             }
@@ -850,26 +1072,29 @@ class HamRadioConditions:
             print(f"Active Bands: {', '.join(summary['active_bands'])}")
             print(f"Active Modes: {', '.join(summary['active_modes'])}")
             print(f"Active DXCC Entities: {', '.join(summary['active_dxcc'])}")
+            print(f"Source: {summary['source']}")
             
             # Print recent spots
-            print("\nRecent Spots:")
-            spots_data = []
-            for spot in activity['spots'][:10]:  # Show last 10 spots
-                spots_data.append([
-                    spot['callsign'],
-                    spot['frequency'],
-                    spot['mode'],
-                    spot['band'],
-                    spot['dxcc'],
-                    spot['timestamp']
-                ])
-            print(tabulate(spots_data, 
-                         headers=['Callsign', 'Frequency', 'Mode', 'Band', 'DXCC', 'Time'],
-                         tablefmt='grid'))
-            print()
+            if activity['spots']:
+                print("\nRecent Spots:")
+                spots_data = []
+                for spot in activity['spots'][:10]:  # Show last 10 spots
+                    spots_data.append([
+                        spot['callsign'],
+                        spot['frequency'],
+                        spot['mode'],
+                        spot['band'],
+                        spot['dxcc'],
+                        spot['timestamp']
+                    ])
+                print(tabulate(spots_data, 
+                             headers=['Callsign', 'Frequency', 'Mode', 'Band', 'DXCC', 'Time'],
+                             tablefmt='grid'))
+                print()
         else:
             print("\nLive Activity: Not available")
             print()
+
 
 def main():
     reporter = HamRadioConditions()
@@ -890,11 +1115,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    reporter = HamRadioConditions()
-    data = reporter.generate_report()
-    return render_template('index.html', data=data)

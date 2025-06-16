@@ -23,6 +23,7 @@
         .icon-dxcc { color: #8B5CF6; }
         .icon-spots { color: #EC4899; }
         .icon-propagation { color: #8B5CF6; }
+        .icon-qrz { color: #3B82F6; }
         
         .section-icon {
             transition: transform 0.2s ease-in-out;
@@ -323,6 +324,27 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            <!-- QRZ Lookup -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    <i class="fas fa-search mr-2 section-icon icon-qrz"></i>QRZ Lookup
+                    <span id="qrz-loading" class="loading-spinner ml-2" style="display: none;"></span>
+                </h2>
+                <div class="mb-4">
+                    <div class="flex gap-2">
+                        <input type="text" id="qrz-callsign" placeholder="Enter callsign" 
+                               class="flex-1 bg-gray-800 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="lookupQRZ()" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            Lookup
+                        </button>
+                    </div>
+                </div>
+                <div id="qrz-results" class="space-y-4">
+                    <p class="text-gray-400">Enter a callsign to lookup information</p>
                 </div>
             </div>
         </div>
@@ -679,6 +701,133 @@
 
         // Update spots every 5 minutes
         setInterval(fetchSpots, 5 * 60 * 1000);
+
+        // Add QRZ lookup functionality
+        async function lookupQRZ() {
+            const callsign = document.getElementById('qrz-callsign').value.trim().toUpperCase();
+            if (!callsign) {
+                alert('Please enter a callsign');
+                return;
+            }
+
+            const loadingSpinner = document.getElementById('qrz-loading');
+            const resultsDiv = document.getElementById('qrz-results');
+            
+            loadingSpinner.style.display = 'inline-block';
+            resultsDiv.innerHTML = '<p class="text-gray-400">Looking up callsign...</p>';
+
+            try {
+                const response = await fetch(`/api/qrz/${callsign}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p class="text-red-500">${data.error}</p>`;
+                    return;
+                }
+
+                resultsDiv.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-gray-400">Name</p>
+                                <p class="text-lg">${data.name || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">Callsign</p>
+                                <p class="text-lg font-mono">${data.callsign || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">Location</p>
+                                <p class="text-lg">${data.location || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">Country</p>
+                                <p class="text-lg">${data.country || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">Grid Square</p>
+                                <p class="text-lg font-mono">${data.grid || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">License Class</p>
+                                <p class="text-lg">${data.class || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">DXCC</p>
+                                <p class="text-lg">${data.dxcc || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">State</p>
+                                <p class="text-lg">${data.state || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">County</p>
+                                <p class="text-lg">${data.county || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">CQ Zone</p>
+                                <p class="text-lg">${data.cq_zone || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">ITU Zone</p>
+                                <p class="text-lg">${data.itu_zone || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">IOTA</p>
+                                <p class="text-lg">${data.iota || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">QSL Manager</p>
+                                <p class="text-lg">${data.qsl_manager || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">LoTW</p>
+                                <p class="text-lg">${data.lotw || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">eQSL</p>
+                                <p class="text-lg">${data.eqsl || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">License Effective</p>
+                                <p class="text-lg">${data.license_effective || '-'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400">License Expires</p>
+                                <p class="text-lg">${data.license_expires || '-'}</p>
+                            </div>
+                        </div>
+                        ${data.image ? `
+                            <div class="mt-4">
+                                <img src="${data.image}" alt="QRZ Image" class="max-w-full rounded-lg">
+                            </div>
+                        ` : ''}
+                        <div class="mt-4 p-4 bg-gray-800 rounded-lg">
+                            <pre class="whitespace-pre-wrap text-sm">${data.formatted_info || ''}</pre>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error fetching QRZ data:', error);
+                resultsDiv.innerHTML = `
+                    <div class="text-red-500">
+                        Error looking up callsign: ${error.message}
+                    </div>
+                `;
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        // Add enter key support for QRZ lookup
+        document.getElementById('qrz-callsign').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                lookupQRZ();
+            }
+        });
     </script>
 </body>
 </html> 

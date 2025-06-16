@@ -10,6 +10,8 @@ services:
       - ZIP_CODE=${ZIP_CODE}
       - TEMP_UNIT=${TEMP_UNIT:-F}
       - CALLSIGN=${CALLSIGN}
+      - QRZ_USERNAME=${QRZ_USERNAME}
+      - QRZ_PASSWORD=${QRZ_PASSWORD:-}
     volumes:
       - .:/app
     restart: unless-stopped 
