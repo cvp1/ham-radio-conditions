@@ -1,8 +1,6 @@
 import os
 import requests
-import json
 from datetime import datetime, timedelta
-import pandas as pd
 from tabulate import tabulate
 from dotenv import load_dotenv
 import schedule
@@ -17,9 +15,6 @@ from dxcc_data import (
     get_nearby_dxcc,
     get_propagation_conditions
 )
-import telnetlib
-import re
-import socket
 from typing import Dict
 import pytz
 import logging
