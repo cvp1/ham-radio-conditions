@@ -61,20 +61,34 @@ def index():
 
 @app.route('/api/spots')
 def get_spots():
-    """Get live spots data with timeout protection"""
+    """Get live spots data - async, non-blocking"""
     try:
         if not ham_conditions:
             return jsonify({'error': 'Ham conditions not initialized'})
         
+        # This now returns immediately
         spots_data = ham_conditions.get_live_activity()
         return jsonify(spots_data)
         
     except Exception as e:
+        logger.error(f"Error in spots route: {e}")
         return jsonify({
             'spots': [],
             'summary': {'total_spots': 0, 'source': 'Error'},
             'error': str(e)
         })
+
+@app.route('/api/spots/status')
+def get_spots_status():
+    """Get spots loading status"""
+    try:
+        if ham_conditions:
+            status = ham_conditions.get_spots_status()
+            return jsonify(status)
+        else:
+            return jsonify({'error': 'Ham conditions not initialized'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 @app.route('/api/qrz/<callsign>')
 def get_qrz_info(callsign):
