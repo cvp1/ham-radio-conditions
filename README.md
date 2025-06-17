@@ -32,7 +32,7 @@ CALLSIGN=your_callsign
 QRZ_USERNAME=your_qrz_username  # Your QRZ.com login username
 QRZ_PASSWORD=your_qrz_password  # Your QRZ.com login password
 
-# Flask Configuration
+# Flask Configuration #
 FLASK_APP=app.py
 FLASK_ENV=production
 ```
