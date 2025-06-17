@@ -287,20 +287,3 @@ class QRZLookup:
             import traceback
             traceback.print_exc()
             return False
-
-
-# Test script
-if __name__ == "__main__":
-    print("🚀 Testing Simple Working QRZ Class")
-    qrz = QRZLookup("N0CVP", "canUdigit19551068")
-    
-    if qrz.test_connection():
-        print("\n🎯 Testing additional lookups...")
-        
-        test_calls = ['K1TTT', 'VE1ABC', 'G0ABC']
-        for call in test_calls:
-            print(f"\n📻 Looking up {call}:")
-            info = qrz.get_formatted_info(call)
-            print(info[:200] + "..." if len(info) > 200 else info)
-    else:
-        print("❌ Connection test failed")
