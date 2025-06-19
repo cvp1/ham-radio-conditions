@@ -31,6 +31,16 @@ QRZ_PASSWORD = os.getenv('QRZ_PASSWORD')
 # Initialize database
 db = Database()
 
+# Load zip code from database if available, otherwise use environment variable
+stored_zip_code = db.get_user_preference('zip_code')
+if stored_zip_code:
+    ZIP_CODE = stored_zip_code
+    logger.info(f"Using stored ZIP code: {ZIP_CODE}")
+elif ZIP_CODE:
+    # Store the environment variable zip code in the database
+    db.store_user_preference('zip_code', ZIP_CODE)
+    logger.info(f"Stored environment ZIP code: {ZIP_CODE}")
+
 # Initialize HamRadioConditions with configured ZIP code
 ham_conditions = HamRadioConditions(zip_code=ZIP_CODE)
 
@@ -221,6 +231,38 @@ def get_database_stats():
     except Exception as e:
         logger.error(f"Error getting database stats: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update-location', methods=['POST'])
+def update_location():
+    """Update the location/zip code"""
+    try:
+        data = request.get_json()
+        if not data or 'zip_code' not in data:
+            return jsonify({'success': False, 'error': 'ZIP code is required'}), 400
+        
+        zip_code = data['zip_code'].strip()
+        if not zip_code:
+            return jsonify({'success': False, 'error': 'ZIP code cannot be empty'}), 400
+        
+        # Store the new zip code in the database
+        db.store_user_preference('zip_code', zip_code)
+        
+        # Update the HamRadioConditions instance with the new zip code
+        global ham_conditions
+        ham_conditions = HamRadioConditions(zip_code=zip_code)
+        
+        # Clear the conditions cache to force a refresh
+        global _conditions_cache, _conditions_cache_time
+        with _conditions_lock:
+            _conditions_cache = None
+            _conditions_cache_time = None
+        
+        logger.info(f"Location updated to ZIP code: {zip_code}")
+        return jsonify({'success': True, 'message': f'Location updated to {zip_code}'})
+        
+    except Exception as e:
+        logger.error(f"Error updating location: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001) 

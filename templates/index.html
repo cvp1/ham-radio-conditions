@@ -81,8 +81,19 @@
 
             <!-- Weather Conditions -->
             <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4">
-                    <i class="fas fa-cloud-sun mr-2 section-icon icon-weather"></i>Weather Conditions
+                <h2 class="text-2xl font-semibold mb-4 flex items-center justify-between">
+                    <div>
+                        <i class="fas fa-cloud-sun mr-2 section-icon icon-weather"></i>Weather Conditions
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="zip-code-input" placeholder="Enter ZIP code" 
+                               class="bg-gray-800 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                               maxlength="10">
+                        <button onclick="updateLocation()" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                            Update
+                        </button>
+                    </div>
                 </h2>
                 <div id="weather-conditions" class="space-y-2"></div>
             </div>
@@ -856,6 +867,51 @@
         document.getElementById('qrz-callsign').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 lookupQRZ();
+            }
+        });
+
+        // Add location update functionality
+        async function updateLocation() {
+            const zipCode = document.getElementById('zip-code-input').value.trim();
+            if (!zipCode) {
+                alert('Please enter a ZIP code');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update-location', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ zip_code: zipCode })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Clear the input
+                    document.getElementById('zip-code-input').value = '';
+                    
+                    // Reload the page to get updated data
+                    window.location.reload();
+                } else {
+                    alert(`Error updating location: ${result.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error updating location:', error);
+                alert(`Error updating location: ${error.message}`);
+            }
+        }
+
+        // Add enter key support for zip code input
+        document.getElementById('zip-code-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                updateLocation();
             }
         });
     </script>
