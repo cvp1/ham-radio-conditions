@@ -8,9 +8,6 @@ import time
 import xml.etree.ElementTree as ET
 import math
 from dxcc_data import (
-    get_dxcc_info,
-    get_dxcc_by_name,
-    get_dxcc_by_continent,
     get_dxcc_by_grid,
     get_nearby_dxcc,
     get_propagation_conditions
@@ -117,24 +114,27 @@ class HamRadioConditions:
     def _get_spots_with_timeout(self):
         """Get spots with timeout handling (thread-safe)"""
         try:
-            # Try sources in order of reliability with simple timeout
-            spots = self._get_dxsummit_spots_fast() or self._get_test_spots()
+            # Try PSKReporter first, then fall back to test spots
+            spots = self._get_pskreporter_spots_fast() or self._get_test_spots()
             return spots
             
         except Exception as e:
             logger.error(f"Error getting spots with timeout: {e}")
             return self._get_test_spots()
 
-    def _get_dxsummit_spots_fast(self):
-        """Fast DXSummit spots with aggressive timeout"""
+    def _get_pskreporter_spots_fast(self):
+        """Fast PSKReporter spots with aggressive timeout"""
         try:
-            logger.debug("Trying DXSummit API (fast)")
+            logger.debug("Trying PSKReporter API (fast)")
             
-            url = "https://www.dxsummit.fi/api/v1/spots"
-            params = {'limit': 25, 'format': 'json'}
+            url = "https://retrieve.pskreporter.info/query"
+            params = {
+                'since': '30',  # Last 30 minutes
+                'limit': '20'   # Get 20 spots
+            }
             headers = {
                 'User-Agent': 'HamRadioConditions/1.0',
-                'Accept': 'application/json',
+                'Accept': 'application/xml',
                 'Connection': 'close'
             }
             
@@ -142,32 +142,35 @@ class HamRadioConditions:
             response = requests.get(url, params=params, headers=headers, timeout=5)
             
             if response.status_code != 200:
-                logger.debug(f"DXSummit API error: {response.status_code}")
+                logger.debug(f"PSKReporter API error: {response.status_code}")
                 return None
             
-            data = response.json()
-            
-            if not isinstance(data, list) or len(data) == 0:
-                logger.debug("DXSummit: No data or wrong format")
+            # Parse XML response
+            try:
+                root = ET.fromstring(response.content)
+            except ET.ParseError as e:
+                logger.debug(f"PSKReporter XML parse error: {e}")
                 return None
             
+            # Find all receptionReport elements
             spots = []
-            for item in data[:15]:  # Process fewer items for speed
+            for report in root.findall('.//receptionReport')[:15]:  # Process fewer items for speed
                 try:
+                    # Extract data from XML attributes
                     spot = {
-                        'timestamp': item.get('time', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
-                        'callsign': item.get('dx', ''),
-                        'frequency': str(item.get('freq', '')),
-                        'spotter': item.get('de', ''),
-                        'comment': item.get('comment', ''),
-                        'mode': self._extract_mode_from_comment(item.get('comment', '')),
-                        'band': self._freq_to_band(item.get('freq', 0)),
-                        'dxcc': str(item.get('dxcc', '')),
-                        'source': 'DXSummit'
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # PSKReporter doesn't provide timestamp
+                        'callsign': report.get('senderCallsign', ''),
+                        'frequency': str(float(report.get('frequency', 0)) / 1000000),  # Convert Hz to MHz
+                        'spotter': report.get('receiverCallsign', ''),
+                        'comment': f"SNR: {report.get('sNR', 'N/A')}",
+                        'mode': report.get('mode', 'Unknown'),
+                        'band': self._freq_to_band(float(report.get('frequency', 0))),
+                        'dxcc': report.get('senderDXCC', ''),
+                        'source': 'PSKReporter'
                     }
                     spots.append(spot)
                 except Exception as e:
-                    logger.debug(f"Error parsing DXSummit spot: {e}")
+                    logger.debug(f"Error parsing PSKReporter spot: {e}")
                     continue
             
             # Generate summary
@@ -182,18 +185,18 @@ class HamRadioConditions:
                     'active_bands': sorted(list(bands)),
                     'active_modes': sorted(list(modes)),
                     'active_dxcc': sorted(list(dxcc_entities))[:10],
-                    'source': 'DXSummit'
+                    'source': 'PSKReporter'
                 }
             }
             
         except requests.exceptions.Timeout:
-            logger.debug("DXSummit API timeout")
+            logger.debug("PSKReporter API timeout")
             return None
         except requests.exceptions.RequestException as e:
-            logger.debug(f"DXSummit request error: {e}")
+            logger.debug(f"PSKReporter request error: {e}")
             return None
         except Exception as e:
-            logger.debug(f"DXSummit error: {e}")
+            logger.debug(f"PSKReporter error: {e}")
             return None
 
     def _get_test_spots(self):

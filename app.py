@@ -6,6 +6,14 @@ import threading
 import time
 from datetime import datetime
 from qrz_data import QRZLookup
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 
 # Load environment variables
 load_dotenv()
@@ -123,4 +131,4 @@ def get_qrz_info(callsign):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, port=5001) 
