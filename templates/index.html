@@ -79,14 +79,6 @@
                 <div id="solar-conditions" class="space-y-2"></div>
             </div>
 
-            <!-- Band Conditions -->
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4">
-                    <i class="fas fa-broadcast-tower mr-2 section-icon icon-band"></i>Band Conditions
-                </h2>
-                <div id="band-conditions" class="space-y-4"></div>
-            </div>
-
             <!-- Weather Conditions -->
             <div class="card rounded-lg p-6">
                 <h2 class="text-2xl font-semibold mb-4">
@@ -95,8 +87,17 @@
                 <div id="weather-conditions" class="space-y-2"></div>
             </div>
 
+            <!-- DXCC Information -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-globe-americas mr-2"></i>
+                    DXCC Information
+                </h2>
+                <div id="dxcc-conditions" class="space-y-4"></div>
+            </div>
+
             <!-- Propagation Summary -->
-            <div class="card rounded-lg p-6 lg:col-span-2">
+            <div class="card rounded-lg p-6 col-span-1 md:col-span-2 lg:col-span-3">
                 <h2 class="text-2xl font-semibold mb-4">
                     <i class="fas fa-broadcast-tower mr-2 section-icon icon-propagation"></i>Propagation Summary
                 </h2>
@@ -178,101 +179,6 @@
                     {% endif %}
                 </div>
             </div>
-
-            <!-- DXCC Information -->
-            {% if data.dxcc_conditions %}
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4 flex items-center">
-                    <i class="fas fa-globe-americas mr-2"></i>
-                    DXCC Information
-                </h2>
-                
-                <!-- Current Location -->
-                <div class="mb-6">
-                    <h3 class="text-lg font-medium mb-3">Current Location</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-gray-400">Name</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.name }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Continent</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.continent }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">ITU Zone</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.itu_zone }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">CQ Zone</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.cq_zone }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Prefixes</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.prefixes|join(', ') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Timezone</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.current.timezone }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Nearby Entities -->
-                {% if data.dxcc_conditions.nearby %}
-                <div class="mb-6">
-                    <h3 class="text-lg font-medium mb-3">Nearby Entities</h3>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="text-gray-400">
-                                    <th class="text-left py-2">Name</th>
-                                    <th class="text-left py-2">Distance</th>
-                                    <th class="text-left py-2">Continent</th>
-                                    <th class="text-left py-2">Prefixes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for entity in data.dxcc_conditions.nearby %}
-                                <tr class="border-t border-gray-700">
-                                    <td class="py-2">{{ entity.name }}</td>
-                                    <td class="py-2">{{ entity.distance }} km</td>
-                                    <td class="py-2">{{ entity.continent }}</td>
-                                    <td class="py-2">{{ entity.prefixes|join(', ') }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Propagation Conditions -->
-                {% if data.dxcc_conditions.propagation %}
-                <div>
-                    <h3 class="text-lg font-medium mb-3">Propagation Conditions</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-gray-400">Best Bands</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_bands|join(', ') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Best Times</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_times|join(', ') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-gray-400">Best Directions</p>
-                            <p class="text-lg">{{ data.dxcc_conditions.propagation.best_directions|join(', ') }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="card rounded-lg p-6">
-                <p class="text-gray-400">DXCC information not available</p>
-            </div>
-            {% endif %}
 
             <!-- Live Spots -->
             <div class="card rounded-lg p-6 lg:col-span-2">
@@ -400,7 +306,11 @@
         // UI update functions
         function updateTimestampAndLocation(data) {
             if (timestampEl) timestampEl.textContent = `Last Updated: ${data.timestamp}`;
-            if (locationEl) locationEl.textContent = `Location: ${data.location}`;
+            if (locationEl) {
+                // Use location name from propagation summary if available, otherwise fall back to the raw location
+                const locationName = data.propagation_summary?.location?.location_name || data.location;
+                locationEl.textContent = `Location: ${locationName}`;
+            }
         }
 
         function updateSolarConditions(data) {
@@ -416,22 +326,117 @@
 
         function updateBandConditions(data) {
             if (!bandDiv) return;
-            safeSetHTML(bandDiv, Object.entries(data.band_conditions)
-                .map(([band, conditions]) => `
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold mb-2">${band}</h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <span class="text-gray-400">Day:</span>
-                                <span class="ml-2 ${updateConditionClass(conditions.day)}">${conditions.day}</span>
+            
+            // Get detailed band conditions from propagation summary
+            const bandConditions = data.propagation_summary?.band_conditions || data.band_conditions || {};
+            const bestBands = data.propagation_summary?.propagation_parameters?.best_bands || [];
+            const isDaytime = data.propagation_summary?.day_night === 'Day';
+            
+            if (Object.keys(bandConditions).length === 0) {
+                safeSetHTML(bandDiv, '<p class="text-gray-400">Band conditions not available</p>');
+                return;
+            }
+            
+            // Helper function to get current rating
+            function getCurrentRating(bandInfo) {
+                if (typeof bandInfo === 'object' && bandInfo.day_rating && bandInfo.night_rating) {
+                    return isDaytime ? bandInfo.day_rating : bandInfo.night_rating;
+                }
+                // Fallback for old format
+                return isDaytime ? bandInfo.day : bandInfo.night;
+            }
+            
+            // Helper function to get band status
+            function getBandStatus(bandName, bandInfo) {
+                const currentRating = getCurrentRating(bandInfo);
+                const isBestBand = bestBands.includes(bandName);
+                
+                if (isBestBand) {
+                    return 'bg-green-900 text-green-200 border-green-500';
+                } else if (currentRating === 'Excellent' || currentRating === 'Good') {
+                    return 'bg-blue-900 text-blue-200 border-blue-500';
+                } else if (currentRating === 'Fair') {
+                    return 'bg-yellow-900 text-yellow-200 border-yellow-500';
+                } else {
+                    return 'bg-red-900 text-red-200 border-red-500';
+                }
+            }
+            
+            safeSetHTML(bandDiv, `
+                <div class="space-y-4">
+                    <!-- Current Time Context -->
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <div class="text-sm text-gray-400">Current Conditions (${isDaytime ? 'Day' : 'Night'})</div>
+                        <div class="text-lg font-semibold">Best Bands: ${bestBands.join(', ') || 'None'}</div>
+                    </div>
+                    
+                    <!-- Band Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${Object.entries(bandConditions).map(([bandName, bandInfo]) => {
+                            const currentRating = getCurrentRating(bandInfo);
+                            const statusClass = getBandStatus(bandName, bandInfo);
+                            const isBestBand = bestBands.includes(bandName);
+                            
+                            return `
+                                <div class="border-2 rounded-lg p-4 ${statusClass}">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <h3 class="text-lg font-semibold">${bandName}</h3>
+                                        ${isBestBand ? '<span class="text-xs bg-green-700 px-2 py-1 rounded">BEST</span>' : ''}
+                                    </div>
+                                    
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-sm opacity-75">Day:</span>
+                                            <span class="font-medium ${updateConditionClass(bandInfo.day_rating || bandInfo.day)}">
+                                                ${bandInfo.day_rating || bandInfo.day || 'N/A'}
+                                            </span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-sm opacity-75">Night:</span>
+                                            <span class="font-medium ${updateConditionClass(bandInfo.night_rating || bandInfo.night)}">
+                                                ${bandInfo.night_rating || bandInfo.night || 'N/A'}
+                                            </span>
+                                        </div>
+                                        
+                                        ${bandInfo.notes ? `
+                                            <div class="mt-2 p-2 bg-black bg-opacity-30 rounded text-xs">
+                                                ${bandInfo.notes}
+                                            </div>
+                                        ` : ''}
+                                        
+                                        <div class="mt-2 text-xs opacity-75">
+                                            Current: <span class="font-medium">${currentRating}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <div class="text-sm text-gray-400 mb-2">Legend:</div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-green-900 border border-green-500 rounded mr-2"></div>
+                                <span>Best Bands</span>
                             </div>
-                            <div>
-                                <span class="text-gray-400">Night:</span>
-                                <span class="ml-2 ${updateConditionClass(conditions.night)}">${conditions.night}</span>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-blue-900 border border-blue-500 rounded mr-2"></div>
+                                <span>Good/Excellent</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-yellow-900 border border-yellow-500 rounded mr-2"></div>
+                                <span>Fair</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-red-900 border border-red-500 rounded mr-2"></div>
+                                <span>Poor</span>
                             </div>
                         </div>
                     </div>
-                `).join(''));
+                </div>
+            `);
         }
 
         function updateWeatherConditions(data) {
@@ -480,64 +485,162 @@
                 return;
             }
             const summary = data.propagation_summary;
+            
+            // Helper function to format aurora conditions
+            function formatAurora(aurora) {
+                if (typeof aurora === 'string') return aurora;
+                return `${aurora.activity} - ${aurora.impact}`;
+            }
+            
+            // Helper function to format tropo conditions
+            function formatTropo(tropo) {
+                if (typeof tropo === 'string') return tropo;
+                return `${tropo.condition} - ${tropo.impact}`;
+            }
+            
             safeSetHTML(propagationDiv, `
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">Current Time</div>
-                        <div class="text-xl font-semibold">${summary.current_time}</div>
-                        <div class="text-sm text-gray-400">${summary.day_night}</div>
-                        <div class="text-sm text-gray-400">Sunrise: ${summary.sunrise}</div>
-                        <div class="text-sm text-gray-400">Sunset: ${summary.sunset}</div>
-                    </div>
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">Solar Conditions</div>
-                        <div class="space-y-1">
-                            <div>SFI: ${summary.solar_conditions.sfi}</div>
-                            <div>A-Index: ${summary.solar_conditions.a_index}</div>
-                            <div>K-Index: ${summary.solar_conditions.k_index}</div>
-                            <div>Aurora: ${summary.solar_conditions.aurora}</div>
+                <div class="space-y-6">
+                    <!-- Main Propagation Overview -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Current Time</div>
+                            <div class="text-xl font-semibold">${summary.current_time}</div>
+                            <div class="text-sm text-gray-400">${summary.day_night}</div>
+                            <div class="text-sm text-gray-400">Sunrise: ${summary.sunrise}</div>
+                            <div class="text-sm text-gray-400">Sunset: ${summary.sunset}</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Location</div>
+                            <div class="text-lg font-semibold">${summary.location?.grid || 'N/A'}</div>
+                            <div class="text-sm text-gray-400">${summary.location?.location_name || summary.location?.latitude + '°N, ' + summary.location?.longitude + '°W'}</div>
+                            <div class="text-sm text-gray-400">${summary.location?.latitude}°N, ${summary.location?.longitude}°W</div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">MUF</div>
+                            <div class="text-xl font-semibold">${summary.propagation_parameters?.muf || 'N/A'}</div>
+                            <div class="text-gray-400 mt-2">Quality</div>
+                            <div class="text-lg ${getPropagationQualityClass(summary.propagation_parameters?.quality)}">
+                                ${summary.propagation_parameters?.quality || 'N/A'}
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Best Bands</div>
+                            <div class="text-lg font-semibold">${summary.propagation_parameters?.best_bands?.join(', ') || 'N/A'}</div>
+                            <div class="text-sm text-gray-400 mt-2">Skip Distances</div>
+                            <div class="text-sm">
+                                ${Object.entries(summary.propagation_parameters?.skip_distances || {}).map(([band, dist]) => 
+                                    `${band}: ${dist}`
+                                ).join(', ')}
+                            </div>
                         </div>
                     </div>
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">MUF</div>
-                        <div class="text-xl font-semibold">${summary.muf}</div>
-                        <div class="text-gray-400 mt-2">Best Bands</div>
-                        <div class="text-lg">${summary.best_bands.join(', ')}</div>
-                    </div>
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">Overall Quality</div>
-                        <div class="text-xl font-semibold ${getPropagationQualityClass(summary.propagation_quality)}">
-                            ${summary.propagation_quality}
+
+                    <!-- Solar Conditions and Cycle -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Solar Conditions</div>
+                            <div class="space-y-1">
+                                <div>SFI: ${summary.solar_conditions.sfi}</div>
+                                <div>A-Index: ${summary.solar_conditions.a_index}</div>
+                                <div>K-Index: ${summary.solar_conditions.k_index}</div>
+                                <div>Aurora: ${summary.solar_conditions.aurora}</div>
+                                <div>Sunspots: ${summary.solar_conditions.sunspots}</div>
+                                <div>X-Ray: ${summary.solar_conditions.xray}</div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Solar Cycle</div>
+                            <div class="space-y-1">
+                                <div class="font-semibold">${summary.solar_cycle?.phase || 'N/A'}</div>
+                                <div class="text-sm">${summary.solar_cycle?.prediction || 'N/A'}</div>
+                                <div class="text-sm">Trend: ${summary.solar_cycle?.sfi_trend || 'N/A'}</div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Weather Context</div>
+                            <div class="space-y-1">
+                                <div>Temp: ${summary.weather_context?.temperature || 'N/A'}</div>
+                                <div>Humidity: ${summary.weather_context?.humidity || 'N/A'}</div>
+                                <div>Pressure: ${summary.weather_context?.pressure || 'N/A'}</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">Aurora Conditions</div>
-                        <div class="text-lg">${summary.aurora_conditions}</div>
+
+                    <!-- Aurora and Tropospheric Conditions -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Aurora Conditions</div>
+                            <div class="space-y-2">
+                                <div class="font-semibold">${formatAurora(summary.aurora_conditions)}</div>
+                                ${typeof summary.aurora_conditions === 'object' ? `
+                                    <div class="text-sm">Affected Bands: ${summary.aurora_conditions.affected_bands}</div>
+                                    <div class="text-sm">Recommendation: ${summary.aurora_conditions.recommendation}</div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Tropospheric Conditions</div>
+                            <div class="space-y-2">
+                                <div class="font-semibold">${formatTropo(summary.tropo_conditions)}</div>
+                                ${typeof summary.tropo_conditions === 'object' ? `
+                                    <div class="text-sm">Score: ${summary.tropo_conditions.score || 'N/A'}</div>
+                                    <div class="text-sm">Recommendation: ${summary.tropo_conditions.recommendation}</div>
+                                ` : ''}
+                            </div>
+                        </div>
                     </div>
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">Tropospheric Conditions</div>
-                        <div class="text-lg">${summary.tropo_conditions}</div>
+
+                    <!-- Recommendations and Summary -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Operating Recommendations</div>
+                            <div class="space-y-1 mt-2">
+                                ${(summary.recommendations || []).map(rec => 
+                                    `<div class="text-sm">• ${rec}</div>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Key Factors</div>
+                            <div class="space-y-1 mt-2">
+                                ${(summary.summary?.key_factors || []).map(factor => 
+                                    `<div class="text-sm">• ${factor}</div>`
+                                ).join('')}
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="mt-4">
-                    <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        ${Object.entries(summary.band_conditions)
-                            .map(([band, condition]) => `
-                                <div class="bg-gray-800 p-3 rounded-lg">
-                                    <div class="text-gray-400">${band}</div>
-                                    <div class="grid grid-cols-2 gap-2 mt-1">
-                                        <div>
+
+                    <!-- Next Hours Outlook -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400">Next Hours Outlook</div>
+                        <div class="text-lg mt-2">${summary.summary?.next_hours_outlook || 'N/A'}</div>
+                    </div>
+
+                    <!-- Detailed Band Conditions -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">Detailed Band Conditions</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            ${Object.entries(summary.band_conditions || {}).map(([band, condition]) => `
+                                <div class="bg-gray-800 p-4 rounded-lg">
+                                    <div class="text-lg font-semibold mb-2">${band}</div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
                                             <span class="text-sm text-gray-400">Day:</span>
-                                            <span class="ml-1 ${updateConditionClass(condition.day)}">${condition.day}</span>
+                                            <span class="${updateConditionClass(condition.day_rating)}">${condition.day_rating}</span>
                                         </div>
-                                        <div>
+                                        <div class="flex justify-between">
                                             <span class="text-sm text-gray-400">Night:</span>
-                                            <span class="ml-1 ${updateConditionClass(condition.night)}">${condition.night}</span>
+                                            <span class="${updateConditionClass(condition.night_rating)}">${condition.night_rating}</span>
                                         </div>
+                                        ${condition.notes ? `
+                                            <div class="text-xs text-gray-400 mt-2 p-2 bg-gray-700 rounded">
+                                                ${condition.notes}
+                                            </div>
+                                        ` : ''}
                                     </div>
                                 </div>
                             `).join('')}
+                        </div>
                     </div>
                 </div>
             `);
@@ -546,12 +649,70 @@
         function updateDXCCConditions(data) {
             if (!dxccDiv) return;
             if (data.dxcc_conditions) {
-                let dxccHtml = '';
-                // ... existing code for building dxccHtml ...
-                // For brevity, you can modularize this further if needed
-                dxccDiv.innerHTML = dxccHtml;
+                const dxcc = data.dxcc_conditions;
+                safeSetHTML(dxccDiv, `
+                    <div class="space-y-4">
+                        <!-- Current Location -->
+                        <div>
+                            <h3 class="text-lg font-medium mb-2">Current Location</h3>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Name:</span>
+                                    <span class="font-semibold">${dxcc.current?.name || 'N/A'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Continent:</span>
+                                    <span class="font-semibold">${dxcc.current?.continent || 'N/A'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">ITU Zone:</span>
+                                    <span class="font-semibold">${dxcc.current?.itu_zone || 'N/A'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">CQ Zone:</span>
+                                    <span class="font-semibold">${dxcc.current?.cq_zone || 'N/A'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Prefixes:</span>
+                                    <span class="font-semibold">${dxcc.current?.prefixes?.join(', ') || 'N/A'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Timezone:</span>
+                                    <span class="font-semibold">${dxcc.current?.timezone || 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${dxcc.nearby && dxcc.nearby.length > 0 ? `
+                            <!-- Nearby Entities -->
+                            <div>
+                                <h3 class="text-lg font-medium mb-2">Nearby Entities</h3>
+                                <div class="space-y-2 max-h-32 overflow-y-auto">
+                                    ${dxcc.nearby.slice(0, 3).map(entity => `
+                                        <div class="bg-gray-800 p-2 rounded text-sm">
+                                            <div class="font-semibold">${entity.name}</div>
+                                            <div class="text-gray-400">${entity.distance} km • ${entity.continent}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${dxcc.propagation ? `
+                            <!-- Propagation Conditions -->
+                            <div>
+                                <h3 class="text-lg font-medium mb-2">Propagation</h3>
+                                <div class="space-y-1 text-sm">
+                                    <div><span class="text-gray-400">Best Bands:</span> ${dxcc.propagation.best_bands?.join(', ') || 'N/A'}</div>
+                                    <div><span class="text-gray-400">Best Times:</span> ${dxcc.propagation.best_times?.join(', ') || 'N/A'}</div>
+                                    <div><span class="text-gray-400">Best Directions:</span> ${dxcc.propagation.best_directions?.join(', ') || 'N/A'}</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `);
             } else {
-                dxccDiv.innerHTML = '<p class="text-gray-400">DXCC data not available</p>';
+                safeSetHTML(dxccDiv, '<p class="text-gray-400">DXCC data not available</p>');
             }
         }
 
@@ -616,7 +777,6 @@
         function updateConditionsUI(data) {
             updateTimestampAndLocation(data);
             updateSolarConditions(data);
-            updateBandConditions(data);
             updateWeatherConditions(data);
             updatePropagationSummary(data);
             updateDXCCConditions(data);
