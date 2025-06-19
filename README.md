@@ -5,8 +5,9 @@ This application fetches real-time ham radio band conditions and environmental d
 - Solar conditions (SFI, A-index, K-index, X-ray, Sunspots, Flux)
 - Band conditions for day and night
 - Current weather conditions
+- Detailed propogation report
 - DXCC entity information and conditions
-- Live spots from the IARC network
+- Live spots from the PSK Network
 - QRZ XML Database API integration for callsign information
 
 ## Setup
@@ -57,10 +58,11 @@ The application will be available at http://localhost:8087
 
 - Real-time solar and geomagnetic data from HamQSL
 - Detailed band condition forecasts for day and night
+- Detailed propogation summary and recommendations
 - Weather conditions
 - Comprehensive propagation reports
 - DXCC entity information with ITU and CQ zones
-- Live spots from the IARC network
+- Live spots from the PSK Network
 - QRZ XML Database API integration with comprehensive callsign information:
   - Basic info (callsign, name, location)
   - License details (class, effective date, expiration)
@@ -70,8 +72,6 @@ The application will be available at http://localhost:8087
   - IOTA and other awards
   - Contact information
 - Modern, responsive UI with real-time updates
-- Hourly updates for propagation data
-- 5-minute updates for live spots
 
 ## Project Structure
 
@@ -87,7 +87,7 @@ The application will be available at http://localhost:8087
 
 - HamQSL XML Feed (http://www.hamqsl.com/solarxml.php) for propagation and solar data
 - OpenWeatherMap API for weather data
-- IARC API (https://holycluster.iarc.org) for live spots
+- PSK API https://pskreporter.info/pskmap.html for live spots
 - DXCC database for entity information
 - QRZ XML Database API (https://xmldata.qrz.com) for callsign lookups
 
