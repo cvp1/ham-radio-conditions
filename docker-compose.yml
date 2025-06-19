@@ -14,4 +14,8 @@ services:
       - QRZ_PASSWORD=${QRZ_PASSWORD:-}
     volumes:
       - .:/app
-    restart: unless-stopped 
+      - ham_radio_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  ham_radio_data: 

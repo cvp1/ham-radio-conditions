@@ -9,6 +9,7 @@ This application fetches real-time ham radio band conditions and environmental d
 - DXCC entity information and conditions
 - Live spots from the PSK Network
 - QRZ XML Database API integration for callsign information
+- **Persistent SQLite database for storing spots, QRZ cache, and user preferences**
 
 ## Setup
 
@@ -63,6 +64,10 @@ The application will be available at http://localhost:8087
 - Comprehensive propagation reports
 - DXCC entity information with ITU and CQ zones
 - Live spots from the PSK Network
+- **Persistent SQLite database with automatic data retention**
+- **Historical spots data with customizable time ranges**
+- **QRZ lookup caching for improved performance**
+- **User preferences storage**
 - QRZ XML Database API integration with comprehensive callsign information:
   - Basic info (callsign, name, location)
   - License details (class, effective date, expiration)
@@ -73,13 +78,35 @@ The application will be available at http://localhost:8087
   - Contact information
 - Modern, responsive UI with real-time updates
 
+## Database Features
+
+The application now uses SQLite for persistent storage with the following capabilities:
+
+### Data Storage
+- **Spots History**: All live spots are automatically stored in the database
+- **QRZ Cache**: QRZ lookups are cached to reduce API calls and improve performance
+- **User Preferences**: User settings and preferences are stored persistently
+
+### Data Management
+- **Automatic Cleanup**: Old data is automatically cleaned up (7 days retention by default)
+- **Database Statistics**: View database size and record counts via API
+- **Historical Queries**: Query spots data with customizable time ranges
+
+### API Endpoints
+- `GET /api/spots/history?hours=24&limit=100` - Get historical spots
+- `GET /api/preferences` - Get user preferences
+- `POST /api/preferences` - Save user preferences
+- `GET /api/database/stats` - Get database statistics
+
 ## Project Structure
 
 - `app.py` - Main application entry point
 - `ham_radio_conditions.py` - Core functionality for ham radio conditions
 - `dxcc_data.py` - DXCC entity information handling
 - `qrz_data.py` - QRZ XML Database API integration
+- `database.py` - SQLite database management and operations
 - `templates/` - HTML templates for the web interface
+- `data/` - SQLite database files (created automatically)
 - `Dockerfile` - Container configuration
 - `docker-compose.yml` - Docker Compose configuration
 
@@ -90,6 +117,7 @@ The application will be available at http://localhost:8087
 - PSK API https://pskreporter.info/pskmap.html for live spots
 - DXCC database for entity information
 - QRZ XML Database API (https://xmldata.qrz.com) for callsign lookups
+- **SQLite database for persistent local storage**
 
 ## UI Features
 
@@ -103,7 +131,6 @@ The application will be available at http://localhost:8087
   - Callsign
   - Frequency
   - Mode
-  - Band
   - DXCC entity
   - Comments
   - QRZ lookup integration with detailed callsign information:
@@ -121,6 +148,7 @@ The application will be available at http://localhost:8087
 - Live spots: Updates every 5 minutes
 - Weather data: Updates on each request
 - QRZ lookups: On-demand when viewing spot details or using the QRZ lookup feature
+- **Database cleanup: Runs every hour to maintain optimal performance**
 
 ## QRZ Integration
 
@@ -128,6 +156,7 @@ The application uses the QRZ XML Database API to provide comprehensive callsign 
 
 - Authentication using QRZ.com login credentials
 - Session management with automatic re-authentication
+- **Caching of lookup results in SQLite database for improved performance**
 - Comprehensive data extraction including:
   - Basic operator information
   - License details
@@ -138,4 +167,18 @@ The application uses the QRZ XML Database API to provide comprehensive callsign 
   - Contact information
 - Error handling and retry logic
 - Formatted display of all available information
-- Automatic session expiration handling 
+- Automatic session expiration handling
+
+## Database Configuration
+
+The SQLite database is automatically created in the `data/` directory and includes:
+
+- **Spots Table**: Stores all live spots with timestamps
+- **QRZ Cache Table**: Caches QRZ lookup results
+- **User Preferences Table**: Stores user settings
+- **Automatic Indexing**: Optimized queries for better performance
+- **Data Retention**: Configurable cleanup of old data
+
+## Docker Volume Persistence
+
+When using Docker, the database is stored in a named volume (`ham_radio_data`) to ensure data persistence across container restarts and updates. 
