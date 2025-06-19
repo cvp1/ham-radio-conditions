@@ -215,7 +215,6 @@
                                     <th class="px-4 py-2">Callsign</th>
                                     <th class="px-4 py-2">Frequency</th>
                                     <th class="px-4 py-2">Mode</th>
-                                    <th class="px-4 py-2">Band</th>
                                     <th class="px-4 py-2">DXCC</th>
                                     <th class="px-4 py-2">Source</th>
                                     <th class="px-4 py-2">Comment</th>
@@ -223,7 +222,7 @@
                             </thead>
                             <tbody id="spots-table-body">
                                 <tr>
-                                    <td colspan="8" class="px-4 py-2 text-center text-gray-400">
+                                    <td colspan="7" class="px-4 py-2 text-center text-gray-400">
                                         Loading spots data...
                                     </td>
                                 </tr>
@@ -739,7 +738,6 @@
                             <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
                             <td class="px-4 py-2 font-mono">${spot.frequency || '-'}</td>
                             <td class="px-4 py-2">${spot.mode || '-'}</td>
-                            <td class="px-4 py-2">${spot.band || '-'}</td>
                             <td class="px-4 py-2">${spot.dxcc || '-'}</td>
                             <td class="px-4 py-2">
                                 <span class="px-2 py-1 rounded text-sm ${spot.source?.includes('RBN') ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
@@ -752,7 +750,7 @@
                 } else {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="8" class="px-4 py-2 text-center text-gray-400">
+                            <td colspan="7" class="px-4 py-2 text-center text-gray-400">
                                 No spots available at this time
                             </td>
                         </tr>

@@ -21,7 +21,7 @@ from astral.sun import sun
 
 # Configure logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
@@ -158,14 +158,27 @@ class HamRadioConditions:
             for report in root.findall('.//receptionReport')[:15]:  # Process fewer items for speed
                 try:
                     # Extract data from XML attributes
+                    raw_freq = report.get('frequency', 0)
+                    
+                    # Handle different frequency formats
+                    try:
+                        if isinstance(raw_freq, str):
+                            # Remove any non-numeric characters except decimal point
+                            raw_freq = ''.join(c for c in raw_freq if c.isdigit() or c == '.')
+                        freq_hz = float(raw_freq)
+                        freq_mhz = freq_hz / 1000000  # Convert Hz to MHz
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Error parsing frequency '{raw_freq}': {e}")
+                        freq_hz = 0
+                        freq_mhz = 0
+                    
                     spot = {
                         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # PSKReporter doesn't provide timestamp
                         'callsign': report.get('senderCallsign', ''),
-                        'frequency': str(float(report.get('frequency', 0)) / 1000000),  # Convert Hz to MHz
+                        'frequency': f"{freq_mhz:.6f}".rstrip('0').rstrip('.') if freq_mhz > 0 else '0',
                         'spotter': report.get('receiverCallsign', ''),
                         'comment': f"SNR: {report.get('sNR', 'N/A')}",
                         'mode': report.get('mode', 'Unknown'),
-                        'band': self._freq_to_band(float(report.get('frequency', 0))),
                         'dxcc': report.get('senderDXCC', ''),
                         'source': 'PSKReporter'
                     }
@@ -175,15 +188,12 @@ class HamRadioConditions:
                     continue
             
             # Generate summary
-            bands = set(s['band'] for s in spots if s['band'] != 'Unknown')
             modes = set(s['mode'] for s in spots if s['mode'] != 'Unknown')
             dxcc_entities = set(s['dxcc'] for s in spots if s['dxcc'])
-            
             return {
                 'spots': spots,
                 'summary': {
                     'total_spots': len(spots),
-                    'active_bands': sorted(list(bands)),
                     'active_modes': sorted(list(modes)),
                     'active_dxcc': sorted(list(dxcc_entities))[:10],
                     'source': 'PSKReporter'
@@ -195,6 +205,14 @@ class HamRadioConditions:
             return None
         except requests.exceptions.RequestException as e:
             logger.debug(f"PSKReporter request error: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.debug(f"PSKReporter HTTP status: {e.response.status_code}")
+                if e.response.status_code == 503:
+                    logger.info("PSKReporter service temporarily unavailable (503) - using fallback data")
+                elif e.response.status_code == 429:
+                    logger.info("PSKReporter rate limit exceeded (429) - using fallback data")
+                else:
+                    logger.info(f"PSKReporter HTTP error {e.response.status_code} - using fallback data")
             return None
         except Exception as e:
             logger.debug(f"PSKReporter error: {e}")
@@ -209,7 +227,6 @@ class HamRadioConditions:
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'callsign': 'W1AW',
                     'frequency': '14.205',
-                    'band': '20m',
                     'mode': 'SSB',
                     'spotter': 'N0CVP',
                     'comment': 'ARRL HQ Station',
@@ -220,19 +237,38 @@ class HamRadioConditions:
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'callsign': 'VE1ABC',
                     'frequency': '7.155',
-                    'band': '40m',
                     'mode': 'CW',
                     'spotter': 'W1ABC',
                     'comment': 'Strong signal',
                     'dxcc': '1',
                     'source': 'Test'
+                },
+                {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'callsign': 'K1ABC',
+                    'frequency': '3.8',
+                    'mode': 'SSB',
+                    'spotter': 'W2XYZ',
+                    'comment': 'Evening net',
+                    'dxcc': '291',
+                    'source': 'Test'
+                },
+                {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'callsign': 'G4ABC',
+                    'frequency': '28.5',
+                    'mode': 'SSB',
+                    'spotter': 'W3DEF',
+                    'comment': 'DX contact',
+                    'dxcc': '223',
+                    'source': 'Test'
                 }
             ],
             'summary': {
-                'total_spots': 2,
-                'active_bands': ['20m', '40m'],
+                'total_spots': 4,
+                'active_bands': ['20m', '40m', '80m', '10m'],
                 'active_modes': ['SSB', 'CW'],
-                'active_dxcc': ['291', '1'],
+                'active_dxcc': ['291', '1', '223'],
                 'source': 'Test Data'
             }
         }
@@ -677,6 +713,8 @@ class HamRadioConditions:
         """Convert frequency to amateur radio band"""
         try:
             freq = float(freq)
+            
+            # Standard amateur radio band ranges
             if 1800 <= freq <= 2000:
                 return '160m'
             elif 3500 <= freq <= 4000:
@@ -699,6 +737,60 @@ class HamRadioConditions:
                 return '6m'
             elif 144000 <= freq <= 148000:
                 return '2m'
+            elif 220000 <= freq <= 225000:
+                return '1.25m'
+            elif 420000 <= freq <= 450000:
+                return '70cm'
+            elif 902000 <= freq <= 928000:
+                return '33cm'
+            elif 1240000 <= freq <= 1300000:
+                return '23cm'
+            
+            # Comprehensive tolerance ranges for frequencies slightly outside standard ranges
+            # 160m band tolerance
+            elif 1790 <= freq <= 2010:
+                return '160m'
+            
+            # 80m band tolerance
+            elif 3490 <= freq <= 4010:
+                return '80m'
+            
+            # 40m band tolerance - expanded to cover 7.075683 MHz
+            elif 6950 <= freq <= 7350:
+                return '40m'
+            
+            # 30m band tolerance
+            elif 10050 <= freq <= 10200:
+                return '30m'
+            
+            # 20m band tolerance - expanded to cover all 14.07x MHz frequencies
+            elif 13950 <= freq <= 14450:
+                return '20m'
+            
+            # 17m band tolerance - expanded to cover 18.101562 MHz
+            elif 18050 <= freq <= 18200:
+                return '17m'
+            
+            # 15m band tolerance - expanded to cover all 21.07x MHz frequencies
+            elif 20950 <= freq <= 21500:
+                return '15m'
+            
+            # 12m band tolerance
+            elif 24880 <= freq <= 25000:
+                return '12m'
+            
+            # 10m band tolerance
+            elif 27990 <= freq <= 29710:
+                return '10m'
+            
+            # 6m band tolerance
+            elif 49990 <= freq <= 54010:
+                return '6m'
+            
+            # 2m band tolerance
+            elif 143990 <= freq <= 148010:
+                return '2m'
+            
             else:
                 return 'Unknown'
         except:
@@ -1549,7 +1641,6 @@ class HamRadioConditions:
             print("\nActivity Summary:")
             summary = activity['summary']
             print(f"Total Spots: {summary['total_spots']}")
-            print(f"Active Bands: {', '.join(summary['active_bands'])}")
             print(f"Active Modes: {', '.join(summary['active_modes'])}")
             print(f"Active DXCC Entities: {', '.join(summary['active_dxcc'])}")
             print(f"Source: {summary['source']}")
