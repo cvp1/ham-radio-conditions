@@ -684,28 +684,16 @@
                         </div>
                         
                         ${dxcc.nearby && dxcc.nearby.length > 0 ? `
-                            <!-- Nearby Entities -->
+                            <!-- Nearby DXCC Entities -->
                             <div>
-                                <h3 class="text-lg font-medium mb-2">Nearby Entities</h3>
-                                <div class="space-y-2 max-h-32 overflow-y-auto">
-                                    ${dxcc.nearby.slice(0, 3).map(entity => `
-                                        <div class="bg-gray-800 p-2 rounded text-sm">
-                                            <div class="font-semibold">${entity.name}</div>
-                                            <div class="text-gray-400">${entity.distance} km • ${entity.continent}</div>
+                                <h3 class="text-lg font-medium mb-2">Nearby DXCC Entities</h3>
+                                <div class="space-y-2">
+                                    ${dxcc.nearby.map(entity => `
+                                        <div class="flex justify-between text-sm">
+                                            <span class="text-gray-400">${entity.name}:</span>
+                                            <span class="font-semibold">${entity.continent} (ITU: ${entity.itu_zone}, CQ: ${entity.cq_zone})</span>
                                         </div>
                                     `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-                        
-                        ${dxcc.propagation ? `
-                            <!-- Propagation Conditions -->
-                            <div>
-                                <h3 class="text-lg font-medium mb-2">Propagation</h3>
-                                <div class="space-y-1 text-sm">
-                                    <div><span class="text-gray-400">Best Bands:</span> ${dxcc.propagation.best_bands?.join(', ') || 'N/A'}</div>
-                                    <div><span class="text-gray-400">Best Times:</span> ${dxcc.propagation.best_times?.join(', ') || 'N/A'}</div>
-                                    <div><span class="text-gray-400">Best Directions:</span> ${dxcc.propagation.best_directions?.join(', ') || 'N/A'}</div>
                                 </div>
                             </div>
                         ` : ''}

@@ -9,8 +9,7 @@ import xml.etree.ElementTree as ET
 import math
 from dxcc_data import (
     get_dxcc_by_grid,
-    get_nearby_dxcc,
-    get_propagation_conditions
+    get_nearby_dxcc
 )
 from typing import Dict
 import pytz
@@ -1015,13 +1014,9 @@ class HamRadioConditions:
             # Get nearby DXCC entities
             nearby_entities = get_nearby_dxcc(grid_square)
             
-            # Get propagation conditions
-            propagation = get_propagation_conditions(grid_square)
-            
             return {
                 'current': current_dxcc,
-                'nearby': nearby_entities,
-                'propagation': propagation
+                'nearby': nearby_entities
             }
         except Exception as e:
             print(f"Error getting DXCC conditions: {str(e)}")
@@ -1034,13 +1029,7 @@ class HamRadioConditions:
                     'prefixes': [],
                     'timezone': 'UTC'
                 },
-                'nearby': [],
-                'propagation': {
-                    'best_bands': [],
-                    'best_times': [],
-                    'best_directions': [],
-                    'distance': 0
-                }
+                'nearby': []
             }
 
     def _calculate_itu_zone(self, lat: float, lon: float) -> int:
@@ -1549,11 +1538,6 @@ class HamRadioConditions:
                 print(tabulate(nearby_data, 
                              headers=['Name', 'Continent', 'ITU Zone', 'CQ Zone'], 
                              tablefmt='grid'))
-            
-            if dxcc['propagation']:
-                print("\nPropagation Conditions:")
-                prop_data = [[k, v] for k, v in dxcc['propagation'].items()]
-                print(tabulate(prop_data, headers=['Parameter', 'Value'], tablefmt='grid'))
             print()
 
         # Live Activity
