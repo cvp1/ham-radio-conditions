@@ -10,6 +10,33 @@ This application fetches real-time ham radio band conditions and environmental d
 - Live spots from the PSK Network
 - QRZ XML Database API integration for callsign information
 - **Persistent SQLite database for storing spots, QRZ cache, and user preferences**
+- **Progressive Web App (PWA) with offline support and install capability**
+
+## PWA Features
+
+This application is now a full Progressive Web App (PWA) with the following features:
+
+### Installation
+- **Install to Home Screen**: Users can install the app on their mobile devices and desktop
+- **App-like Experience**: Runs in standalone mode without browser UI
+- **Automatic Updates**: Service worker handles app updates seamlessly
+
+### Offline Functionality
+- **Offline Support**: App works offline with cached data
+- **Smart Caching**: Static files and API responses are cached for offline use
+- **Offline Page**: Custom offline page when no cached content is available
+- **Background Sync**: Data updates automatically when connection is restored
+
+### Performance
+- **Fast Loading**: Critical resources are cached for instant loading
+- **Network Optimization**: Network-first strategy for API calls with cache fallback
+- **Background Updates**: Data refreshes in the background
+
+### User Experience
+- **Install Prompt**: Automatic install prompt for eligible users
+- **Update Notifications**: Notifies users when new versions are available
+- **Responsive Design**: Optimized for all screen sizes and orientations
+- **Safe Area Support**: Proper handling of device notches and home indicators
 
 ## Setup
 
@@ -106,6 +133,11 @@ The application now uses SQLite for persistent storage with the following capabi
 - `qrz_data.py` - QRZ XML Database API integration
 - `database.py` - SQLite database management and operations
 - `templates/` - HTML templates for the web interface
+- `static/` - Static files for PWA functionality
+  - `manifest.json` - PWA manifest file
+  - `sw.js` - Service worker for offline functionality
+  - `offline.html` - Offline page
+  - `icons/` - App icons for various sizes
 - `data/` - SQLite database files (created automatically)
 - `Dockerfile` - Container configuration
 - `docker-compose.yml` - Docker Compose configuration

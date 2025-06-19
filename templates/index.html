@@ -4,8 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ham Radio Conditions</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Real-time ham radio propagation conditions, solar weather, and live spots">
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ham Radio">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-72x72.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-72x72.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/static/icons/icon-152x152.png">
+    
+    <!-- Stylesheets -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
     <style>
         .card {
             background: rgba(255, 255, 255, 0.1);
@@ -55,6 +77,14 @@
         .propagation-good { color: #3B82F6; }
         .propagation-fair { color: #F59E0B; }
         .propagation-poor { color: #EF4444; }
+        
+        /* PWA specific styles */
+        @media (display-mode: standalone) {
+            body {
+                padding-top: env(safe-area-inset-top);
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -913,6 +943,97 @@
             if (e.key === 'Enter') {
                 updateLocation();
             }
+        });
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', function() {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', function() {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // New service worker available
+                                    if (confirm('A new version of Ham Radio Conditions is available. Would you like to update?')) {
+                                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                        window.location.reload();
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch(function(error) {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // PWA Install Prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Show install button if not already installed
+            if (!window.matchMedia('(display-mode: standalone)').matches) {
+                showInstallButton();
+            }
+        });
+
+        function showInstallButton() {
+            // Create install button
+            const installButton = document.createElement('button');
+            installButton.textContent = 'Install App';
+            installButton.className = 'fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-colors';
+            installButton.onclick = installApp;
+            document.body.appendChild(installButton);
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                if (installButton.parentNode) {
+                    installButton.remove();
+                }
+            }, 10000);
+        }
+
+        async function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log('Install prompt outcome:', outcome);
+                deferredPrompt = null;
+                
+                // Remove install button
+                const installButton = document.querySelector('button[onclick="installApp()"]');
+                if (installButton) {
+                    installButton.remove();
+                }
+            }
+        }
+
+        // Handle app installed event
+        window.addEventListener('appinstalled', (evt) => {
+            console.log('App was installed');
+            // Remove install button if present
+            const installButton = document.querySelector('button[onclick="installApp()"]');
+            if (installButton) {
+                installButton.remove();
+            }
+        });
+
+        // Online/Offline status handling
+        window.addEventListener('online', function() {
+            console.log('App is online');
+            // Refresh data when coming back online
+            fetchSpots();
+        });
+
+        window.addEventListener('offline', function() {
+            console.log('App is offline');
         });
     </script>
 </body>

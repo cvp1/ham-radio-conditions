@@ -1,0 +1,89 @@
+{
+  "name": "Ham Radio Conditions",
+  "short_name": "Ham Radio",
+  "description": "Real-time ham radio propagation conditions, solar weather, and live spots",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["utilities", "weather", "communication"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/static/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Spots",
+      "short_name": "Spots",
+      "description": "View live ham radio spots",
+      "url": "/?section=spots",
+      "icons": [
+        {
+          "src": "/static/icons/spots-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "QRZ Lookup",
+      "short_name": "QRZ",
+      "description": "Look up ham radio callsigns",
+      "url": "/?section=qrz",
+      "icons": [
+        {
+          "src": "/static/icons/qrz-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+} 

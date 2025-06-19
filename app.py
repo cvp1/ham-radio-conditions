@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from ham_radio_conditions import HamRadioConditions
 import os
 from dotenv import load_dotenv
@@ -19,7 +19,7 @@ logger.addHandler(handler)
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
 # Get configuration from environment variables
 ZIP_CODE = os.getenv('ZIP_CODE')
@@ -263,6 +263,27 @@ def update_location():
     except Exception as e:
         logger.error(f"Error updating location: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# PWA Routes
+@app.route('/manifest.json')
+def manifest():
+    """Serve the PWA manifest"""
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+
+@app.route('/sw.js')
+def service_worker():
+    """Serve the service worker"""
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+
+@app.route('/offline.html')
+def offline():
+    """Serve the offline page"""
+    return send_from_directory('static', 'offline.html')
+
+@app.route('/static/icons/<path:filename>')
+def icons(filename):
+    """Serve app icons"""
+    return send_from_directory('static/icons', filename)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001) 
