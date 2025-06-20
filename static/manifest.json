@@ -10,6 +10,8 @@
   "scope": "/",
   "lang": "en",
   "categories": ["utilities", "weather", "communication"],
+  "prefer_related_applications": false,
+  "related_applications": [],
   "icons": [
     {
       "src": "/static/icons/icon-72x72.png",

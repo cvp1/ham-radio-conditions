@@ -13,6 +13,16 @@
     <meta name="apple-mobile-web-app-title" content="Ham Radio">
     <meta name="mobile-web-app-capable" content="yes">
     
+    <!-- Safari-specific meta tags -->
+    <meta name="apple-touch-fullscreen" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    
+    <!-- Cache control for Safari -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     
@@ -29,14 +39,43 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
+        /* Cache bust: v1.1 */
         .card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .condition-good { color: #10B981; }
-        .condition-fair { color: #F59E0B; }
-        .condition-poor { color: #EF4444; }
+        
+        /* Enhanced band condition colors */
+        .condition-good { 
+            color: #10B981 !important; 
+            font-weight: 600 !important;
+            text-shadow: 0 0 8px rgba(16, 185, 129, 0.3) !important;
+        }
+        .condition-fair { 
+            color: #F59E0B !important; 
+            font-weight: 600 !important;
+            text-shadow: 0 0 8px rgba(245, 158, 11, 0.3) !important;
+        }
+        .condition-poor { 
+            color: #EF4444 !important; 
+            font-weight: 600 !important;
+            text-shadow: 0 0 8px rgba(239, 68, 68, 0.3) !important;
+        }
+        
+        /* Alternative approach with more specific selectors */
+        #band-conditions-grid .condition-good { 
+            color: #10B981 !important; 
+            font-weight: 600 !important;
+        }
+        #band-conditions-grid .condition-fair { 
+            color: #F59E0B !important; 
+            font-weight: 600 !important;
+        }
+        #band-conditions-grid .condition-poor { 
+            color: #EF4444 !important; 
+            font-weight: 600 !important;
+        }
         
         /* Icon colors and animations */
         .icon-solar { color: #F59E0B; }
@@ -95,7 +134,15 @@
 
     <div class="container mx-auto px-4 py-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-2">Ham Radio Conditions</h1>
+            <div class="flex items-center justify-between mb-4">
+                <div></div> <!-- Empty div for spacing -->
+                <h1 class="text-4xl font-bold">Ham Radio Conditions</h1>
+                <button id="refresh-button" onclick="refreshAllData()" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-lg border border-blue-500">
+                    <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                    <span>Refresh</span>
+                </button>
+            </div>
             <p class="text-gray-400" id="timestamp"></p>
             <p class="text-gray-400" id="location"></p>
         </header>
@@ -144,7 +191,7 @@
                 </h2>
                 <div id="propagation-summary" class="space-y-4">
                     {% if data.propagation_summary %}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <!-- Time and Day/Night -->
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Current Time</div>
@@ -191,28 +238,6 @@
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Tropospheric Conditions</div>
                             <div class="text-lg">{{ data.propagation_summary.tropo_conditions }}</div>
-                        </div>
-                    </div>
-
-                    <!-- Current Band Conditions -->
-                    <div class="mt-4">
-                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {% for band, conditions in data.propagation_summary.band_conditions.items() %}
-                            <div class="bg-gray-800 p-3 rounded-lg">
-                                <div class="text-gray-400">{{ band }}</div>
-                                <div class="grid grid-cols-2 gap-2 mt-1">
-                                    <div>
-                                        <span class="text-sm text-gray-400">Day:</span>
-                                        <span class="ml-1 {{ conditions.day|lower }}-condition">{{ conditions.day }}</span>
-                                    </div>
-                                    <div>
-                                        <span class="text-sm text-gray-400">Night:</span>
-                                        <span class="ml-1 {{ conditions.night|lower }}-condition">{{ conditions.night }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
                         </div>
                     </div>
                     {% else %}
@@ -301,7 +326,7 @@
         const timestampEl = document.getElementById('timestamp');
         const locationEl = document.getElementById('location');
         const solarDiv = document.getElementById('solar-conditions');
-        const bandDiv = document.getElementById('band-conditions');
+        const bandDiv = document.getElementById('band-conditions-grid');
         const weatherDiv = document.getElementById('weather-conditions');
         const propagationDiv = document.getElementById('propagation-summary');
         const dxccDiv = document.getElementById('dxcc-conditions');
@@ -365,118 +390,102 @@
         }
 
         function updateBandConditions(data) {
-            if (!bandDiv) return;
+            // Find the band conditions grid within the propagation summary
+            const bandDiv = document.getElementById('band-conditions-grid');
+            if (!bandDiv) {
+                return;
+            }
             
-            // Get detailed band conditions from propagation summary
-            const bandConditions = data.propagation_summary?.band_conditions || data.band_conditions || {};
-            const bestBands = data.propagation_summary?.propagation_parameters?.best_bands || [];
-            const isDaytime = data.propagation_summary?.day_night === 'Day';
-            
-            if (Object.keys(bandConditions).length === 0) {
+            if (!data.propagation_summary || !data.propagation_summary.band_conditions) {
                 safeSetHTML(bandDiv, '<p class="text-gray-400">Band conditions not available</p>');
                 return;
             }
             
-            // Helper function to get current rating
-            function getCurrentRating(bandInfo) {
-                if (typeof bandInfo === 'object' && bandInfo.day_rating && bandInfo.night_rating) {
-                    return isDaytime ? bandInfo.day_rating : bandInfo.night_rating;
-                }
-                // Fallback for old format
-                return isDaytime ? bandInfo.day : bandInfo.night;
-            }
+            const bandConditions = data.propagation_summary.band_conditions;
             
-            // Helper function to get band status
-            function getBandStatus(bandName, bandInfo) {
-                const currentRating = getCurrentRating(bandInfo);
-                const isBestBand = bestBands.includes(bandName);
+            // Sort bands by frequency (6m to 160m)
+            // Use a predefined order to ensure correct sorting
+            const bandOrder = ['6m', '10m', '12m', '15m', '17m', '20m', '30m', '40m', '80m', '160m'];
+            
+            const sortedBands = Object.entries(bandConditions).sort(([bandA], [bandB]) => {
+                const normalizedA = bandA.toLowerCase().trim();
+                const normalizedB = bandB.toLowerCase().trim();
                 
-                if (isBestBand) {
-                    return 'bg-green-900 text-green-200 border-green-500';
-                } else if (currentRating === 'Excellent' || currentRating === 'Good') {
-                    return 'bg-blue-900 text-blue-200 border-blue-500';
-                } else if (currentRating === 'Fair') {
-                    return 'bg-yellow-900 text-yellow-200 border-yellow-500';
-                } else {
-                    return 'bg-red-900 text-red-200 border-red-500';
+                // Helper function to find band index with multiple matching strategies
+                function findBandIndex(bandName) {
+                    // Try exact match first
+                    let index = bandOrder.findIndex(band => bandName === band.toLowerCase());
+                    if (index !== -1) return index;
+                    
+                    // Try without 'm' suffix
+                    index = bandOrder.findIndex(band => bandName === band.replace('m', '').toLowerCase());
+                    if (index !== -1) return index;
+                    
+                    // Try with just the number
+                    const numberMatch = bandName.match(/^(\d+)/);
+                    if (numberMatch) {
+                        const number = numberMatch[1];
+                        index = bandOrder.findIndex(band => band.replace('m', '') === number);
+                        if (index !== -1) return index;
+                    }
+                    
+                    // Try partial match (e.g., "160" matches "160m")
+                    index = bandOrder.findIndex(band => band.toLowerCase().includes(bandName) || bandName.includes(band.toLowerCase()));
+                    if (index !== -1) return index;
+                    
+                    return -1;
                 }
-            }
+                
+                // Find indices in the predefined order
+                const indexA = findBandIndex(normalizedA);
+                const indexB = findBandIndex(normalizedB);
+                
+                // If both bands are found in the order, sort by their position
+                if (indexA !== -1 && indexB !== -1) {
+                    return indexA - indexB;
+                }
+                
+                // If only one is found, prioritize the one in the order
+                if (indexA !== -1) return -1;
+                if (indexB !== -1) return 1;
+                
+                // If neither is found, sort alphabetically
+                return normalizedA.localeCompare(normalizedB);
+            });
             
-            safeSetHTML(bandDiv, `
-                <div class="space-y-4">
-                    <!-- Current Time Context -->
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <div class="text-sm text-gray-400">Current Conditions (${isDaytime ? 'Day' : 'Night'})</div>
-                        <div class="text-lg font-semibold">Best Bands: ${bestBands.join(', ') || 'None'}</div>
-                    </div>
-                    
-                    <!-- Band Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        ${Object.entries(bandConditions).map(([bandName, bandInfo]) => {
-                            const currentRating = getCurrentRating(bandInfo);
-                            const statusClass = getBandStatus(bandName, bandInfo);
-                            const isBestBand = bestBands.includes(bandName);
-                            
-                            return `
-                                <div class="border-2 rounded-lg p-4 ${statusClass}">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h3 class="text-lg font-semibold">${bandName}</h3>
-                                        ${isBestBand ? '<span class="text-xs bg-green-700 px-2 py-1 rounded">BEST</span>' : ''}
-                                    </div>
-                                    
-                                    <div class="space-y-2">
-                                        <div class="flex justify-between">
-                                            <span class="text-sm opacity-75">Day:</span>
-                                            <span class="font-medium ${updateConditionClass(bandInfo.day_rating || bandInfo.day)}">
-                                                ${bandInfo.day_rating || bandInfo.day || 'N/A'}
-                                            </span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-sm opacity-75">Night:</span>
-                                            <span class="font-medium ${updateConditionClass(bandInfo.night_rating || bandInfo.night)}">
-                                                ${bandInfo.night_rating || bandInfo.night || 'N/A'}
-                                            </span>
-                                        </div>
-                                        
-                                        ${bandInfo.notes ? `
-                                            <div class="mt-2 p-2 bg-black bg-opacity-30 rounded text-xs">
-                                                ${bandInfo.notes}
-                                            </div>
-                                        ` : ''}
-                                        
-                                        <div class="mt-2 text-xs opacity-75">
-                                            Current: <span class="font-medium">${currentRating}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    
-                    <!-- Legend -->
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <div class="text-sm text-gray-400 mb-2">Legend:</div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                            <div class="flex items-center">
-                                <div class="w-3 h-3 bg-green-900 border border-green-500 rounded mr-2"></div>
-                                <span>Best Bands</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-3 h-3 bg-blue-900 border border-blue-500 rounded mr-2"></div>
-                                <span>Good/Excellent</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-3 h-3 bg-yellow-900 border border-yellow-500 rounded mr-2"></div>
-                                <span>Fair</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="w-3 h-3 bg-red-900 border border-red-500 rounded mr-2"></div>
-                                <span>Poor</span>
-                            </div>
+            // Generate HTML for sorted bands
+            const bandHtml = sortedBands.map(([bandName, conditions]) => {
+                const dayClass = `${(conditions.day_rating || '').toLowerCase()}-condition`;
+                const nightClass = `${(conditions.night_rating || '').toLowerCase()}-condition`;
+                
+                // Get color for inline style
+                const getColor = (rating) => {
+                    if (rating === 'Good') return '#10B981';
+                    if (rating === 'Fair') return '#F59E0B';
+                    if (rating === 'Poor') return '#EF4444';
+                    return '#6B7280'; // gray for N/A
+                };
+                
+                const dayColor = getColor(conditions.day_rating);
+                const nightColor = getColor(conditions.night_rating);
+                
+                return `
+                <div class="bg-gray-800 p-3 rounded-lg">
+                    <div class="text-gray-400">${bandName}</div>
+                    <div class="grid grid-cols-2 gap-2 mt-1">
+                        <div>
+                            <span class="text-sm text-gray-400">Day:</span>
+                            <span class="ml-1 ${dayClass}" style="color: ${dayColor} !important; font-weight: 600;">${conditions.day_rating || 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-400">Night:</span>
+                            <span class="ml-1 ${nightClass}" style="color: ${nightColor} !important; font-weight: 600;">${conditions.night_rating || 'N/A'}</span>
                         </div>
                     </div>
                 </div>
-            `);
+            `}).join('');
+            
+            safeSetHTML(bandDiv, bandHtml);
         }
 
         function updateWeatherConditions(data) {
@@ -656,30 +665,11 @@
                         <div class="text-lg mt-2">${summary.summary?.next_hours_outlook || 'N/A'}</div>
                     </div>
 
-                    <!-- Detailed Band Conditions -->
-                    <div>
-                        <h3 class="text-lg font-semibold mb-4">Detailed Band Conditions</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            ${Object.entries(summary.band_conditions || {}).map(([band, condition]) => `
-                                <div class="bg-gray-800 p-4 rounded-lg">
-                                    <div class="text-lg font-semibold mb-2">${band}</div>
-                                    <div class="space-y-2">
-                                        <div class="flex justify-between">
-                                            <span class="text-sm text-gray-400">Day:</span>
-                                            <span class="${updateConditionClass(condition.day_rating)}">${condition.day_rating}</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-sm text-gray-400">Night:</span>
-                                            <span class="${updateConditionClass(condition.night_rating)}">${condition.night_rating}</span>
-                                        </div>
-                                        ${condition.notes ? `
-                                            <div class="text-xs text-gray-400 mt-2 p-2 bg-gray-700 rounded">
-                                                ${condition.notes}
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
+                    <!-- Current Band Conditions -->
+                    <div class="mt-4">
+                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
+                        <div id="band-conditions-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <!-- Band conditions will be populated by updateBandConditions -->
                         </div>
                     </div>
                 </div>
@@ -744,68 +734,13 @@
             }
         }
 
-        function updateSpotsUI(data) {
-            if (!activityDiv) return;
-            // Update summary
-            if (summaryDiv && data.summary) {
-                const summaryHtml = `
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Total Spots</div>
-                            <div class="text-xl font-semibold">${data.summary.total_spots || 0}</div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Active Bands</div>
-                            <div class="text-xl font-semibold">${data.summary.active_bands?.join(', ') || 'None'}</div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Active Modes</div>
-                            <div class="text-xl font-semibold">${data.summary.active_modes?.join(', ') || 'None'}</div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Active DXCC</div>
-                            <div class="text-xl font-semibold">${data.summary.active_dxcc?.length || 0}</div>
-                        </div>
-                    </div>
-                `;
-                summaryDiv.innerHTML = summaryHtml;
-            }
-            // Update spots table
-            if (tableBody) {
-                if (data.spots && data.spots.length > 0) {
-                    tableBody.innerHTML = data.spots.map(spot => `
-                        <tr class="border-t border-gray-700 hover:bg-gray-800">
-                            <td class="px-4 py-2">${spot.timestamp || '-'}</td>
-                            <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
-                            <td class="px-4 py-2 font-mono">${spot.frequency || '-'}</td>
-                            <td class="px-4 py-2">${spot.mode || '-'}</td>
-                            <td class="px-4 py-2">${spot.dxcc || '-'}</td>
-                            <td class="px-4 py-2">
-                                <span class="px-2 py-1 rounded text-sm ${spot.source?.includes('RBN') ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
-                                    ${spot.source || '-'}
-                                </span>
-                            </td>
-                            <td class="px-4 py-2 text-gray-400">${spot.comment || '-'}</td>
-                        </tr>
-                    `).join('');
-                } else {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="7" class="px-4 py-2 text-center text-gray-400">
-                                No spots available at this time
-                            </td>
-                        </tr>
-                    `;
-                }
-            }
-        }
-
         // Main UI update
         function updateConditionsUI(data) {
             updateTimestampAndLocation(data);
             updateSolarConditions(data);
             updateWeatherConditions(data);
             updatePropagationSummary(data);
+            updateBandConditions(data);
             updateDXCCConditions(data);
         }
 
@@ -813,35 +748,101 @@
         const initialData = JSON.parse(document.getElementById('data').textContent);
         updateConditionsUI(initialData);
 
+        // Wait for DOM to be fully loaded before fetching spots
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial spots load
+            fetchSpots();
+            
+            // Update spots every 5 minutes
+            setInterval(fetchSpots, 5 * 60 * 1000);
+        });
+
         // Function to fetch spots data
         async function fetchSpots() {
+            // Get DOM elements each time to ensure they exist
             const loadingSpinner = document.getElementById('spots-loading');
-            loadingSpinner.style.display = 'inline-block';
+            const activityDiv = document.getElementById('live-activity');
+            const summaryDiv = document.getElementById('activity-summary');
+            const tableBody = document.getElementById('spots-table-body');
+            
+            if (loadingSpinner) loadingSpinner.style.display = 'inline-block';
             
             try {
-                const response = await fetch('/api/spots');
+                const response = await fetchWithSafariHandling('/api/spots');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const spotsData = await response.json();
-                updateSpotsUI(spotsData);
+                
+                // Update spots UI with proper error handling
+                if (activityDiv) {
+                    // Update summary
+                    if (summaryDiv && spotsData.summary) {
+                        const summaryHtml = `
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-gray-800 p-4 rounded-lg">
+                                    <div class="text-gray-400">Total Spots</div>
+                                    <div class="text-xl font-semibold">${spotsData.summary.total_spots || 0}</div>
+                                </div>
+                                <div class="bg-gray-800 p-4 rounded-lg">
+                                    <div class="text-gray-400">Active Bands</div>
+                                    <div class="text-xl font-semibold">${spotsData.summary.active_bands?.join(', ') || 'None'}</div>
+                                </div>
+                                <div class="bg-gray-800 p-4 rounded-lg">
+                                    <div class="text-gray-400">Active Modes</div>
+                                    <div class="text-xl font-semibold">${spotsData.summary.active_modes?.join(', ') || 'None'}</div>
+                                </div>
+                                <div class="bg-gray-800 p-4 rounded-lg">
+                                    <div class="text-gray-400">Active DXCC</div>
+                                    <div class="text-xl font-semibold">${spotsData.summary.active_dxcc?.length || 0}</div>
+                                </div>
+                            </div>
+                        `;
+                        summaryDiv.innerHTML = summaryHtml;
+                    }
+                    
+                    // Update spots table
+                    if (tableBody) {
+                        if (spotsData.spots && spotsData.spots.length > 0) {
+                            tableBody.innerHTML = spotsData.spots.map(spot => `
+                                <tr class="border-t border-gray-700 hover:bg-gray-800">
+                                    <td class="px-4 py-2">${spot.timestamp || '-'}</td>
+                                    <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
+                                    <td class="px-4 py-2 font-mono">${spot.frequency || '-'}</td>
+                                    <td class="px-4 py-2">${spot.mode || '-'}</td>
+                                    <td class="px-4 py-2">${spot.dxcc || '-'}</td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 rounded text-sm ${spot.source?.includes('RBN') ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
+                                            ${spot.source || '-'}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-gray-400">${spot.comment || '-'}</td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            tableBody.innerHTML = `
+                                <tr>
+                                    <td colspan="7" class="px-4 py-2 text-center text-gray-400">
+                                        No spots available at this time
+                                    </td>
+                                </tr>
+                            `;
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('Error fetching spots:', error);
-                document.getElementById('live-activity').innerHTML = `
-                    <div class="text-red-500">
-                        Error loading live spots: ${error.message}
-                    </div>
-                `;
+                if (activityDiv) {
+                    activityDiv.innerHTML = `
+                        <div class="text-red-500">
+                            Error loading live spots: ${error.message}
+                        </div>
+                    `;
+                }
             } finally {
-                loadingSpinner.style.display = 'none';
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
             }
         }
-
-        // Initial spots load
-        fetchSpots();
-
-        // Update spots every 5 minutes
-        setInterval(fetchSpots, 5 * 60 * 1000);
 
         // Add QRZ lookup functionality
         async function lookupQRZ() {
@@ -858,7 +859,7 @@
             resultsDiv.innerHTML = '<p class="text-gray-400">Looking up callsign...</p>';
 
             try {
-                const response = await fetch(`/api/qrz/${callsign}`);
+                const response = await fetchWithSafariHandling(`/api/qrz/${callsign}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -909,7 +910,7 @@
             }
 
             try {
-                const response = await fetch('/api/update-location', {
+                const response = await fetchWithSafariHandling('/api/update-location', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -927,8 +928,8 @@
                     // Clear the input
                     document.getElementById('zip-code-input').value = '';
                     
-                    // Reload the page to get updated data
-                    window.location.reload();
+                    // Use Safari-enhanced refresh
+                    safariRefresh();
                 } else {
                     alert(`Error updating location: ${result.error || 'Unknown error'}`);
                 }
@@ -947,10 +948,23 @@
 
         // PWA Service Worker Registration
         if ('serviceWorker' in navigator) {
+            // Safari-specific detection
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('/sw.js')
                     .then(function(registration) {
                         console.log('Service Worker registered successfully:', registration.scope);
+                        
+                        // Safari-specific: More aggressive update handling
+                        if (isSafari) {
+                            console.log('Safari detected - using enhanced update handling');
+                            
+                            // Force immediate activation for Safari
+                            if (registration.waiting) {
+                                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                        }
                         
                         // Check for updates
                         registration.addEventListener('updatefound', function() {
@@ -960,35 +974,69 @@
                                     // New service worker available
                                     if (confirm('A new version of Ham Radio Conditions is available. Would you like to update?')) {
                                         newWorker.postMessage({ type: 'SKIP_WAITING' });
-                                        window.location.reload();
+                                        
+                                        // Safari-specific: More aggressive refresh
+                                        if (isSafari) {
+                                            // Force a hard refresh for Safari
+                                            window.location.href = window.location.href;
+                                        } else {
+                                            window.location.reload();
+                                        }
                                     }
                                 }
                             });
+                        });
+                        
+                        // Handle service worker messages
+                        navigator.serviceWorker.addEventListener('message', function(event) {
+                            if (event.data && event.data.type === 'FORCE_REFRESH') {
+                                console.log('Force refresh message received from service worker');
+                                window.location.reload();
+                            }
                         });
                     })
                     .catch(function(error) {
                         console.log('Service Worker registration failed:', error);
                     });
             });
+            
+            // Safari-specific: Handle page visibility changes
+            if (isSafari) {
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden) {
+                        console.log('Safari: Page became visible, refreshing data');
+                        // Refresh data when page becomes visible
+                        fetchSpots();
+                    }
+                });
+            }
         }
 
         // PWA Install Prompt
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
+            // Store the event so we can trigger it later
             deferredPrompt = e;
             
-            // Show install button if not already installed
+            // Don't prevent default - let the browser show the native prompt
+            // e.preventDefault(); // Remove this line
+            
+            // Show our custom install button as an alternative
             if (!window.matchMedia('(display-mode: standalone)').matches) {
                 showInstallButton();
             }
         });
 
         function showInstallButton() {
+            // Check if button already exists
+            if (document.querySelector('.pwa-install-button')) {
+                return;
+            }
+            
             // Create install button
             const installButton = document.createElement('button');
             installButton.textContent = 'Install App';
-            installButton.className = 'fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-colors';
+            installButton.className = 'pwa-install-button fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-colors';
             installButton.onclick = installApp;
             document.body.appendChild(installButton);
             
@@ -1002,15 +1050,28 @@
 
         async function installApp() {
             if (deferredPrompt) {
+                // Show the native install prompt
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
                 console.log('Install prompt outcome:', outcome);
                 deferredPrompt = null;
                 
                 // Remove install button
-                const installButton = document.querySelector('button[onclick="installApp()"]');
+                const installButton = document.querySelector('.pwa-install-button');
                 if (installButton) {
                     installButton.remove();
+                }
+            } else {
+                // Fallback: try to trigger native install
+                console.log('No deferred prompt available, trying alternative install method');
+                // Some browsers support a different approach
+                if (window.navigator && window.navigator.getInstalledRelatedApps) {
+                    try {
+                        const relatedApps = await window.navigator.getInstalledRelatedApps();
+                        console.log('Installed related apps:', relatedApps);
+                    } catch (error) {
+                        console.log('Could not check installed apps:', error);
+                    }
                 }
             }
         }
@@ -1019,7 +1080,7 @@
         window.addEventListener('appinstalled', (evt) => {
             console.log('App was installed');
             // Remove install button if present
-            const installButton = document.querySelector('button[onclick="installApp()"]');
+            const installButton = document.querySelector('.pwa-install-button');
             if (installButton) {
                 installButton.remove();
             }
@@ -1034,6 +1095,112 @@
 
         window.addEventListener('offline', function() {
             console.log('App is offline');
+        });
+
+        // Safari-specific detection
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        
+        // Safari-specific refresh function
+        function safariRefresh() {
+            if (isSafari) {
+                console.log('Safari: Performing enhanced refresh');
+                // Clear any cached data
+                if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                        for (let name of names) {
+                            caches.delete(name);
+                        }
+                    });
+                }
+                // Force a hard refresh
+                window.location.href = window.location.href;
+            } else {
+                window.location.reload();
+            }
+        }
+        
+        // Enhanced fetch function with Safari-specific handling
+        async function fetchWithSafariHandling(url, options = {}) {
+            try {
+                // Safari-specific: Add cache-busting headers
+                if (isSafari) {
+                    options.headers = {
+                        ...options.headers,
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    };
+                }
+                
+                const response = await fetch(url, options);
+                return response;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw error;
+            }
+        }
+
+        // Add refresh button functionality
+        async function refreshAllData() {
+            console.log('Refreshing all data...');
+            
+            // Get refresh button and icon
+            const refreshButton = document.getElementById('refresh-button');
+            const refreshIcon = document.getElementById('refresh-icon');
+            
+            if (!refreshButton) {
+                console.error('Refresh button not found!');
+                return;
+            }
+            
+            // Disable button and show loading state
+            refreshButton.disabled = true;
+            refreshIcon.classList.add('fa-spin');
+            
+            try {
+                // First try to fetch fresh data from the server
+                const response = await fetchWithSafariHandling('/');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const html = await response.text();
+                
+                // Extract the data from the response
+                const dataMatch = html.match(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/);
+                if (dataMatch) {
+                    const freshData = JSON.parse(dataMatch[1]);
+                    
+                    // Update all UI components with fresh data
+                    updateConditionsUI(freshData);
+                    
+                    // Refresh spots data
+                    await fetchSpots();
+                    
+                    console.log('Data refreshed successfully');
+                } else {
+                    // If we can't extract data, do a full page refresh
+                    console.log('Could not extract data, doing full page refresh');
+                    window.location.reload();
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                // On error, do a full page refresh
+                console.log('Error during refresh, doing full page refresh');
+                window.location.reload();
+            } finally {
+                // Re-enable button and stop loading animation
+                refreshButton.disabled = false;
+                refreshIcon.classList.remove('fa-spin');
+            }
+        }
+        
+        // Add keyboard shortcut for refresh (Ctrl+R or Cmd+R)
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault(); // Prevent default browser refresh
+                refreshAllData();
+            }
         });
     </script>
 </body>

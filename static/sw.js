@@ -1,6 +1,6 @@
-const CACHE_NAME = 'ham-radio-conditions-v1';
-const STATIC_CACHE = 'ham-radio-static-v1';
-const DYNAMIC_CACHE = 'ham-radio-dynamic-v1';
+const CACHE_NAME = 'ham-radio-conditions-v2';
+const STATIC_CACHE = 'ham-radio-static-v2';
+const DYNAMIC_CACHE = 'ham-radio-dynamic-v2';
 
 // Files to cache immediately
 const STATIC_FILES = [
@@ -17,6 +17,9 @@ const API_ENDPOINTS = [
   '/api/spots/status'
 ];
 
+// Safari-specific detection
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
 // Install event - cache static files
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing...');
@@ -28,6 +31,10 @@ self.addEventListener('install', (event) => {
       })
       .then(() => {
         console.log('Static files cached successfully');
+        // Safari-specific: Use skipWaiting more aggressively
+        if (isSafari) {
+          console.log('Safari detected - using skipWaiting');
+        }
         return self.skipWaiting();
       })
       .catch((error) => {
@@ -53,6 +60,10 @@ self.addEventListener('activate', (event) => {
       })
       .then(() => {
         console.log('Service Worker activated');
+        // Safari-specific: More aggressive client claiming
+        if (isSafari) {
+          console.log('Safari detected - claiming clients immediately');
+        }
         return self.clients.claim();
       })
   );
@@ -62,6 +73,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Safari-specific: Handle navigation requests differently
+  if (isSafari && request.mode === 'navigate') {
+    event.respondWith(handleSafariNavigation(request));
+    return;
+  }
 
   // Handle API requests
   if (url.pathname.startsWith('/api/')) {
@@ -75,6 +92,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 });
+
+// Safari-specific navigation handling
+async function handleSafariNavigation(request) {
+  try {
+    // For Safari, try network first for navigation
+    const networkResponse = await fetch(request);
+    
+    // Cache the response for offline use
+    if (networkResponse.ok) {
+      const cache = await caches.open(STATIC_CACHE);
+      cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.log('Safari navigation failed, trying cache:', request.url);
+    
+    // Fall back to cache
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    // Return offline page
+    return caches.match('/offline.html');
+  }
+}
 
 // Handle API requests with network-first strategy
 async function handleApiRequest(request) {
@@ -136,13 +180,33 @@ async function handleStaticRequest(request) {
     console.log('Network failed for static file:', request.url);
     
     // Return offline page for HTML requests
-    if (request.headers.get('accept').includes('text/html')) {
+    if (request.headers.get('accept') && request.headers.get('accept').includes('text/html')) {
       return caches.match('/offline.html');
     }
     
     throw error;
   }
 }
+
+// Message handling for Safari-specific updates
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('Skip waiting message received');
+    self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'FORCE_REFRESH') {
+    console.log('Force refresh message received');
+    // Force refresh all clients
+    event.waitUntil(
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'FORCE_REFRESH' });
+        });
+      })
+    );
+  }
+});
 
 // Background sync for updating data when online
 self.addEventListener('sync', (event) => {
