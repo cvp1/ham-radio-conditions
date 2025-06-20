@@ -4,7 +4,7 @@ services:
     ports:
       - "8087:8087"
     environment:
-      - FLASK_APP=app.py
+      - FLASK_APP=wsgi.py
       - FLASK_ENV=production
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
       - ZIP_CODE=${ZIP_CODE}
@@ -12,10 +12,20 @@ services:
       - CALLSIGN=${CALLSIGN}
       - QRZ_USERNAME=${QRZ_USERNAME}
       - QRZ_PASSWORD=${QRZ_PASSWORD:-}
+      - DATABASE_PATH=/app/data/ham_radio.db
+      - DATA_RETENTION_DAYS=7
     volumes:
       - .:/app
       - ham_radio_data:/app/data
+      - ham_radio_logs:/app/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
-  ham_radio_data: 
+  ham_radio_data:
+  ham_radio_logs: 

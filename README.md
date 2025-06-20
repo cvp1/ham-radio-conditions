@@ -61,26 +61,65 @@ CALLSIGN=your_callsign
 QRZ_USERNAME=your_qrz_username  # Your QRZ.com login username
 QRZ_PASSWORD=your_qrz_password  # Your QRZ.com login password
 
-# Flask Configuration #
-FLASK_APP=app.py
-FLASK_ENV=production
+# Flask Configuration
+FLASK_APP=wsgi_dev.py
+FLASK_ENV=development
 ```
 
 3. Run the application:
 ```bash
 python app.py
+# or
+python wsgi_dev.py
 ```
 
 ### Option 2: Docker Setup
 
-1. Create a `.env` file as described above
+1. Create a `.env` file with your configuration:
+```bash
+# Use the automated setup script
+python create_env_template.py
+
+# Or create manually with at least these required variables:
+OPENWEATHER_API_KEY=your_weather_api_key
+ZIP_CODE=your_zip_code
+```
 
 2. Build and run using Docker Compose:
 ```bash
+# For newer Docker versions (recommended)
+docker compose up --build
+
+# For older Docker versions
 docker-compose up --build
 ```
 
+**Note:** Newer Docker versions use `docker compose` (with space), while older versions use `docker-compose` (with hyphen). The `test_docker.py` script will automatically detect which command to use.
+
+**Required Environment Variables:**
+- `OPENWEATHER_API_KEY` - Get from [OpenWeatherMap](https://openweathermap.org/api)
+- `ZIP_CODE` - Your location for weather and propagation data
+
+**Optional Environment Variables:**
+- `QRZ_USERNAME` & `QRZ_PASSWORD` - For QRZ lookup functionality
+- `CALLSIGN` - Your ham radio callsign
+- `TEMP_UNIT` - Temperature unit (F or C)
+
 The application will be available at http://localhost:8087
+
+### Option 3: Automated Development Setup
+
+1. Run the automated setup script:
+```bash
+python setup_dev.py
+```
+
+This will:
+- Check Python version compatibility
+- Create necessary directories
+- Create a `.env` file with template values
+- Install dependencies
+- Run basic tests
 
 ## Features
 
@@ -127,20 +166,45 @@ The application now uses SQLite for persistent storage with the following capabi
 
 ## Project Structure
 
-- `app.py` - Main application entry point
-- `ham_radio_conditions.py` - Core functionality for ham radio conditions
-- `dxcc_data.py` - DXCC entity information handling
-- `qrz_data.py` - QRZ XML Database API integration
-- `database.py` - SQLite database management and operations
-- `templates/` - HTML templates for the web interface
-- `static/` - Static files for PWA functionality
-  - `manifest.json` - PWA manifest file
-  - `sw.js` - Service worker for offline functionality
-  - `offline.html` - Offline page
-  - `icons/` - App icons for various sizes
-- `data/` - SQLite database files (created automatically)
-- `Dockerfile` - Container configuration
-- `docker-compose.yml` - Docker Compose configuration
+```
+ham-radio-conditions/
+├── app.py                     # Main application entry point (development)
+├── wsgi.py                    # WSGI entry point for production
+├── wsgi_dev.py                # WSGI entry point for development
+├── app_factory.py            # Application factory for creating Flask app
+├── config.py                 # Configuration management
+├── ham_radio_conditions.py   # Core functionality for ham radio conditions
+├── dxcc_data.py              # DXCC entity information handling
+├── qrz_data.py               # QRZ XML Database API integration
+├── database.py               # SQLite database management and operations
+├── requirements.txt          # Python dependencies
+├── Dockerfile                # Container configuration
+├── docker-compose.yml        # Docker Compose configuration
+├── setup_dev.py              # Development setup script
+├── test_app.py               # Basic test suite
+├── test_docker.py            # Docker testing script
+├── docker_commands.py        # Docker Compose command helper
+├── .env                      # Environment variables (create this)
+├── .gitignore               # Git ignore patterns
+├── README.md                # This file
+├── utils/                   # Utility modules
+│   ├── __init__.py
+│   ├── logging_config.py    # Logging configuration
+│   └── background_tasks.py  # Background task management
+├── routes/                  # Route modules
+│   ├── __init__.py
+│   ├── api.py              # API endpoints
+│   └── pwa.py              # PWA-specific routes
+├── templates/               # HTML templates
+│   └── index.html          # Main application template
+├── static/                  # Static files for PWA functionality
+│   ├── manifest.json       # PWA manifest file
+│   ├── sw.js              # Service worker for offline functionality
+│   ├── offline.html       # Offline page
+│   └── icons/             # App icons for various sizes
+├── data/                   # SQLite database files (created automatically)
+└── logs/                   # Application logs (created automatically)
+```
 
 ## Data Sources
 
