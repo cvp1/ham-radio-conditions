@@ -305,4 +305,45 @@ def debug_ham_conditions():
             'error': str(e),
             'traceback': traceback.format_exc(),
             'config_keys': list(current_app.config.keys()) if current_app else []
+        }), 500
+
+
+@api_bp.route('/debug/update-cache', methods=['POST'])
+def manual_update_cache():
+    """Manually trigger a cache update for testing"""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions not initialized'}), 500
+        
+        # Clear existing cache
+        if hasattr(ham_conditions, '_conditions_cache'):
+            ham_conditions._conditions_cache = None
+        if hasattr(ham_conditions, '_conditions_cache_time'):
+            ham_conditions._conditions_cache_time = None
+        
+        # Generate new report
+        import time
+        start_time = time.time()
+        new_cache = ham_conditions.generate_report()
+        end_time = time.time()
+        
+        # Update cache
+        ham_conditions._conditions_cache = new_cache
+        ham_conditions._conditions_cache_time = time.time()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cache updated manually',
+            'cache_generated': bool(new_cache),
+            'generation_time': f"{end_time - start_time:.2f}s",
+            'cache_time': ham_conditions._conditions_cache_time
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in manual cache update: {e}")
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500 

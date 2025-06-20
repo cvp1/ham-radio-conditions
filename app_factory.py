@@ -181,10 +181,10 @@ def setup_app_background_tasks(app: Flask, services: dict) -> None:
     # Register cleanup on app shutdown
     @app.teardown_appcontext
     def cleanup(error):
-        """Cleanup on application shutdown."""
+        """Cleanup on application context teardown."""
         if error:
-            logger.error(f"Application error: {error}")
-        task_manager.stop_all()
+            logger.error(f"Application context error: {error}")
+        # Don't stop background tasks on context teardown - they should keep running
     
     logger.info("Background tasks configured")
 

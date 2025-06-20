@@ -5,6 +5,7 @@ Handles periodic tasks like cache updates and database cleanup.
 
 import threading
 import time
+import atexit
 from typing import Optional, Callable
 from utils.logging_config import get_logger
 from config import get_config
@@ -19,6 +20,7 @@ class BackgroundTaskManager:
         self.tasks = {}
         self.running = False
         self.threads = {}
+        self._shutdown_registered = False
     
     def add_task(
         self,
@@ -73,13 +75,26 @@ class BackgroundTaskManager:
     
     def start_all(self) -> None:
         """Start all background tasks."""
+        if self.running:
+            logger.warning("Background tasks already running")
+            return
+            
         self.running = True
+        
+        # Register shutdown handler only once
+        if not self._shutdown_registered:
+            atexit.register(self.stop_all)
+            self._shutdown_registered = True
+        
         for name in self.tasks:
             self.start_task(name)
         logger.info("Started all background tasks")
     
     def stop_all(self) -> None:
         """Stop all background tasks."""
+        if not self.running:
+            return
+            
         self.running = False
         logger.info("Stopped all background tasks")
     
@@ -90,11 +105,15 @@ class BackgroundTaskManager:
         while self.running:
             try:
                 task_func()
+                logger.debug(f"Background task {name} completed successfully")
             except Exception as e:
                 logger.error(f"Error in background task {name}: {e}")
             
-            # Sleep for the interval
-            time.sleep(interval)
+            # Sleep for the interval, but check running status periodically
+            for _ in range(interval):
+                if not self.running:
+                    break
+                time.sleep(1)
         
         logger.info(f"Background task {name} stopped")
 
@@ -143,7 +162,7 @@ def create_conditions_updater(ham_conditions, cache_lock):
             with cache_lock:
                 ham_conditions._conditions_cache = ham_conditions.generate_report()
                 ham_conditions._conditions_cache_time = time.time()
-            logger.debug("Updated conditions cache")
+            logger.info("Updated conditions cache")
         except Exception as e:
             logger.error(f"Error updating conditions cache: {e}")
     
@@ -158,7 +177,7 @@ def create_database_cleanup(db):
         """Clean up old database data periodically."""
         try:
             db.cleanup_old_data(days=config.DATA_RETENTION_DAYS)
-            logger.debug("Database cleanup completed")
+            logger.info("Database cleanup completed")
         except Exception as e:
             logger.error(f"Error in database cleanup: {e}")
     
