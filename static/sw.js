@@ -1,5 +1,5 @@
 // Service Worker with improved cache management and update handling
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.0.1';
 const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `ham-radio-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `ham-radio-dynamic-${CACHE_VERSION}`;
@@ -27,7 +27,9 @@ const API_ENDPOINTS = {
   '/api/spots': { strategy: 'network-first', maxAge: 2 * 60 * 1000 }, // 2 minutes
   '/api/spots/history': { strategy: 'cache-first', maxAge: 10 * 60 * 1000 }, // 10 minutes
   '/api/spots/status': { strategy: 'network-first', maxAge: 1 * 60 * 1000 }, // 1 minute
-  '/api/conditions': { strategy: 'network-first', maxAge: 5 * 60 * 1000 } // 5 minutes
+  '/api/conditions': { strategy: 'network-first', maxAge: 5 * 60 * 1000 }, // 5 minutes
+  '/api/update-location': { strategy: 'network-only', maxAge: 0 }, // No caching for POST requests
+  '/api/cache/clear': { strategy: 'network-only', maxAge: 0 } // No caching for cache clear
 };
 
 // Safari-specific detection
@@ -105,8 +107,34 @@ async function cleanupOldCaches() {
     
     await Promise.all(deletePromises);
     console.log('Old caches cleaned up');
+    
+    // Clear any cached 503 responses for update-location endpoint
+    await clearSpecificCacheEntries();
   } catch (error) {
     console.error('Error cleaning up old caches:', error);
+  }
+}
+
+// Clear specific cache entries that might cause issues
+async function clearSpecificCacheEntries() {
+  try {
+    const cache = await caches.open(API_CACHE);
+    const keys = await cache.keys();
+    
+    const problematicUrls = [
+      '/api/update-location',
+      'http://127.0.0.1:8087/api/update-location'
+    ];
+    
+    for (const request of keys) {
+      const url = request.url;
+      if (problematicUrls.some(problematicUrl => url.includes(problematicUrl))) {
+        console.log(`Clearing problematic cache entry: ${url}`);
+        await cache.delete(request);
+      }
+    }
+  } catch (error) {
+    console.error('Error clearing specific cache entries:', error);
   }
 }
 
@@ -123,6 +151,8 @@ async function handleApiRequest(request) {
       return handleCacheFirst(request, config.maxAge, API_CACHE);
     case 'stale-while-revalidate':
       return handleStaleWhileRevalidate(request, config.maxAge, API_CACHE);
+    case 'network-only':
+      return handleNetworkOnly(request);
     default:
       return handleNetworkFirst(request, config.maxAge, API_CACHE);
   }
@@ -298,6 +328,17 @@ async function handleStaleWhileRevalidate(request, maxAge, cacheName) {
     return networkResponse;
   } catch (error) {
     console.error('Network failed for stale-while-revalidate request:', request.url);
+    throw error;
+  }
+}
+
+// Network-only strategy (no caching)
+async function handleNetworkOnly(request) {
+  try {
+    const networkResponse = await fetch(request);
+    return networkResponse;
+  } catch (error) {
+    console.error('Network failed for network-only request:', request.url);
     throw error;
   }
 }

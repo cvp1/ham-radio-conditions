@@ -5,7 +5,6 @@ Handles periodic updates and cleanup operations.
 
 import time
 import threading
-import schedule
 import logging
 from typing import Callable, Optional
 from utils.cache_manager import cache_get, cache_set, cache_delete

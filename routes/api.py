@@ -165,9 +165,11 @@ def qrz_lookup(callsign):
             
             # Perform QRZ lookup
             try:
-                qrz_data = qrz_lookup.lookup_callsign(callsign)
+                qrz_data = qrz_lookup.lookup(callsign)
                 
                 if qrz_data:
+                    # Add formatted_info for frontend display
+                    qrz_data['formatted_info'] = qrz_lookup.get_formatted_info(callsign)
                     # Cache the result
                     cache_set('qrz', callsign.upper(), qrz_data, max_age=3600)  # 1 hour
                     
@@ -375,97 +377,6 @@ def get_database_stats():
         return jsonify(stats)
     except Exception as e:
         logger.error(f"Error getting database stats: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@api_bp.route('/update-location', methods=['POST'])
-def update_location():
-    """Update user location for better propagation predictions"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        db = current_app.config.get('DATABASE')
-        if not db:
-            return jsonify({'error': 'Database not initialized'}), 500
-        
-        # Handle both old zip_code format and new lat/lon format
-        if 'zip_code' in data:
-            # Old format - zip code
-            zip_code = data['zip_code'].strip()
-            if not zip_code:
-                return jsonify({'error': 'ZIP code cannot be empty'}), 400
-            
-            # Store zip code in database
-            db.store_user_preference('zip_code', zip_code)
-            logger.info(f"Updated user location to ZIP code: {zip_code}")
-            
-            # Update ham conditions if available
-            ham_conditions = current_app.config.get('HAM_CONDITIONS')
-            if ham_conditions and hasattr(ham_conditions, 'update_location'):
-                success = ham_conditions.update_location(zip_code)
-                if success:
-                    logger.info(f"Successfully updated ham conditions location to ZIP: {zip_code}")
-                else:
-                    logger.warning(f"Failed to update ham conditions location to ZIP: {zip_code}")
-            else:
-                logger.warning("Ham conditions service not available for location update")
-            
-            return jsonify({
-                'success': True,
-                'message': f'Location updated to ZIP code: {zip_code}',
-                'zip_code': zip_code
-            })
-            
-        elif 'latitude' in data and 'longitude' in data:
-            # New format - latitude/longitude
-            latitude = data.get('latitude')
-            longitude = data.get('longitude')
-            
-            if latitude is None or longitude is None:
-                return jsonify({'error': 'Latitude and longitude are required'}), 400
-            
-            # Validate coordinates
-            try:
-                lat = float(latitude)
-                lon = float(longitude)
-                if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
-                    return jsonify({'error': 'Invalid coordinates'}), 400
-            except ValueError:
-                return jsonify({'error': 'Invalid coordinate format'}), 400
-            
-            # Store location in database
-            db.store_user_preference('latitude', str(lat))
-            db.store_user_preference('longitude', str(lon))
-            logger.info(f"Updated user location: {lat}, {lon}")
-            
-            # Update ham conditions if available
-            ham_conditions = current_app.config.get('HAM_CONDITIONS')
-            if ham_conditions:
-                # For lat/lon, we need to update the instance directly
-                ham_conditions.lat = lat
-                ham_conditions.lon = lon
-                ham_conditions.grid_square = ham_conditions.latlon_to_grid(lat, lon)
-                ham_conditions.timezone = ham_conditions._get_timezone_from_coords(lat, lon)
-                
-                # Clear caches to force refresh with new location
-                if hasattr(ham_conditions, 'clear_cache'):
-                    ham_conditions.clear_cache()
-                
-                logger.info(f"Successfully updated ham conditions location to lat/lon: {lat}, {lon}")
-            
-            return jsonify({
-                'success': True,
-                'message': 'Location updated successfully',
-                'latitude': lat,
-                'longitude': lon
-            })
-        else:
-            return jsonify({'error': 'Either zip_code or latitude/longitude are required'}), 400
-        
-    except Exception as e:
-        logger.error(f"Error updating location: {e}")
         return jsonify({'error': str(e)}), 500
 
 

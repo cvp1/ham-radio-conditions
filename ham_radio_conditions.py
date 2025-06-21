@@ -1,9 +1,7 @@
 import os
 import requests
 from datetime import datetime, timedelta
-from tabulate import tabulate
 from dotenv import load_dotenv
-import schedule
 import time
 import xml.etree.ElementTree as ET
 import math
@@ -17,8 +15,6 @@ import pytz
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from astral import LocationInfo
-from astral.sun import sun
 from utils.cache_manager import cache_get, cache_set, cache_delete
 
 # Configure logging
@@ -460,80 +456,6 @@ class HamRadioConditions:
                 '17m-15m': {'day': 'N/A', 'night': 'N/A'},
                 '12m-10m': {'day': 'N/A', 'night': 'N/A'}
             }
-
-    def convert_temp(self, temp_c):
-        """Convert temperature from Celsius to the configured unit"""
-        if self.temp_unit == 'F':
-            return round((temp_c * 9/5) + 32, 1)
-        return round(temp_c, 1)
-
-    def get_weather_from_openweather(self):
-        """Get weather data from OpenWeather API"""
-        if not self.openweather_api_key:
-            print("OpenWeather API key not configured")
-            return None
-
-        try:
-            url = f"http://api.openweathermap.org/data/2.5/weather?lat={self.lat}&lon={self.lon}&appid={self.openweather_api_key}&units=metric"
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            return {
-                'temperature': f"{self.convert_temp(data['main']['temp'])}°{self.temp_unit}",
-                'humidity': f"{data['main']['humidity']}%",
-                'pressure': f"{data['main']['pressure']} hPa",
-                'description': data['weather'][0]['description'].capitalize(),
-                'city': data['name'],
-                'state': data.get('sys', {}).get('country', ''),
-                'source': 'OpenWeather'
-            }
-        except Exception as e:
-            print(f"Error fetching weather from OpenWeather: {str(e)}")
-            return None
-
-    def get_weather_from_nws(self):
-        """Get weather data from National Weather Service API"""
-        try:
-            # First, get the grid endpoint
-            points_url = f"https://api.weather.gov/points/{self.lat},{self.lon}"
-            response = requests.get(points_url, headers={'User-Agent': 'HamRadioConditions/1.0'}, timeout=10)
-            response.raise_for_status()
-            grid_data = response.json()
-            
-            # Then get the forecast
-            forecast_url = grid_data['properties']['forecast']
-            response = requests.get(forecast_url, headers={'User-Agent': 'HamRadioConditions/1.0'}, timeout=10)
-            response.raise_for_status()
-            forecast_data = response.json()
-            
-            current = forecast_data['properties']['periods'][0]
-            return {
-                'temperature': f"{current['temperature']}°{self.temp_unit}",
-                'humidity': f"{current['relativeHumidity']['value']}%",
-                'pressure': f"{current['pressure']['value']} hPa",
-                'description': current['shortForecast'],
-                'city': grid_data['properties']['relativeLocation']['properties']['city'],
-                'state': grid_data['properties']['relativeLocation']['properties']['state'],
-                'source': 'National Weather Service'
-            }
-        except Exception as e:
-            print(f"Error fetching weather from NWS: {str(e)}")
-            return None
-
-    def get_itu_zone(self, lat, lon):
-        """Calculate ITU zone from latitude and longitude"""
-        # ITU zones are numbered from 1 to 90, with 1 starting at 180°W
-        # Each zone is 20° wide
-        itu_zone = int((lon + 180) / 20) + 1
-        return str(itu_zone)
-
-    def get_cq_zone(self, lat, lon):
-        """Calculate CQ zone from latitude and longitude"""
-        # CQ zones are numbered from 1 to 40, with 1 starting at 180°W
-        # Each zone is 10° wide
-        cq_zone = int((lon + 180) / 10) + 1
-        return str(cq_zone)
 
     def get_dxcc_conditions(self, grid_square: str) -> Dict:
         """
@@ -1062,33 +984,44 @@ class HamRadioConditions:
     def _calculate_sunrise_sunset(self):
         """Calculate sunrise and sunset times for the current location"""
         try:
-            location = LocationInfo("Location", "Region", "US", self.lat, self.lon)
+            # Simple sunrise/sunset calculation based on latitude and time of year
+            # This is a simplified version - for more accuracy, use a proper astronomical library
             now_local = datetime.now(self.timezone)
             today = now_local.date()
-            tomorrow = today + timedelta(days=1)
             
-            # Get today's sunrise and sunset
-            sun_today = sun(location.observer, date=today)
-            sunrise_local = sun_today['sunrise'].astimezone(self.timezone)
-            sunset_today_local = sun_today['sunset'].astimezone(self.timezone)
+            # Approximate sunrise/sunset times based on latitude
+            # These are rough estimates - in production, use a proper astronomical library
+            if abs(self.lat) < 30:  # Tropical regions
+                sunrise_hour = 6
+                sunset_hour = 18
+            elif abs(self.lat) < 45:  # Mid-latitudes
+                sunrise_hour = 6
+                sunset_hour = 18
+            elif abs(self.lat) < 60:  # High latitudes
+                sunrise_hour = 7
+                sunset_hour = 17
+            else:  # Polar regions
+                sunrise_hour = 8
+                sunset_hour = 16
             
-            # Get tomorrow's sunset
-            sun_tomorrow = sun(location.observer, date=tomorrow)
-            sunset_tomorrow_local = sun_tomorrow['sunset'].astimezone(self.timezone)
-
-            # Use the next sunset after now
-            if sunset_today_local > now_local:
-                sunset_local = sunset_today_local
-            else:
-                sunset_local = sunset_tomorrow_local
-
+            # Adjust for seasonal variations (simplified)
+            day_of_year = today.timetuple().tm_yday
+            if 80 <= day_of_year <= 265:  # Spring/Summer in Northern Hemisphere
+                sunrise_hour -= 1
+                sunset_hour += 1
+            
+            sunrise_time = now_local.replace(hour=sunrise_hour, minute=0, second=0, microsecond=0)
+            sunset_time = now_local.replace(hour=sunset_hour, minute=0, second=0, microsecond=0)
+            
+            is_day = sunrise_time <= now_local <= sunset_time
+            
             return {
-                'sunrise': sunrise_local.strftime('%I:%M %p'),
-                'sunset': sunset_local.strftime('%I:%M %p'),
-                'is_day': sunrise_local <= now_local <= sunset_local
+                'sunrise': sunrise_time.strftime('%I:%M %p'),
+                'sunset': sunset_time.strftime('%I:%M %p'),
+                'is_day': is_day
             }
         except Exception as e:
-            print(f"Error calculating sunrise/sunset: {e}")
+            logger.error(f"Error calculating sunrise/sunset: {e}")
             return {
                 'sunrise': 'N/A',
                 'sunset': 'N/A',
@@ -1528,6 +1461,7 @@ class HamRadioConditions:
                     'limit': 1
                 }
                 
+                logger.info(f"Geocoding ZIP {zip_code} with OpenCage API...")
                 response = requests.get(url, params=params, timeout=10)
                 if response.status_code == 200:
                     data = response.json()
@@ -1535,8 +1469,18 @@ class HamRadioConditions:
                         result = data['results'][0]
                         lat = result['geometry']['lat']
                         lon = result['geometry']['lng']
-                        logger.info(f"Geocoded ZIP {zip_code} to lat={lat}, lon={lon}")
+                        
+                        # Log the full result for debugging
+                        formatted_address = result.get('formatted', 'Unknown')
+                        logger.info(f"OpenCage result for ZIP {zip_code}: lat={lat}, lon={lon}, address='{formatted_address}'")
+                        
                         return (lat, lon)
+                    else:
+                        logger.warning(f"No results from OpenCage API for ZIP {zip_code}")
+                else:
+                    logger.error(f"OpenCage API error for ZIP {zip_code}: {response.status_code}")
+            else:
+                logger.info(f"OpenCage API key not available, using fallback for ZIP {zip_code}")
             
             # Fallback: Use a simple ZIP code database for common US ZIP codes
             # This is a limited fallback - in production, you'd want a comprehensive database
@@ -1561,6 +1505,7 @@ class HamRadioConditions:
                 '85382': (33.6389, -112.1429),  # Sun City West, AZ
                 '85383': (33.6389, -112.1429),  # Surprise, AZ
                 '85396': (33.6389, -112.1429),  # Youngtown, AZ
+                '98282': (48.2418, -122.5047),  # Camano Island, WA
             }
             
             if zip_code in zip_coords:
@@ -1710,14 +1655,16 @@ def main():
     print("📋 Generating initial report...")
     update_report()
 
-    # Schedule updates every hour
-    schedule.every(1).hours.do(update_report)
-
-    print("\n⏰ Scheduled hourly updates. Press Ctrl+C to exit.")
+    print("\n⏰ Running continuous updates. Press Ctrl+C to exit.")
     try:
+        last_update = time.time()
         while True:
-            schedule.run_pending()
-            time.sleep(1)
+            current_time = time.time()
+            # Update every hour
+            if current_time - last_update >= 3600:  # 1 hour
+                update_report()
+                last_update = current_time
+            time.sleep(60)  # Check every minute
     except KeyboardInterrupt:
         print("\n👋 Shutting down...")
 
