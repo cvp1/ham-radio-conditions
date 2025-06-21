@@ -543,12 +543,28 @@
         }
 
         function updatePropagationSummary(data) {
-            if (!propagationDiv) return;
+            console.log('updatePropagationSummary: Called with data:', {
+                hasPropagationSummary: !!data.propagation_summary,
+                propagationDiv: !!propagationDiv
+            });
+            
+            if (!propagationDiv) {
+                console.error('updatePropagationSummary: propagationDiv not found');
+                return;
+            }
             if (!data.propagation_summary) {
+                console.warn('updatePropagationSummary: No propagation_summary in data');
                 safeSetHTML(propagationDiv, '<p class="text-gray-400">Propagation data not available</p>');
                 return;
             }
             const summary = data.propagation_summary;
+            
+            console.log('updatePropagationSummary: Updating with summary:', {
+                current_time: summary.current_time,
+                recommendations_count: summary.recommendations?.length || 0,
+                has_solar_conditions: !!summary.solar_conditions,
+                has_aurora_conditions: !!summary.aurora_conditions
+            });
             
             // Helper function to format aurora conditions
             function formatAurora(aurora) {
@@ -689,6 +705,8 @@
                     </div>
                 </div>
             `);
+            
+            console.log('updatePropagationSummary: Successfully updated propagation summary');
         }
 
         function updateDXCCConditions(data) {
@@ -759,17 +777,46 @@
             updateDXCCConditions(data);
         }
 
-        // Initial data load
-        const initialData = JSON.parse(document.getElementById('data').textContent);
-        updateConditionsUI(initialData);
+        // Function to fetch updated conditions data
+        async function fetchUpdatedConditions() {
+            console.log('fetchUpdatedConditions: Starting to fetch updated conditions...');
+            try {
+                const response = await fetchWithRetry('/api/conditions');
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('fetchUpdatedConditions: Received data:', {
+                        hasPropagationSummary: !!data.propagation_summary,
+                        hasSolarConditions: !!data.solar_conditions,
+                        hasWeatherConditions: !!data.weather_conditions,
+                        timestamp: data.timestamp
+                    });
+                    updateConditionsUI(data);
+                    console.log('Updated conditions data fetched successfully');
+                } else {
+                    console.error('fetchUpdatedConditions: Response not ok:', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching updated conditions:', error);
+            }
+        }
 
-        // Wait for DOM to be fully loaded before fetching spots
+        // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            // Initial spots load
+            // Load initial data from server-side rendered data
+            const initialData = JSON.parse(document.getElementById('data').textContent);
+            updateConditionsUI(initialData);
+            
+            // Load initial data
             fetchSpots();
             
-            // Update spots every 5 minutes
-            setInterval(fetchSpots, 5 * 60 * 1000);
+            // Set up periodic updates
+            setInterval(fetchSpots, 30000); // Update every 30 seconds
+            
+            // Set up periodic conditions updates (including recommendations)
+            setInterval(fetchUpdatedConditions, 300000); // Update every 5 minutes (300 seconds)
+            
+            // Fetch fresh conditions data immediately
+            fetchUpdatedConditions();
         });
 
         // Enhanced fetch function with better error handling
@@ -805,11 +852,25 @@
             const summaryDiv = document.getElementById('activity-summary');
             const tableBody = document.getElementById('spots-table-body');
             
+            console.log('fetchSpots: DOM elements found:', {
+                loadingSpinner: !!loadingSpinner,
+                activityDiv: !!activityDiv,
+                summaryDiv: !!summaryDiv,
+                tableBody: !!tableBody
+            });
+            
             if (loadingSpinner) loadingSpinner.style.display = 'inline-block';
             
             try {
                 const response = await fetchWithRetry('/api/spots');
                 const spotsData = await response.json();
+                
+                console.log('fetchSpots: Received data:', {
+                    spotsCount: spotsData.spots?.length || 0,
+                    summary: spotsData.summary,
+                    hasSpots: !!spotsData.spots,
+                    hasSummary: !!spotsData.summary
+                });
                 
                 // Update spots UI with proper error handling
                 if (activityDiv) {
@@ -836,12 +897,13 @@
                             </div>
                         `;
                         summaryDiv.innerHTML = summaryHtml;
+                        console.log('fetchSpots: Updated summary');
                     }
                     
                     // Update spots table
                     if (tableBody) {
                         if (spotsData.spots && spotsData.spots.length > 0) {
-                            tableBody.innerHTML = spotsData.spots.map(spot => `
+                            const tableHtml = spotsData.spots.map(spot => `
                                 <tr class="border-t border-gray-700 hover:bg-gray-800">
                                     <td class="px-4 py-2">${spot.timestamp || '-'}</td>
                                     <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
@@ -856,6 +918,8 @@
                                     <td class="px-4 py-2 text-gray-400">${spot.comment || '-'}</td>
                                 </tr>
                             `).join('');
+                            tableBody.innerHTML = tableHtml;
+                            console.log('fetchSpots: Updated table with', spotsData.spots.length, 'spots');
                         } else {
                             tableBody.innerHTML = `
                                 <tr>
@@ -864,8 +928,11 @@
                                     </td>
                                 </tr>
                             `;
+                            console.log('fetchSpots: No spots available');
                         }
                     }
+                } else {
+                    console.error('fetchSpots: activityDiv not found');
                 }
             } catch (error) {
                 console.error('Error fetching spots:', error);
@@ -1227,15 +1294,6 @@
                 }
             }, 3000);
         }
-
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            // Load initial data
-            fetchSpots();
-            
-            // Set up periodic updates
-            setInterval(fetchSpots, 30000); // Update every 30 seconds
-        });
     </script>
 </body>
 </html>
