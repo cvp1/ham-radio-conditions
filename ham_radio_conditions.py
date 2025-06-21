@@ -51,19 +51,28 @@ class HamRadioConditions:
         else:
             target_zip = None
         
-        # If ZIP code is provided, get coordinates and grid square
-        if target_zip:
+        # If ZIP code is provided, try to get coordinates from weather API
+        if target_zip and self.openweather_api_key:
             try:
-                lat, lon = self.zip_to_latlon(target_zip)
-                if lat and lon:
-                    self.lat = lat
-                    self.lon = lon
-                    self.grid_square = self.latlon_to_grid(lat, lon)
-                    # Get timezone from coordinates
-                    self.timezone = self._get_timezone_from_coords(lat, lon)
-                    logger.info(f"Location set to ZIP {target_zip}: lat={lat}, lon={lon}, grid={self.grid_square}")
+                # Use OpenWeather API to get coordinates for the ZIP code
+                url = "http://api.openweathermap.org/geo/1.0/zip"
+                params = {
+                    'zip': f"{target_zip},US",
+                    'appid': self.openweather_api_key
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    self.lat = data['lat']
+                    self.lon = data['lon']
+                    self.grid_square = self.latlon_to_grid(self.lat, self.lon)
+                    self.timezone = self._get_timezone_from_coords(self.lat, self.lon)
+                    logger.info(f"Location set to ZIP {target_zip}: lat={self.lat}, lon={self.lon}, grid={self.grid_square}")
+                else:
+                    logger.warning(f"Could not get coordinates for ZIP {target_zip}, using defaults")
             except Exception as e:
-                logger.error(f"Error initializing with ZIP code {target_zip}: {e}")
+                logger.error(f"Error getting coordinates for ZIP {target_zip}: {e}")
         
         # Start background spots loading
         self._start_background_spots_loading()
@@ -1246,25 +1255,22 @@ class HamRadioConditions:
             return "Unknown"
 
     def _get_location_name(self):
-        """Get a proper location name based on coordinates"""
+        """Get location name from weather data or return generic location."""
         try:
-            # Use weather data if available to get city name
+            # Try to get location from weather data first
             weather = self.get_weather_conditions()
             if weather and weather.get('city'):
-                return f"{weather['city']}, {weather.get('state', 'AZ')}"
+                return f"{weather['city']}, {weather.get('state', '')}"
             
-            # Fallback to approximate location based on coordinates
-            if 31.5 <= self.lat <= 32.5 and -111.0 <= self.lon <= -109.0:
-                return "St. David, AZ"
-            elif 31.0 <= self.lat <= 32.0 and -111.5 <= self.lon <= -110.5:
-                return "Tucson Area, AZ"
-            elif 33.0 <= self.lat <= 34.0 and -112.5 <= self.lon <= -111.5:
-                return "Phoenix Area, AZ"
+            # Fallback to generic location based on coordinates
+            env_zip_code = os.getenv('ZIP_CODE')
+            if env_zip_code:
+                return f"ZIP {env_zip_code}"
             else:
                 return f"Grid {self.grid_square}"
         except Exception as e:
             logger.error(f"Error getting location name: {e}")
-            return f"Grid {self.grid_square}"
+            return "Unknown Location"
 
     def _convert_hamqsl_to_individual_bands(self, hamqsl_bands):
         """Convert HamQSL band groups to individual band conditions"""
@@ -1448,93 +1454,34 @@ class HamRadioConditions:
             logger.error(f"Error converting lat/lon to grid: {e}")
             return "AA00aa"
 
-    def zip_to_latlon(self, zip_code: str) -> tuple:
-        """Convert ZIP code to latitude and longitude using geocoding service."""
+    def update_location(self, zip_code: str) -> bool:
+        """Update the location with a new ZIP code. Only allow ZIP from .env file."""
         try:
-            # Try to use OpenCage Geocoding API if available
-            opencage_api_key = os.getenv('OPENCAGE_API_KEY')
-            if opencage_api_key:
-                url = "https://api.opencagedata.com/geocode/v1/json"
-                params = {
-                    'q': f"{zip_code}, USA",
-                    'key': opencage_api_key,
-                    'limit': 1
-                }
-                
-                logger.info(f"Geocoding ZIP {zip_code} with OpenCage API...")
-                response = requests.get(url, params=params, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data['results']:
-                        result = data['results'][0]
-                        lat = result['geometry']['lat']
-                        lon = result['geometry']['lng']
-                        
-                        # Log the full result for debugging
-                        formatted_address = result.get('formatted', 'Unknown')
-                        logger.info(f"OpenCage result for ZIP {zip_code}: lat={lat}, lon={lon}, address='{formatted_address}'")
-                        
-                        return (lat, lon)
-                    else:
-                        logger.warning(f"No results from OpenCage API for ZIP {zip_code}")
-                else:
-                    logger.error(f"OpenCage API error for ZIP {zip_code}: {response.status_code}")
-            else:
-                logger.info(f"OpenCage API key not available, using fallback for ZIP {zip_code}")
+            env_zip_code = os.getenv('ZIP_CODE')
+            if zip_code != env_zip_code:
+                logger.error(f"Attempted to update location to ZIP {zip_code}, but only ZIP from .env is allowed.")
+                return False
             
-            # Fallback: Use a simple ZIP code database for common US ZIP codes
-            # This is a limited fallback - in production, you'd want a comprehensive database
-            zip_coords = {
-                '90210': (34.1030, -118.4105),  # Beverly Hills, CA
-                '10001': (40.7505, -73.9965),   # New York, NY
-                '20001': (38.9097, -77.0169),   # Washington, DC
-                '33101': (25.7743, -80.1937),   # Miami, FL
-                '60601': (41.8857, -87.6228),   # Chicago, IL
-                '77001': (29.7604, -95.3698),   # Houston, TX
-                '85001': (33.4484, -112.0740),  # Phoenix, AZ
-                '98101': (47.6062, -122.3321),  # Seattle, WA
-                '80201': (39.7392, -104.9903),  # Denver, CO
-                '02101': (42.3601, -71.0589),   # Boston, MA
-                '85630': (31.9686, -110.7856),  # Sierra Vista, AZ
-                '85701': (32.2226, -110.9747),  # Tucson, AZ
-                '85001': (33.4484, -112.0740),  # Phoenix, AZ
-                '85201': (33.4152, -111.8315),  # Mesa, AZ
-                '85301': (33.4353, -112.3576),  # Glendale, AZ
-                '85364': (33.5387, -112.1860),  # Peoria, AZ
-                '85381': (33.5722, -112.0891),  # Sun City, AZ
-                '85382': (33.6389, -112.1429),  # Sun City West, AZ
-                '85383': (33.6389, -112.1429),  # Surprise, AZ
-                '85396': (33.6389, -112.1429),  # Youngtown, AZ
-                '98282': (48.2418, -122.5047),  # Camano Island, WA
+            if not self.openweather_api_key:
+                logger.error("OpenWeather API key not available for geocoding")
+                return False
+            
+            # Use OpenWeather API to get coordinates for the ZIP code
+            url = "http://api.openweathermap.org/geo/1.0/zip"
+            params = {
+                'zip': f"{zip_code},US",
+                'appid': self.openweather_api_key
             }
             
-            if zip_code in zip_coords:
-                lat, lon = zip_coords[zip_code]
-                logger.info(f"Using fallback coordinates for ZIP {zip_code}: lat={lat}, lon={lon}")
-                return (lat, lon)
-            
-            # If no match found, return default coordinates
-            logger.warning(f"ZIP code {zip_code} not found in database, using default coordinates")
-            return (34.0522, -118.2437)  # Default to Los Angeles
-            
-        except Exception as e:
-            logger.error(f"Error converting ZIP {zip_code} to lat/lon: {e}")
-            return (34.0522, -118.2437)  # Default to Los Angeles
-
-    def update_location(self, zip_code: str) -> bool:
-        """Update the location with a new ZIP code."""
-        try:
-            lat, lon = self.zip_to_latlon(zip_code)
-            if lat and lon:
-                self.lat = lat
-                self.lon = lon
-                self.grid_square = self.latlon_to_grid(lat, lon)
-                self.timezone = self._get_timezone_from_coords(lat, lon)
-                
-                # Clear caches to force refresh with new location
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                self.lat = data['lat']
+                self.lon = data['lon']
+                self.grid_square = self.latlon_to_grid(self.lat, self.lon)
+                self.timezone = self._get_timezone_from_coords(self.lat, self.lon)
                 self.clear_cache()
-                
-                logger.info(f"Location updated to ZIP {zip_code}: lat={lat}, lon={lon}, grid={self.grid_square}")
+                logger.info(f"Location updated to ZIP {zip_code}: lat={self.lat}, lon={self.lon}, grid={self.grid_square}")
                 return True
             else:
                 logger.error(f"Failed to get coordinates for ZIP {zip_code}")
