@@ -9,7 +9,8 @@ import xml.etree.ElementTree as ET
 import math
 from dxcc_data import (
     get_dxcc_by_grid,
-    get_nearby_dxcc
+    get_nearby_dxcc,
+    grid_to_latlon
 )
 from typing import Dict
 import pytz
@@ -18,6 +19,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from astral import LocationInfo
 from astral.sun import sun
+from utils.cache_manager import cache_get, cache_set, cache_delete
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -41,25 +43,31 @@ class HamRadioConditions:
         self.lon = -118.2437
         self.timezone = pytz.timezone('America/Los_Angeles')
         
-        # Async spots caching
-        self._spots_cache = None
-        self._spots_cache_time = None
-        self._spots_loading = False
-        self._spots_lock = threading.Lock()
+        # Initialize thread pool executor for async operations
         self._executor = ThreadPoolExecutor(max_workers=2)
         
-        # If ZIP code is provided, get coordinates and grid square
+        # Get ZIP code from environment or parameter
+        env_zip_code = os.getenv('ZIP_CODE')
         if zip_code:
+            target_zip = zip_code
+        elif env_zip_code:
+            target_zip = env_zip_code
+        else:
+            target_zip = None
+        
+        # If ZIP code is provided, get coordinates and grid square
+        if target_zip:
             try:
-                lat, lon = self.zip_to_latlon(zip_code)
+                lat, lon = self.zip_to_latlon(target_zip)
                 if lat and lon:
                     self.lat = lat
                     self.lon = lon
                     self.grid_square = self.latlon_to_grid(lat, lon)
                     # Get timezone from coordinates
                     self.timezone = self._get_timezone_from_coords(lat, lon)
+                    logger.info(f"Location set to ZIP {target_zip}: lat={lat}, lon={lon}, grid={self.grid_square}")
             except Exception as e:
-                print(f"Error initializing with ZIP code: {e}")
+                logger.error(f"Error initializing with ZIP code {target_zip}: {e}")
         
         # Start background spots loading
         self._start_background_spots_loading()
@@ -82,35 +90,22 @@ class HamRadioConditions:
 
     def _load_spots_async(self):
         """Load spots asynchronously with timeout"""
-        with self._spots_lock:
-            if self._spots_loading:
-                logger.debug("Spots already loading, skipping")
-                return
-            self._spots_loading = True
-        
         try:
             logger.debug("Starting async spots load")
             future = self._executor.submit(self._get_spots_with_timeout)
             spots = future.result(timeout=30)  # 30 second max
             
-            with self._spots_lock:
-                self._spots_cache = spots
-                self._spots_cache_time = time.time()
-                self._spots_loading = False
-            
             if spots and spots.get('summary', {}).get('total_spots', 0) > 0:
+                # Cache the spots data
+                cache_set('spots', 'current', spots, max_age=120)  # 2 minutes
                 logger.info(f"Loaded {spots['summary']['total_spots']} spots from {spots['summary']['source']}")
             else:
                 logger.debug("No spots loaded")
                 
         except FuturesTimeoutError:
             logger.warning("Spots loading timed out after 30 seconds")
-            with self._spots_lock:
-                self._spots_loading = False
         except Exception as e:
             logger.error(f"Error loading spots async: {e}")
-            with self._spots_lock:
-                self._spots_loading = False
 
     def _get_spots_with_timeout(self):
         """Get spots with timeout handling (thread-safe)"""
@@ -122,6 +117,133 @@ class HamRadioConditions:
         except Exception as e:
             logger.error(f"Error getting spots with timeout: {e}")
             return self._get_test_spots()
+
+    def get_live_activity(self):
+        """Get live activity with caching."""
+        # Try to get from cache first
+        cached_spots = cache_get('spots', 'current')
+        if cached_spots:
+            return cached_spots
+        
+        # If not in cache, load synchronously
+        try:
+            spots = self._get_spots_with_timeout()
+            if spots:
+                cache_set('spots', 'current', spots, max_age=120)
+            return spots
+        except Exception as e:
+            logger.error(f"Error getting live activity: {e}")
+            return None
+
+    def get_live_activity_simple(self):
+        """Get simplified live activity."""
+        activity = self.get_live_activity()
+        if activity and 'summary' in activity:
+            return activity['summary']
+        return {'total_spots': 0, 'source': 'None'}
+
+    def generate_report(self):
+        """Generate complete conditions report with caching."""
+        # Try to get from cache first
+        cached_report = cache_get('conditions', 'current')
+        if cached_report:
+            logger.debug("Returning cached conditions report")
+            # Update the timestamp to current time even for cached data
+            cached_report['timestamp'] = datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')
+            return cached_report
+        
+        # Generate new report
+        try:
+            logger.debug("Generating new conditions report")
+            report = {
+                'timestamp': datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z'),
+                'callsign': self.callsign,  # Add callsign to the report
+                'solar_conditions': self.get_solar_conditions(),
+                'weather_conditions': self.get_weather_conditions(),
+                'band_conditions': self.get_band_conditions(),
+                'dxcc_conditions': self.get_dxcc_conditions(self.grid_square),
+                'propagation_summary': self.get_propagation_summary(),
+                'live_activity': self.get_live_activity_simple()
+            }
+            
+            # Cache the report
+            cache_set('conditions', 'current', report, max_age=300)  # 5 minutes
+            logger.info("Generated and cached new conditions report")
+            
+            return report
+        except Exception as e:
+            logger.error(f"Error generating report: {e}")
+            return None
+
+    def get_weather_conditions(self):
+        """Get weather conditions with caching."""
+        # Try to get from cache first
+        cached_weather = cache_get('weather', 'current')
+        if cached_weather:
+            return cached_weather
+        
+        # Get fresh weather data
+        try:
+            weather = self._get_weather_data()
+            if weather:
+                cache_set('weather', 'current', weather, max_age=600)  # 10 minutes
+            return weather
+        except Exception as e:
+            logger.error(f"Error getting weather conditions: {e}")
+            return None
+
+    def _get_weather_data(self):
+        """Get weather data from OpenWeather API."""
+        if not self.openweather_api_key:
+            return None
+        
+        try:
+            url = f"http://api.openweathermap.org/data/2.5/weather"
+            params = {
+                'lat': self.lat,
+                'lon': self.lon,
+                'appid': self.openweather_api_key,
+                'units': 'imperial' if self.temp_unit == 'F' else 'metric'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Extract city and state from location name
+                location_name = data.get('name', 'Unknown')
+                city = location_name
+                state = data.get('sys', {}).get('country', '')
+                
+                return {
+                    'temperature': f"{data['main']['temp']:.1f}°{'F' if self.temp_unit == 'F' else 'C'}",
+                    'humidity': f"{data['main']['humidity']}%",
+                    'pressure': f"{data['main']['pressure']} hPa",
+                    'description': data['weather'][0]['description'].title(),
+                    'wind_speed': f"{data['wind']['speed']} {'mph' if self.temp_unit == 'F' else 'm/s'}",
+                    'wind_direction': f"{data['wind'].get('deg', 0)}°",
+                    'visibility': f"{data.get('visibility', 10000) / 1000:.1f} km",
+                    'city': city,
+                    'state': state,
+                    'location': location_name,
+                    'source': 'OpenWeather'
+                }
+        except Exception as e:
+            logger.error(f"Error fetching weather data: {e}")
+        
+        return None
+
+    def clear_cache(self, cache_type=None):
+        """Clear specific or all caches."""
+        if cache_type:
+            cache_delete(cache_type, 'current')
+            logger.info(f"Cleared {cache_type} cache")
+        else:
+            # Clear all caches
+            cache_delete('conditions', 'current')
+            cache_delete('spots', 'current')
+            cache_delete('weather', 'current')
+            logger.info("Cleared all caches")
 
     def _get_pskreporter_spots_fast(self):
         """Fast PSKReporter spots with aggressive timeout"""
@@ -273,112 +395,461 @@ class HamRadioConditions:
             }
         }
 
-    def get_live_activity(self):
-        """Get live activity data (non-blocking)"""
+    def get_solar_conditions(self):
+        """Fetch current solar conditions from HamQSL XML feed"""
         try:
-            # Check cache first
-            with self._spots_lock:
-                if self._spots_cache is not None:
-                    # Cache is valid for 10 minutes
-                    if self._spots_cache_time and (time.time() - self._spots_cache_time) < 600:
-                        logger.debug("Returning cached spots")
-                        return self._spots_cache
-                
-                loading_status = self._spots_loading
+            response = requests.get('http://www.hamqsl.com/solarxml.php', timeout=10)
+            root = ET.fromstring(response.content)
             
-            # If no cache and not currently loading, start loading
-            if not loading_status:
-                logger.debug("Starting background spots load")
-                threading.Thread(target=self._load_spots_async, daemon=True).start()
-            
-            # Return cached data or test data
-            with self._spots_lock:
-                if self._spots_cache is not None:
-                    return self._spots_cache
-            
-            # Return test data while loading
-            logger.debug("Returning test data while spots load in background")
-            test_spots = self._get_test_spots()
-            test_spots['summary']['source'] = 'Loading...'
-            return test_spots
-            
+            # Find the solardata element
+            solar_data = root.find('solardata')
+            if solar_data is not None:
+                return {
+                    'sfi': solar_data.find('solarflux').text.strip() if solar_data.find('solarflux') is not None else 'N/A',
+                    'a_index': solar_data.find('aindex').text.strip() if solar_data.find('aindex') is not None else 'N/A',
+                    'k_index': solar_data.find('kindex').text.strip() if solar_data.find('kindex') is not None else 'N/A',
+                    'xray': solar_data.find('xray').text.strip() if solar_data.find('xray') is not None else 'N/A',
+                    'sunspots': solar_data.find('sunspots').text.strip() if solar_data.find('sunspots') is not None else 'N/A',
+                    'proton_flux': solar_data.find('protonflux').text.strip() if solar_data.find('protonflux') is not None else 'N/A',
+                    'electron_flux': solar_data.find('electonflux').text.strip() if solar_data.find('electonflux') is not None else 'N/A',
+                    'aurora': solar_data.find('aurora').text.strip() if solar_data.find('aurora') is not None else 'N/A',
+                    'updated': solar_data.find('updated').text.strip() if solar_data.find('updated') is not None else 'N/A'
+                }
+            return {'sfi': 'N/A', 'a_index': 'N/A', 'k_index': 'N/A', 'xray': 'N/A', 
+                   'sunspots': 'N/A', 'proton_flux': 'N/A', 'electron_flux': 'N/A',
+                   'aurora': 'N/A', 'updated': 'N/A'}
         except Exception as e:
-            logger.error(f"Error in get_live_activity: {e}")
-            return self._get_test_spots()
+            print(f"Error fetching solar conditions: {e}")
+            return {'sfi': 'N/A', 'a_index': 'N/A', 'k_index': 'N/A', 'xray': 'N/A', 
+                   'sunspots': 'N/A', 'proton_flux': 'N/A', 'electron_flux': 'N/A',
+                   'aurora': 'N/A', 'updated': 'N/A'}
 
-    def get_live_activity_simple(self):
-        """Simple immediate response for testing"""
-        logger.debug("Simple spots method called")
-        return self._get_test_spots()
-
-    def _get_timezone_from_coords(self, lat, lon):
-        """Get timezone from coordinates using astral"""
+    def get_band_conditions(self):
+        """Fetch band conditions from HamQSL XML feed"""
         try:
-            # Arizona-specific timezone (no DST)
-            if 31.0 <= lat <= 37.0 and -115.0 <= lon <= -109.0:
-                return pytz.timezone('America/Phoenix')
+            response = requests.get('http://www.hamqsl.com/solarxml.php', timeout=10)
+            root = ET.fromstring(response.content)
             
-            # For now, use a more accurate longitude-based approach
-            # This is better than the previous simple division
-            if lon >= -67.5 and lon < -52.5:  # Eastern Time
-                return pytz.timezone('America/New_York')
-            elif lon >= -97.5 and lon < -82.5:  # Central Time
-                return pytz.timezone('America/Chicago')
-            elif lon >= -112.5 and lon < -97.5:  # Mountain Time
-                return pytz.timezone('America/Denver')
-            elif lon >= -127.5 and lon < -112.5:  # Pacific Time
-                return pytz.timezone('America/Los_Angeles')
-            elif lon >= -142.5 and lon < -127.5:  # Alaska Time
-                return pytz.timezone('America/Anchorage')
-            else:
-                # Fallback to longitude-based calculation
-                hours_offset = round(lon / 15)
-                if hours_offset >= 0:
-                    return pytz.timezone(f'Etc/GMT-{hours_offset}')
-                else:
-                    return pytz.timezone(f'Etc/GMT+{abs(hours_offset)}')
+            # Find the band conditions
+            bands = {}
+            # Define the bands we want to check
+            band_list = ['80m-40m', '30m-20m', '17m-15m', '12m-10m']
+            
+            # Initialize all bands with N/A
+            for band_name in band_list:
+                bands[band_name] = {'day': 'N/A', 'night': 'N/A'}
+            
+            # Find all band conditions
+            calculated_conditions = root.find('.//calculatedconditions')
+            if calculated_conditions is not None:
+                for band in calculated_conditions.findall('band'):
+                    band_name = band.get('name')
+                    time = band.get('time')
+                    condition = band.text.strip() if band.text else 'N/A'
+                    
+                    if band_name in bands and time in ['day', 'night']:
+                        bands[band_name][time] = condition
+            
+            return bands
         except Exception as e:
-            print(f"Error getting timezone: {e}")
-            return pytz.UTC
-
-    def _calculate_sunrise_sunset(self):
-        """Calculate sunrise and sunset times for the current location"""
-        try:
-            location = LocationInfo("Location", "Region", "US", self.lat, self.lon)
-            now_local = datetime.now(self.timezone)
-            today = now_local.date()
-            tomorrow = today + timedelta(days=1)
-            
-            # Get today's sunrise and sunset
-            sun_today = sun(location.observer, date=today)
-            sunrise_local = sun_today['sunrise'].astimezone(self.timezone)
-            sunset_today_local = sun_today['sunset'].astimezone(self.timezone)
-            
-            # Get tomorrow's sunset
-            sun_tomorrow = sun(location.observer, date=tomorrow)
-            sunset_tomorrow_local = sun_tomorrow['sunset'].astimezone(self.timezone)
-
-            # Use the next sunset after now
-            if sunset_today_local > now_local:
-                sunset_local = sunset_today_local
-            else:
-                sunset_local = sunset_tomorrow_local
-
+            print(f"Error fetching band conditions: {e}")
+            # Return default band structure with N/A values
             return {
-                'sunrise': sunrise_local.strftime('%I:%M %p'),
-                'sunset': sunset_local.strftime('%I:%M %p'),
-                'is_day': sunrise_local <= now_local <= sunset_local
+                '80m-40m': {'day': 'N/A', 'night': 'N/A'},
+                '30m-20m': {'day': 'N/A', 'night': 'N/A'},
+                '17m-15m': {'day': 'N/A', 'night': 'N/A'},
+                '12m-10m': {'day': 'N/A', 'night': 'N/A'}
+            }
+
+    def convert_temp(self, temp_c):
+        """Convert temperature from Celsius to the configured unit"""
+        if self.temp_unit == 'F':
+            return round((temp_c * 9/5) + 32, 1)
+        return round(temp_c, 1)
+
+    def get_weather_from_openweather(self):
+        """Get weather data from OpenWeather API"""
+        if not self.openweather_api_key:
+            print("OpenWeather API key not configured")
+            return None
+
+        try:
+            url = f"http://api.openweathermap.org/data/2.5/weather?lat={self.lat}&lon={self.lon}&appid={self.openweather_api_key}&units=metric"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            return {
+                'temperature': f"{self.convert_temp(data['main']['temp'])}°{self.temp_unit}",
+                'humidity': f"{data['main']['humidity']}%",
+                'pressure': f"{data['main']['pressure']} hPa",
+                'description': data['weather'][0]['description'].capitalize(),
+                'city': data['name'],
+                'state': data.get('sys', {}).get('country', ''),
+                'source': 'OpenWeather'
             }
         except Exception as e:
-            print(f"Error calculating sunrise/sunset: {e}")
+            print(f"Error fetching weather from OpenWeather: {str(e)}")
+            return None
+
+    def get_weather_from_nws(self):
+        """Get weather data from National Weather Service API"""
+        try:
+            # First, get the grid endpoint
+            points_url = f"https://api.weather.gov/points/{self.lat},{self.lon}"
+            response = requests.get(points_url, headers={'User-Agent': 'HamRadioConditions/1.0'}, timeout=10)
+            response.raise_for_status()
+            grid_data = response.json()
+            
+            # Then get the forecast
+            forecast_url = grid_data['properties']['forecast']
+            response = requests.get(forecast_url, headers={'User-Agent': 'HamRadioConditions/1.0'}, timeout=10)
+            response.raise_for_status()
+            forecast_data = response.json()
+            
+            current = forecast_data['properties']['periods'][0]
             return {
-                'sunrise': 'N/A',
-                'sunset': 'N/A',
-                'is_day': True
+                'temperature': f"{current['temperature']}°{self.temp_unit}",
+                'humidity': f"{current['relativeHumidity']['value']}%",
+                'pressure': f"{current['pressure']['value']} hPa",
+                'description': current['shortForecast'],
+                'city': grid_data['properties']['relativeLocation']['properties']['city'],
+                'state': grid_data['properties']['relativeLocation']['properties']['state'],
+                'source': 'National Weather Service'
+            }
+        except Exception as e:
+            print(f"Error fetching weather from NWS: {str(e)}")
+            return None
+
+    def get_itu_zone(self, lat, lon):
+        """Calculate ITU zone from latitude and longitude"""
+        # ITU zones are numbered from 1 to 90, with 1 starting at 180°W
+        # Each zone is 20° wide
+        itu_zone = int((lon + 180) / 20) + 1
+        return str(itu_zone)
+
+    def get_cq_zone(self, lat, lon):
+        """Calculate CQ zone from latitude and longitude"""
+        # CQ zones are numbered from 1 to 40, with 1 starting at 180°W
+        # Each zone is 10° wide
+        cq_zone = int((lon + 180) / 10) + 1
+        return str(cq_zone)
+
+    def get_dxcc_conditions(self, grid_square: str) -> Dict:
+        """
+        Get DXCC conditions for the current location.
+        
+        Args:
+            grid_square (str): The Maidenhead grid square
+            
+        Returns:
+            dict: DXCC conditions including current entity and nearby entities
+        """
+        try:
+            # Get current DXCC entity
+            current_dxcc = get_dxcc_by_grid(grid_square)
+            if not current_dxcc:
+                # Calculate ITU and CQ zones based on grid square coordinates
+                lat, lon = self.grid_to_latlon(grid_square)
+                itu_zone = self._calculate_itu_zone(lat, lon)
+                cq_zone = self._calculate_cq_zone(lat, lon)
+                
+                current_dxcc = {
+                    'name': 'Unknown',
+                    'continent': 'Unknown',
+                    'itu_zone': str(itu_zone),
+                    'cq_zone': str(cq_zone),
+                    'prefixes': [],
+                    'timezone': 'UTC'
+                }
+            else:
+                # Calculate ITU and CQ zones based on grid square coordinates
+                lat, lon = self.grid_to_latlon(grid_square)
+                itu_zone = self._calculate_itu_zone(lat, lon)
+                cq_zone = self._calculate_cq_zone(lat, lon)
+                
+                # Update current DXCC with calculated zones
+                current_dxcc['itu_zone'] = str(itu_zone)
+                current_dxcc['cq_zone'] = str(cq_zone)
+            
+            # Get nearby DXCC entities
+            nearby_entities = get_nearby_dxcc(grid_square)
+            
+            return {
+                'current': current_dxcc,
+                'nearby': nearby_entities
+            }
+        except Exception as e:
+            print(f"Error getting DXCC conditions: {str(e)}")
+            return {
+                'current': {
+                    'name': 'Unknown',
+                    'continent': 'Unknown',
+                    'itu_zone': 'Unknown',
+                    'cq_zone': 'Unknown',
+                    'prefixes': [],
+                    'timezone': 'UTC'
+                },
+                'nearby': []
+            }
+
+    def _calculate_itu_zone(self, lat: float, lon: float) -> int:
+        """
+        Calculate ITU zone based on latitude and longitude.
+        
+        Args:
+            lat (float): Latitude in degrees
+            lon (float): Longitude in degrees
+            
+        Returns:
+            int: ITU zone number
+        """
+        # ITU zones are based on longitude, with zone 1 starting at 180°W
+        # Each zone is 20° wide
+        # Normalize longitude to -180 to 180
+        lon = ((lon + 180) % 360) - 180
+        # Calculate zone (1-90)
+        itu_zone = int((lon + 180) / 20)
+        if itu_zone == 0:
+            itu_zone = 90
+        return max(1, min(itu_zone, 90))  # Ensure zone is between 1 and 90
+
+    def _calculate_cq_zone(self, lat: float, lon: float) -> int:
+        """
+        Calculate CQ zone based on latitude and longitude.
+        
+        Args:
+            lat (float): Latitude in degrees
+            lon (float): Longitude in degrees
+            
+        Returns:
+            int: CQ zone number
+        """
+        # CQ zones are based on the official CQ zone map
+        # Zone 1 starts at 180°W, 0°N
+        # Each zone is 10° wide in longitude
+        # Zones 1-18 are in the Northern Hemisphere
+        # Zones 19-40 are in the Southern Hemisphere
+        
+        # Normalize longitude to -180 to 180
+        lon = ((lon + 180) % 360) - 180
+        # Calculate base zone (1-18 for Northern Hemisphere)
+        base_zone = int((lon + 180) / 10)
+        if base_zone == 0:
+            base_zone = 18
+        
+        # Adjust for Southern Hemisphere
+        if lat < 0:
+            base_zone += 18
+            
+        # Ensure zone is between 1 and 40
+        return max(1, min(base_zone, 40))
+
+    def _calculate_muf(self, solar_data):
+        """Calculate Maximum Usable Frequency (MUF) based on solar conditions."""
+        try:
+            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
+            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
+            
+            # Base MUF calculation based on solar flux
+            if sfi >= 150:
+                base_muf = 25 + (sfi - 150) * 0.1  # High solar activity
+            elif sfi >= 100:
+                base_muf = 15 + (sfi - 100) * 0.2  # Moderate solar activity
+            elif sfi >= 70:
+                base_muf = 10 + (sfi - 70) * 0.17  # Low solar activity
+            else:
+                base_muf = 5 + sfi * 0.07  # Very low solar activity
+            
+            # Adjust for geomagnetic activity
+            if k_index > 5:
+                base_muf *= 0.5  # Severe geomagnetic storm
+            elif k_index > 3:
+                base_muf *= 0.7  # Moderate geomagnetic activity
+            elif k_index > 1:
+                base_muf *= 0.9  # Slight geomagnetic activity
+            
+            return round(max(3, min(50, base_muf)), 1)  # Clamp between 3-50 MHz
+        except Exception as e:
+            logger.error(f"Error calculating MUF: {e}")
+            return 15.0  # Default fallback
+
+    def _determine_best_bands(self, solar_data, is_daytime):
+        """Determine the best bands for current conditions."""
+        try:
+            muf = self._calculate_muf(solar_data)
+            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
+            
+            # Define band frequencies
+            bands = {
+                '160m': 1.8, '80m': 3.5, '40m': 7.0, '30m': 10.1,
+                '20m': 14.0, '17m': 18.1, '15m': 21.0, '12m': 24.9,
+                '10m': 28.0, '6m': 50.0
+            }
+            
+            # Filter bands based on MUF
+            available_bands = [band for band, freq in bands.items() if freq <= muf * 1.2]
+            
+            # Prioritize bands based on conditions
+            if k_index > 4:
+                # High geomagnetic activity - prefer lower bands
+                priority_bands = ['80m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m']
+            elif is_daytime:
+                # Daytime - prefer higher bands
+                priority_bands = ['20m', '15m', '12m', '10m', '6m', '17m', '30m', '40m', '80m']
+            else:
+                # Nighttime - prefer lower bands
+                priority_bands = ['80m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m']
+            
+            # Return available bands in priority order
+            return [band for band in priority_bands if band in available_bands][:5]
+        except Exception as e:
+            logger.error(f"Error determining best bands: {e}")
+            return ['20m', '40m', '80m']  # Default fallback
+
+    def _calculate_propagation_quality(self, solar_data, is_daytime):
+        """Calculate overall propagation quality."""
+        try:
+            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
+            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
+            a_index = float(solar_data.get('a_index', '0').replace('A-Index: ', ''))
+            
+            # Base quality score
+            quality_score = 0
+            
+            # Solar flux contribution
+            if sfi >= 150:
+                quality_score += 40
+            elif sfi >= 120:
+                quality_score += 30
+            elif sfi >= 100:
+                quality_score += 20
+            elif sfi >= 80:
+                quality_score += 10
+            else:
+                quality_score += 0
+            
+            # Geomagnetic activity penalty
+            if k_index <= 1:
+                quality_score += 20
+            elif k_index <= 2:
+                quality_score += 15
+            elif k_index <= 3:
+                quality_score += 10
+            elif k_index <= 4:
+                quality_score += 5
+            else:
+                quality_score -= 20
+            
+            # A-index penalty
+            if a_index <= 10:
+                quality_score += 10
+            elif a_index <= 20:
+                quality_score += 5
+            elif a_index <= 30:
+                quality_score += 0
+            else:
+                quality_score -= 15
+            
+            # Time of day adjustment
+            if is_daytime:
+                quality_score += 10  # Daytime generally better for HF
+            
+            # Determine quality level
+            if quality_score >= 70:
+                return "Excellent"
+            elif quality_score >= 50:
+                return "Good"
+            elif quality_score >= 30:
+                return "Fair"
+            elif quality_score >= 10:
+                return "Poor"
+            else:
+                return "Very Poor"
+        except Exception as e:
+            logger.error(f"Error calculating propagation quality: {e}")
+            return "Unknown"
+
+    def _get_aurora_conditions(self, solar_data):
+        """Get aurora conditions and their impact on propagation."""
+        try:
+            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
+            a_index = float(solar_data.get('a_index', '0').replace('A-Index: ', ''))
+            
+            # Determine aurora activity level
+            if k_index >= 6 or a_index >= 50:
+                activity = "Strong"
+                impact = "Severe HF propagation degradation"
+                affected_bands = "All HF bands severely affected"
+                recommendation = "Focus on VHF/UHF and local contacts"
+            elif k_index >= 4 or a_index >= 30:
+                activity = "Moderate"
+                impact = "Significant HF propagation degradation"
+                affected_bands = "Higher HF bands (15m, 12m, 10m) affected"
+                recommendation = "Monitor conditions, focus on lower bands"
+            elif k_index >= 2 or a_index >= 15:
+                activity = "Weak"
+                impact = "Minor HF propagation effects"
+                affected_bands = "Some higher bands may be affected"
+                recommendation = "Monitor auroral conditions"
+            else:
+                activity = "None"
+                impact = "No auroral effects on propagation"
+                affected_bands = "None"
+                recommendation = "Normal HF operation"
+            
+            return {
+                'activity': activity,
+                'impact': impact,
+                'affected_bands': affected_bands,
+                'recommendation': recommendation,
+                'k_index': k_index,
+                'a_index': a_index
+            }
+        except Exception as e:
+            logger.error(f"Error getting aurora conditions: {e}")
+            return {
+                'activity': 'Unknown',
+                'impact': 'Unknown',
+                'affected_bands': 'Unknown',
+                'recommendation': 'Check solar conditions'
+            }
+
+    def _get_solar_cycle_info(self, solar_data):
+        """Get solar cycle information and predictions."""
+        try:
+            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
+            sunspots = solar_data.get('sunspots', '0')
+            
+            # Determine solar cycle phase
+            if sfi >= 150:
+                cycle_phase = "Solar Maximum"
+                prediction = "Excellent HF conditions expected"
+            elif sfi >= 100:
+                cycle_phase = "Rising Solar Maximum"
+                prediction = "Good HF conditions improving"
+            elif sfi >= 70:
+                cycle_phase = "Solar Minimum to Rising"
+                prediction = "Fair conditions, improving"
+            else:
+                cycle_phase = "Solar Minimum"
+                prediction = "Poor HF conditions, focus on lower bands"
+            
+            return {
+                'phase': cycle_phase,
+                'prediction': prediction,
+                'sfi_trend': 'Rising' if sfi > 80 else 'Stable' if sfi > 60 else 'Declining'
+            }
+        except Exception as e:
+            logger.error(f"Error getting solar cycle info: {e}")
+            return {
+                'phase': 'Unknown',
+                'prediction': 'Unknown',
+                'sfi_trend': 'Unknown'
             }
 
     def get_propagation_summary(self):
-        """Generate a comprehensive propagation summary with detailed analysis"""
+        """Generate a comprehensive propagation summary with detailed analysis."""
         try:
             # Get current time in local timezone
             now = datetime.now(self.timezone)
@@ -588,6 +1059,42 @@ class HamRadioConditions:
                 }
             }
 
+    def _calculate_sunrise_sunset(self):
+        """Calculate sunrise and sunset times for the current location"""
+        try:
+            location = LocationInfo("Location", "Region", "US", self.lat, self.lon)
+            now_local = datetime.now(self.timezone)
+            today = now_local.date()
+            tomorrow = today + timedelta(days=1)
+            
+            # Get today's sunrise and sunset
+            sun_today = sun(location.observer, date=today)
+            sunrise_local = sun_today['sunrise'].astimezone(self.timezone)
+            sunset_today_local = sun_today['sunset'].astimezone(self.timezone)
+            
+            # Get tomorrow's sunset
+            sun_tomorrow = sun(location.observer, date=tomorrow)
+            sunset_tomorrow_local = sun_tomorrow['sunset'].astimezone(self.timezone)
+
+            # Use the next sunset after now
+            if sunset_today_local > now_local:
+                sunset_local = sunset_today_local
+            else:
+                sunset_local = sunset_tomorrow_local
+
+            return {
+                'sunrise': sunrise_local.strftime('%I:%M %p'),
+                'sunset': sunset_local.strftime('%I:%M %p'),
+                'is_day': sunrise_local <= now_local <= sunset_local
+            }
+        except Exception as e:
+            print(f"Error calculating sunrise/sunset: {e}")
+            return {
+                'sunrise': 'N/A',
+                'sunset': 'N/A',
+                'is_day': True
+            }
+
     def _get_key_propagation_factors(self, solar_data, is_daytime):
         """Get key factors affecting current propagation using HamQSL data."""
         try:
@@ -709,710 +1216,6 @@ class HamRadioConditions:
             print(f"Error getting outlook: {e}")
             return "Unknown outlook - check solar conditions"
 
-    def _freq_to_band(self, freq):
-        """Convert frequency to amateur radio band"""
-        try:
-            freq = float(freq)
-            
-            # Standard amateur radio band ranges
-            if 1800 <= freq <= 2000:
-                return '160m'
-            elif 3500 <= freq <= 4000:
-                return '80m'
-            elif 7000 <= freq <= 7300:
-                return '40m'
-            elif 10100 <= freq <= 10150:
-                return '30m'
-            elif 14000 <= freq <= 14350:
-                return '20m'
-            elif 18068 <= freq <= 18168:
-                return '17m'
-            elif 21000 <= freq <= 21450:
-                return '15m'
-            elif 24890 <= freq <= 24990:
-                return '12m'
-            elif 28000 <= freq <= 29700:
-                return '10m'
-            elif 50000 <= freq <= 54000:
-                return '6m'
-            elif 144000 <= freq <= 148000:
-                return '2m'
-            elif 220000 <= freq <= 225000:
-                return '1.25m'
-            elif 420000 <= freq <= 450000:
-                return '70cm'
-            elif 902000 <= freq <= 928000:
-                return '33cm'
-            elif 1240000 <= freq <= 1300000:
-                return '23cm'
-            
-            # Comprehensive tolerance ranges for frequencies slightly outside standard ranges
-            # 160m band tolerance
-            elif 1790 <= freq <= 2010:
-                return '160m'
-            
-            # 80m band tolerance
-            elif 3490 <= freq <= 4010:
-                return '80m'
-            
-            # 40m band tolerance - expanded to cover 7.075683 MHz
-            elif 6950 <= freq <= 7350:
-                return '40m'
-            
-            # 30m band tolerance
-            elif 10050 <= freq <= 10200:
-                return '30m'
-            
-            # 20m band tolerance - expanded to cover all 14.07x MHz frequencies
-            elif 13950 <= freq <= 14450:
-                return '20m'
-            
-            # 17m band tolerance - expanded to cover 18.101562 MHz
-            elif 18050 <= freq <= 18200:
-                return '17m'
-            
-            # 15m band tolerance - expanded to cover all 21.07x MHz frequencies
-            elif 20950 <= freq <= 21500:
-                return '15m'
-            
-            # 12m band tolerance
-            elif 24880 <= freq <= 25000:
-                return '12m'
-            
-            # 10m band tolerance
-            elif 27990 <= freq <= 29710:
-                return '10m'
-            
-            # 6m band tolerance
-            elif 49990 <= freq <= 54010:
-                return '6m'
-            
-            # 2m band tolerance
-            elif 143990 <= freq <= 148010:
-                return '2m'
-            
-            else:
-                return 'Unknown'
-        except:
-            return 'Unknown'
-    
-    def _extract_mode_from_comment(self, comment):
-        """Extract operating mode from spot comment"""
-        if not comment:
-            return 'Unknown'
-        
-        comment_upper = comment.upper()
-        
-        # Check for specific modes
-        if 'FT8' in comment_upper:
-            return 'FT8'
-        elif 'FT4' in comment_upper:
-            return 'FT4'
-        elif 'CW' in comment_upper:
-            return 'CW'
-        elif any(mode in comment_upper for mode in ['SSB', 'LSB', 'USB', 'PHONE']):
-            return 'SSB'
-        elif 'RTTY' in comment_upper:
-            return 'RTTY'
-        elif 'PSK' in comment_upper:
-            return 'PSK'
-        elif 'JT65' in comment_upper:
-            return 'JT65'
-        elif 'JT9' in comment_upper:
-            return 'JT9'
-        elif 'MFSK' in comment_upper:
-            return 'MFSK'
-        elif 'OLIVIA' in comment_upper:
-            return 'OLIVIA'
-        elif 'CONTESTIA' in comment_upper:
-            return 'CONTESTIA'
-        elif any(mode in comment_upper for mode in ['DIGITAL', 'DATA']):
-            return 'Digital'
-        else:
-            return 'Unknown'
-
-    def grid_to_latlon(self, grid_square):
-        """Convert Maidenhead grid square to latitude and longitude"""
-        try:
-            # Convert to uppercase and ensure we have at least 4 characters
-            grid = grid_square.upper()[:4]
-            
-            # First two characters (A-R) - 20° longitude x 10° latitude fields
-            lon = (ord(grid[0]) - ord('A')) * 20 - 180
-            lat = (ord(grid[1]) - ord('A')) * 10 - 90
-            
-            # Next two characters (0-9) - 2° longitude x 1° latitude squares
-            lon += (ord(grid[2]) - ord('0')) * 2
-            lat += (ord(grid[3]) - ord('0'))
-            
-            # If we have 6 characters, add more precision (5' longitude x 2.5' latitude)
-            if len(grid_square) >= 6:
-                lon += (ord(grid_square[4].upper()) - ord('A')) * (2/24)
-                lat += (ord(grid_square[5].upper()) - ord('A')) * (1/24)
-            
-            # Add half a grid square to center the coordinates
-            # For 4-char grid: add 1° longitude and 0.5° latitude
-            # For 6-char grid: add 1/24° longitude and 1/48° latitude
-            if len(grid_square) >= 6:
-                lon += 1/24  # Half of 2/24
-                lat += 1/48  # Half of 1/24
-            else:
-                lon += 1     # Half of 2°
-                lat += 0.5   # Half of 1°
-            
-            return lat, lon
-        except Exception as e:
-            print(f"Error converting grid square {grid_square}: {e}")
-            # Fallback to DM41vv coordinates (approximately 40.0°N, 105.0°W)
-            return 40.0, -105.0
-
-    def zip_to_latlon(self, zip_code):
-        """Convert ZIP code to latitude and longitude using OpenWeather API"""
-        if not self.openweather_api_key:
-            print("OpenWeather API key not configured")
-            return 40.0, -105.0  # Default to DM41vv coordinates
-
-        try:
-            url = f"http://api.openweathermap.org/geo/1.0/zip?zip={zip_code},US&appid={self.openweather_api_key}"
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            return data['lat'], data['lon']
-        except Exception as e:
-            print(f"Error converting ZIP code {zip_code}: {e}")
-            return 40.0, -105.0  # Default to DM41vv coordinates
-
-    def latlon_to_grid(self, lat, lon):
-        """Convert latitude and longitude to Maidenhead grid square"""
-        try:
-            # Normalize longitude to -180 to 180
-            lon = ((lon + 180) % 360) - 180
-            
-            # Calculate first two characters (A-R)
-            lon_field = int((lon + 180) / 20)
-            lat_field = int((lat + 90) / 10)
-            
-            # Calculate next two characters (0-9)
-            lon_square = int(((lon + 180) % 20) / 2)
-            lat_square = int(((lat + 90) % 10))
-            
-            # Calculate last two characters (a-x)
-            lon_sub = int((((lon + 180) % 20) % 2) * 12)
-            lat_sub = int((((lat + 90) % 10) % 1) * 24)
-            
-            # Convert to characters
-            grid = (
-                chr(ord('A') + lon_field) +
-                chr(ord('A') + lat_field) +
-                str(lon_square) +
-                str(lat_square) +
-                chr(ord('a') + lon_sub) +
-                chr(ord('a') + lat_sub)
-            )
-            
-            return grid
-        except Exception as e:
-            print(f"Error converting lat/lon to grid square: {e}")
-            return 'DM41vv'  # Default grid square
-
-    def get_solar_conditions(self):
-        """Fetch current solar conditions from HamQSL XML feed"""
-        try:
-            response = requests.get('http://www.hamqsl.com/solarxml.php', timeout=10)
-            root = ET.fromstring(response.content)
-            
-            # Find the solardata element
-            solar_data = root.find('solardata')
-            if solar_data is not None:
-                return {
-                    'sfi': solar_data.find('solarflux').text.strip() if solar_data.find('solarflux') is not None else 'N/A',
-                    'a_index': solar_data.find('aindex').text.strip() if solar_data.find('aindex') is not None else 'N/A',
-                    'k_index': solar_data.find('kindex').text.strip() if solar_data.find('kindex') is not None else 'N/A',
-                    'xray': solar_data.find('xray').text.strip() if solar_data.find('xray') is not None else 'N/A',
-                    'sunspots': solar_data.find('sunspots').text.strip() if solar_data.find('sunspots') is not None else 'N/A',
-                    'proton_flux': solar_data.find('protonflux').text.strip() if solar_data.find('protonflux') is not None else 'N/A',
-                    'electron_flux': solar_data.find('electonflux').text.strip() if solar_data.find('electonflux') is not None else 'N/A',
-                    'aurora': solar_data.find('aurora').text.strip() if solar_data.find('aurora') is not None else 'N/A',
-                    'updated': solar_data.find('updated').text.strip() if solar_data.find('updated') is not None else 'N/A'
-                }
-            return {'sfi': 'N/A', 'a_index': 'N/A', 'k_index': 'N/A', 'xray': 'N/A', 
-                   'sunspots': 'N/A', 'proton_flux': 'N/A', 'electron_flux': 'N/A',
-                   'aurora': 'N/A', 'updated': 'N/A'}
-        except Exception as e:
-            print(f"Error fetching solar conditions: {e}")
-            return {'sfi': 'N/A', 'a_index': 'N/A', 'k_index': 'N/A', 'xray': 'N/A', 
-                   'sunspots': 'N/A', 'proton_flux': 'N/A', 'electron_flux': 'N/A',
-                   'aurora': 'N/A', 'updated': 'N/A'}
-
-    def get_band_conditions(self):
-        """Fetch band conditions from HamQSL XML feed"""
-        try:
-            response = requests.get('http://www.hamqsl.com/solarxml.php', timeout=10)
-            root = ET.fromstring(response.content)
-            
-            # Find the band conditions
-            bands = {}
-            # Define the bands we want to check
-            band_list = ['80m-40m', '30m-20m', '17m-15m', '12m-10m']
-            
-            # Initialize all bands with N/A
-            for band_name in band_list:
-                bands[band_name] = {'day': 'N/A', 'night': 'N/A'}
-            
-            # Find all band conditions
-            calculated_conditions = root.find('.//calculatedconditions')
-            if calculated_conditions is not None:
-                for band in calculated_conditions.findall('band'):
-                    band_name = band.get('name')
-                    time = band.get('time')
-                    condition = band.text.strip() if band.text else 'N/A'
-                    
-                    if band_name in bands and time in ['day', 'night']:
-                        bands[band_name][time] = condition
-            
-            return bands
-        except Exception as e:
-            print(f"Error fetching band conditions: {e}")
-            # Return default band structure with N/A values
-            return {
-                '80m-40m': {'day': 'N/A', 'night': 'N/A'},
-                '30m-20m': {'day': 'N/A', 'night': 'N/A'},
-                '17m-15m': {'day': 'N/A', 'night': 'N/A'},
-                '12m-10m': {'day': 'N/A', 'night': 'N/A'}
-            }
-
-    def convert_temp(self, temp_c):
-        """Convert temperature from Celsius to the configured unit"""
-        if self.temp_unit == 'F':
-            return round((temp_c * 9/5) + 32, 1)
-        return round(temp_c, 1)
-
-    def get_weather_from_openweather(self):
-        """Get weather data from OpenWeather API"""
-        if not self.openweather_api_key:
-            print("OpenWeather API key not configured")
-            return None
-
-        try:
-            url = f"http://api.openweathermap.org/data/2.5/weather?lat={self.lat}&lon={self.lon}&appid={self.openweather_api_key}&units=metric"
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            return {
-                'temperature': f"{self.convert_temp(data['main']['temp'])}°{self.temp_unit}",
-                'humidity': f"{data['main']['humidity']}%",
-                'pressure': f"{data['main']['pressure']} hPa",
-                'description': data['weather'][0]['description'].capitalize(),
-                'city': data['name'],
-                'state': data.get('sys', {}).get('country', ''),
-                'source': 'OpenWeather'
-            }
-        except Exception as e:
-            print(f"Error fetching weather from OpenWeather: {str(e)}")
-            return None
-
-    def get_weather_from_nws(self):
-        """Get weather data from National Weather Service API"""
-        try:
-            # First, get the grid endpoint
-            points_url = f"https://api.weather.gov/points/{self.lat},{self.lon}"
-            response = requests.get(points_url, headers={'User-Agent': 'HamRadioConditions/1.0'}, timeout=10)
-            response.raise_for_status()
-            grid_data = response.json()
-            
-            # Then get the forecast
-            forecast_url = grid_data['properties']['forecast']
-            response = requests.get(forecast_url, headers={'User-Agent': 'HamRadioConditions/1.0'}, timeout=10)
-            response.raise_for_status()
-            forecast_data = response.json()
-            
-            current = forecast_data['properties']['periods'][0]
-            return {
-                'temperature': f"{current['temperature']}°{self.temp_unit}",
-                'humidity': f"{current['relativeHumidity']['value']}%",
-                'pressure': f"{current['pressure']['value']} hPa",
-                'description': current['shortForecast'],
-                'city': grid_data['properties']['relativeLocation']['properties']['city'],
-                'state': grid_data['properties']['relativeLocation']['properties']['state'],
-                'source': 'National Weather Service'
-            }
-        except Exception as e:
-            print(f"Error fetching weather from NWS: {str(e)}")
-            return None
-
-    def get_weather_conditions(self):
-        """Get weather conditions from OpenWeather or NWS"""
-        # Try OpenWeather first
-        weather_data = self.get_weather_from_openweather()
-        
-        # If OpenWeather fails, try NWS
-        if not weather_data:
-            weather_data = self.get_weather_from_nws()
-        
-        return weather_data
-
-    def get_itu_zone(self, lat, lon):
-        """Calculate ITU zone from latitude and longitude"""
-        # ITU zones are numbered from 1 to 90, with 1 starting at 180°W
-        # Each zone is 20° wide
-        itu_zone = int((lon + 180) / 20) + 1
-        return str(itu_zone)
-
-    def get_cq_zone(self, lat, lon):
-        """Calculate CQ zone from latitude and longitude"""
-        # CQ zones are numbered from 1 to 40, with 1 starting at 180°W
-        # Each zone is 10° wide
-        cq_zone = int((lon + 180) / 10) + 1
-        return str(cq_zone)
-
-    def get_dxcc_conditions(self, grid_square: str) -> Dict:
-        """
-        Get DXCC conditions for the current location.
-        
-        Args:
-            grid_square (str): The Maidenhead grid square
-            
-        Returns:
-            dict: DXCC conditions including current entity and nearby entities
-        """
-        try:
-            # Get current DXCC entity
-            current_dxcc = get_dxcc_by_grid(grid_square)
-            if not current_dxcc:
-                # Calculate ITU and CQ zones based on grid square coordinates
-                lat, lon = self.grid_to_latlon(grid_square)
-                itu_zone = self._calculate_itu_zone(lat, lon)
-                cq_zone = self._calculate_cq_zone(lat, lon)
-                
-                current_dxcc = {
-                    'name': 'Unknown',
-                    'continent': 'Unknown',
-                    'itu_zone': str(itu_zone),
-                    'cq_zone': str(cq_zone),
-                    'prefixes': [],
-                    'timezone': 'UTC'
-                }
-            else:
-                # Calculate ITU and CQ zones based on grid square coordinates
-                lat, lon = self.grid_to_latlon(grid_square)
-                itu_zone = self._calculate_itu_zone(lat, lon)
-                cq_zone = self._calculate_cq_zone(lat, lon)
-                
-                # Update current DXCC with calculated zones
-                current_dxcc['itu_zone'] = str(itu_zone)
-                current_dxcc['cq_zone'] = str(cq_zone)
-            
-            # Get nearby DXCC entities
-            nearby_entities = get_nearby_dxcc(grid_square)
-            
-            return {
-                'current': current_dxcc,
-                'nearby': nearby_entities
-            }
-        except Exception as e:
-            print(f"Error getting DXCC conditions: {str(e)}")
-            return {
-                'current': {
-                    'name': 'Unknown',
-                    'continent': 'Unknown',
-                    'itu_zone': 'Unknown',
-                    'cq_zone': 'Unknown',
-                    'prefixes': [],
-                    'timezone': 'UTC'
-                },
-                'nearby': []
-            }
-
-    def _calculate_itu_zone(self, lat: float, lon: float) -> int:
-        """
-        Calculate ITU zone based on latitude and longitude.
-        
-        Args:
-            lat (float): Latitude in degrees
-            lon (float): Longitude in degrees
-            
-        Returns:
-            int: ITU zone number
-        """
-        # ITU zones are based on longitude, with zone 1 starting at 180°W
-        # Each zone is 20° wide
-        # Normalize longitude to -180 to 180
-        lon = ((lon + 180) % 360) - 180
-        # Calculate zone (1-90)
-        itu_zone = int((lon + 180) / 20)
-        if itu_zone == 0:
-            itu_zone = 90
-        return max(1, min(itu_zone, 90))  # Ensure zone is between 1 and 90
-
-    def _calculate_cq_zone(self, lat: float, lon: float) -> int:
-        """
-        Calculate CQ zone based on latitude and longitude.
-        
-        Args:
-            lat (float): Latitude in degrees
-            lon (float): Longitude in degrees
-            
-        Returns:
-            int: CQ zone number
-        """
-        # CQ zones are based on the official CQ zone map
-        # Zone 1 starts at 180°W, 0°N
-        # Each zone is 10° wide in longitude
-        # Zones 1-18 are in the Northern Hemisphere
-        # Zones 19-40 are in the Southern Hemisphere
-        
-        # Normalize longitude to -180 to 180
-        lon = ((lon + 180) % 360) - 180
-        # Calculate base zone (1-18 for Northern Hemisphere)
-        base_zone = int((lon + 180) / 10)
-        if base_zone == 0:
-            base_zone = 18
-        
-        # Adjust for Southern Hemisphere
-        if lat < 0:
-            base_zone += 18
-            
-        # Ensure zone is between 1 and 40
-        return max(1, min(base_zone, 40))
-
-    def _calculate_muf(self, solar_data):
-        """Calculate Maximum Usable Frequency based on SFI, time of day, and location."""
-        try:
-            # Get solar data
-            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
-            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
-            a_index = float(solar_data.get('a_index', '0').replace('A-Index: ', ''))
-            
-            # Get time and location info
-            sun_info = self._calculate_sunrise_sunset()
-            now = datetime.now(self.timezone)
-            hour = now.hour
-            
-            # Base MUF calculation using ITU-R P.1239 model
-            # F2 layer critical frequency
-            foF2_day = 4.2 + 0.02 * sfi  # Daytime F2 critical frequency
-            foF2_night = 2.0 + 0.01 * sfi  # Nighttime F2 critical frequency
-            
-            # Time factor (smooth transition between day/night)
-            if sun_info['is_day']:
-                time_factor = 1.0
-            else:
-                time_factor = 0.4
-            
-            # Seasonal factor (based on day of year)
-            day_of_year = now.timetuple().tm_yday
-            seasonal_factor = 1.0 + 0.2 * math.sin(2 * math.pi * (day_of_year - 80) / 365)
-            
-            # Solar cycle factor (approximate)
-            solar_cycle_factor = 1.0 + 0.3 * (sfi - 70) / 100
-            
-            # Geomagnetic activity factor
-            geomagnetic_factor = 1.0 - 0.1 * k_index - 0.05 * a_index / 10
-            
-            # Calculate MUF
-            muf = foF2_day * time_factor * seasonal_factor * solar_cycle_factor * geomagnetic_factor
-            
-            # Apply location-specific adjustments
-            # Higher latitudes have lower MUF
-            lat_factor = 1.0 - 0.2 * abs(self.lat) / 90
-            muf *= lat_factor
-            
-            # Ensure reasonable bounds
-            muf = max(3.0, min(muf, 35.0))
-            
-            return round(muf, 1)
-        except Exception as e:
-            print(f"Error calculating MUF: {e}")
-            return 15.0
-
-    def _calculate_band_conditions_detailed(self, solar_data, is_daytime):
-        """Calculate detailed conditions for each amateur band using only Good, Fair, Poor ratings."""
-        try:
-            muf = self._calculate_muf(solar_data)
-            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
-            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
-            a_index = float(solar_data.get('a_index', '0').replace('A-Index: ', ''))
-            
-            bands = {
-                '160m': {'freq': 1.8, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '80m': {'freq': 3.5, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '40m': {'freq': 7.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '30m': {'freq': 10.1, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '20m': {'freq': 14.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '17m': {'freq': 18.1, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '15m': {'freq': 21.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '12m': {'freq': 24.9, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '10m': {'freq': 28.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
-                '6m': {'freq': 50.0, 'day_rating': '', 'night_rating': '', 'notes': ''}
-            }
-            
-            for band_name, band_info in bands.items():
-                freq = band_info['freq']
-                notes = []
-                # MUF check
-                if freq > muf:
-                    band_info['day_rating'] = 'Poor'
-                    band_info['night_rating'] = 'Poor'
-                    notes.append(f"Above MUF ({muf:.1f} MHz)")
-                else:
-                    # SFI/K/A-index logic
-                    for period, label in [('day_rating', True), ('night_rating', False)]:
-                        # Start with Good if below MUF
-                        rating = 'Good'
-                        # SFI
-                        if sfi < 70:
-                            rating = 'Fair'
-                            notes.append('Low SFI')
-                        elif sfi < 90:
-                            rating = 'Fair'
-                        # K-index
-                        if k_index > 6:
-                            rating = 'Poor'
-                            notes.append(f'Severe geomagnetic storm (K={k_index})')
-                        elif k_index > 4:
-                            rating = 'Poor'
-                            notes.append(f'High K-index ({k_index})')
-                        elif k_index > 2:
-                            if rating != 'Poor':
-                                rating = 'Fair'
-                                notes.append(f'Elevated K-index ({k_index})')
-                        # A-index
-                        if a_index > 30:
-                            rating = 'Poor'
-                            notes.append(f'High A-index ({a_index})')
-                        elif a_index > 20:
-                            if rating != 'Poor':
-                                rating = 'Fair'
-                                notes.append(f'Elevated A-index ({a_index})')
-                        # Time of day adjustments
-                        if label:  # Day
-                            if freq < 7:
-                                rating = 'Poor'
-                                notes.append('Daytime - lower bands poor')
-                        else:  # Night
-                            if freq > 21:
-                                rating = 'Poor'
-                                notes.append('Nighttime - higher bands poor')
-                        band_info[period] = rating
-                band_info['notes'] = '; '.join(notes) if notes else ''
-            return bands
-        except Exception as e:
-            print(f"Error calculating detailed band conditions: {e}")
-            return {}
-
-    def _determine_best_bands(self, solar_data, is_daytime):
-        """Determine best bands based on current conditions."""
-        try:
-            # Get HamQSL band conditions
-            hamqsl_bands = self.get_band_conditions()
-            band_conditions = self._convert_hamqsl_to_individual_bands(hamqsl_bands)
-            best_bands = []
-            
-            for band_name, conditions in band_conditions.items():
-                rating = conditions['day_rating'] if is_daytime else conditions['night_rating']
-                if rating == 'Good':
-                    best_bands.append(band_name)
-            
-            # Sort by frequency (lower first for night, higher first for day)
-            if is_daytime:
-                best_bands.sort(key=lambda x: band_conditions[x]['freq'], reverse=True)
-            else:
-                best_bands.sort(key=lambda x: band_conditions[x]['freq'])
-            
-            return best_bands[:5]  # Return top 5 bands
-        except Exception as e:
-            print(f"Error determining best bands: {e}")
-            return ['20m', '40m']
-
-    def _calculate_propagation_quality(self, solar_data, is_daytime):
-        """Calculate overall propagation quality score with detailed analysis."""
-        try:
-            # Get solar data
-            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
-            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
-            a_index = float(solar_data.get('a_index', '0').replace('A-Index: ', ''))
-            
-            # Calculate individual scores (0-100)
-            sfi_score = min(100, max(0, (sfi - 70) * 2))  # SFI 70-120 range
-            k_score = max(0, 100 - (k_index * 15))  # K-index impact
-            a_score = max(0, 100 - (a_index / 2))  # A-index impact
-            
-            # Time of day factor
-            time_score = 80 if is_daytime else 70  # Daytime generally better for HF
-            
-            # Location factor (lower latitudes generally better)
-            lat_score = 100 - (abs(self.lat) / 90) * 20
-            
-            # Weighted average
-            quality = (sfi_score * 0.3 + k_score * 0.25 + a_score * 0.15 + 
-                      time_score * 0.2 + lat_score * 0.1)
-            
-            # Convert to descriptive rating
-            if quality >= 85:
-                return "Excellent"
-            elif quality >= 70:
-                return "Good"
-            elif quality >= 50:
-                return "Fair"
-            elif quality >= 30:
-                return "Poor"
-            else:
-                return "Very Poor"
-        except Exception as e:
-            print(f"Error calculating propagation quality: {e}")
-            return "Unknown"
-
-    def _get_aurora_conditions(self, solar_data):
-        """Get detailed aurora conditions and impact."""
-        try:
-            aurora_level = solar_data.get('aurora', '0')
-            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
-            
-            # Parse aurora level
-            try:
-                level = float(aurora_level.replace('Aurora: ', ''))
-            except:
-                level = 0
-            
-            # Determine aurora activity
-            if level >= 7 or k_index >= 6:
-                return {
-                    'activity': 'Strong',
-                    'impact': 'HF propagation severely affected',
-                    'affected_bands': 'All HF bands',
-                    'recommendation': 'Use VHF/UHF or wait for conditions to improve'
-                }
-            elif level >= 5 or k_index >= 4:
-                return {
-                    'activity': 'Moderate',
-                    'impact': 'Higher HF bands affected',
-                    'affected_bands': '15m, 12m, 10m',
-                    'recommendation': 'Focus on lower bands (40m, 80m)'
-                }
-            elif level >= 3 or k_index >= 2:
-                return {
-                    'activity': 'Light',
-                    'impact': 'Minimal impact on propagation',
-                    'affected_bands': '10m occasionally',
-                    'recommendation': 'Normal operation'
-                }
-            else:
-                return {
-                    'activity': 'None',
-                    'impact': 'No aurora impact',
-                    'affected_bands': 'None',
-                    'recommendation': 'Optimal conditions'
-                }
-        except Exception as e:
-            print(f"Error getting aurora conditions: {e}")
-            return {
-                'activity': 'Unknown',
-                'impact': 'Unknown',
-                'affected_bands': 'Unknown',
-                'recommendation': 'Check solar conditions'
-            }
-
     def _get_tropo_conditions(self):
         """Get detailed tropospheric conditions based on weather data."""
         try:
@@ -1506,175 +1309,8 @@ class HamRadioConditions:
             else:
                 return "Variable"
         except Exception as e:
-            print(f"Error calculating skip distance: {e}")
+            logger.error(f"Error calculating skip distance: {e}")
             return "Unknown"
-
-    def _get_solar_cycle_info(self, solar_data):
-        """Get solar cycle information and predictions."""
-        try:
-            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
-            sunspots = solar_data.get('sunspots', '0')
-            
-            # Determine solar cycle phase
-            if sfi >= 150:
-                cycle_phase = "Solar Maximum"
-                prediction = "Excellent HF conditions expected"
-            elif sfi >= 100:
-                cycle_phase = "Rising Solar Maximum"
-                prediction = "Good HF conditions improving"
-            elif sfi >= 70:
-                cycle_phase = "Solar Minimum to Rising"
-                prediction = "Fair conditions, improving"
-            else:
-                cycle_phase = "Solar Minimum"
-                prediction = "Poor HF conditions, focus on lower bands"
-            
-            return {
-                'phase': cycle_phase,
-                'prediction': prediction,
-                'sfi_trend': 'Rising' if sfi > 80 else 'Stable' if sfi > 60 else 'Declining'
-            }
-        except Exception as e:
-            print(f"Error getting solar cycle info: {e}")
-            return {
-                'phase': 'Unknown',
-                'prediction': 'Unknown',
-                'sfi_trend': 'Unknown'
-            }
-
-    def generate_report(self):
-        """Generate a comprehensive report of all conditions"""
-        try:
-            # Get current timestamp
-            timestamp = datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')
-            
-            # Get all condition data (these are fast)
-            solar_conditions = self.get_solar_conditions()
-            band_conditions = self.get_band_conditions()
-            weather_conditions = self.get_weather_conditions()
-            propagation_summary = self.get_propagation_summary()
-            dxcc_conditions = self.get_dxcc_conditions(self.grid_square)
-            
-            # Get live activity data (async, non-blocking)
-            live_activity = self.get_live_activity()
-            
-            # Compile the report
-            report = {
-                'timestamp': timestamp,
-                'location': f"{self.grid_square} ({self.lat:.4f}°N, {self.lon:.4f}°W)",
-                'callsign': self.callsign,
-                'solar_conditions': solar_conditions,
-                'band_conditions': band_conditions,
-                'weather_conditions': weather_conditions,
-                'propagation_summary': propagation_summary,
-                'dxcc_conditions': dxcc_conditions,
-                'live_activity': live_activity
-            }
-            
-            return report
-            
-        except Exception as e:
-            logger.error(f"Error generating report: {e}")
-            # Return a minimal report with error information
-            return {
-                'timestamp': datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z'),
-                'location': f"{self.grid_square} ({self.lat:.4f}°N, {self.lon:.4f}°W)",
-                'callsign': self.callsign,
-                'error': str(e),
-                'live_activity': self._get_test_spots()  # Always provide some spots
-            }
-
-    def print_report(self, report):
-        """Print the report in a formatted table"""
-        print("\n=== Ham Radio Conditions Report ===")
-        print(f"Generated at: {report['timestamp']}")
-        print(f"Location: {report['location']}\n")
-
-        # Solar Conditions
-        print("Solar Conditions:")
-        solar_data = [[k, v] for k, v in report['solar_conditions'].items()]
-        print(tabulate(solar_data, headers=['Parameter', 'Value'], tablefmt='grid'))
-        print()
-
-        # Band Conditions
-        print("Band Conditions:")
-        band_data = []
-        for band, conditions in report['band_conditions'].items():
-            if isinstance(conditions, dict):
-                band_data.append([band, f"Day: {conditions.get('day', 'N/A')}", f"Night: {conditions.get('night', 'N/A')}"])
-        print(tabulate(band_data, headers=['Band', 'Day Conditions', 'Night Conditions'], tablefmt='grid'))
-        print()
-
-        # Weather Conditions (only if available)
-        if report['weather_conditions']:
-            print(f"Weather Conditions (Source: {report['weather_conditions']['source']}):")
-            weather_data = [[k, v] for k, v in report['weather_conditions'].items() if k != 'source']
-            print(tabulate(weather_data, headers=['Parameter', 'Value'], tablefmt='grid'))
-            print()
-        else:
-            print("Weather Conditions: Not available (both weather APIs failed)")
-            print()
-
-        # DXCC Conditions
-        if report['dxcc_conditions']:
-            print("DXCC Conditions:")
-            dxcc = report['dxcc_conditions']
-            
-            if dxcc['current']:
-                print(f"\nCurrent DXCC Entity: {dxcc['current']['name']}")
-            
-            if dxcc['nearby']:
-                print("\nNearby DXCC Entities:")
-                nearby_data = [[d['name'], d['continent'], d['itu_zone'], d['cq_zone']] 
-                             for d in dxcc['nearby']]
-                print(tabulate(nearby_data, 
-                             headers=['Name', 'Continent', 'ITU Zone', 'CQ Zone'], 
-                             tablefmt='grid'))
-            print()
-
-        # Live Activity
-        if report.get('live_activity'):
-            print("\nLive Activity:")
-            activity = report['live_activity']
-            
-            # Print summary
-            print("\nActivity Summary:")
-            summary = activity['summary']
-            print(f"Total Spots: {summary['total_spots']}")
-            print(f"Active Modes: {', '.join(summary['active_modes'])}")
-            print(f"Active DXCC Entities: {', '.join(summary['active_dxcc'])}")
-            print(f"Source: {summary['source']}")
-            
-            # Print recent spots
-            if activity['spots']:
-                print("\nRecent Spots:")
-                spots_data = []
-                for spot in activity['spots'][:10]:  # Show last 10 spots
-                    spots_data.append([
-                        spot['callsign'],
-                        spot['frequency'],
-                        spot['mode'],
-                        spot['band'],
-                        spot.get('dxcc', 'N/A'),
-                        spot['timestamp']
-                    ])
-                print(tabulate(spots_data, 
-                             headers=['Callsign', 'Frequency', 'Mode', 'Band', 'DXCC', 'Time'],
-                             tablefmt='grid'))
-                print()
-        else:
-            print("\nLive Activity: Not available")
-            print()
-
-    def get_spots_status(self):
-        """Get current spots loading status"""
-        with self._spots_lock:
-            return {
-                'loading': self._spots_loading,
-                'cached': self._spots_cache is not None,
-                'cache_age': time.time() - self._spots_cache_time if self._spots_cache_time else None,
-                'source': self._spots_cache.get('summary', {}).get('source', 'None') if self._spots_cache else 'None'
-            }
 
     def _get_location_name(self):
         """Get a proper location name based on coordinates"""
@@ -1694,7 +1330,7 @@ class HamRadioConditions:
             else:
                 return f"Grid {self.grid_square}"
         except Exception as e:
-            print(f"Error getting location name: {e}")
+            logger.error(f"Error getting location name: {e}")
             return f"Grid {self.grid_square}"
 
     def _convert_hamqsl_to_individual_bands(self, hamqsl_bands):
@@ -1752,7 +1388,7 @@ class HamRadioConditions:
             
             return individual_bands
         except Exception as e:
-            print(f"Error converting HamQSL bands: {e}")
+            logger.error(f"Error converting HamQSL bands: {e}")
             # Fallback to calculated conditions
             solar_data = self.get_solar_conditions()
             sun_info = self._calculate_sunrise_sunset()
@@ -1766,6 +1402,289 @@ class HamRadioConditions:
             '10m': 28.0, '6m': 50.0
         }
         return frequencies.get(band_name, 14.0)
+
+    def _calculate_band_conditions_detailed(self, solar_data, is_daytime):
+        """Calculate detailed conditions for each amateur band using only Good, Fair, Poor ratings."""
+        try:
+            muf = self._calculate_muf(solar_data)
+            sfi = float(solar_data.get('sfi', '0').replace(' SFI', ''))
+            k_index = float(solar_data.get('k_index', '0').replace('K-Index: ', ''))
+            a_index = float(solar_data.get('a_index', '0').replace('A-Index: ', ''))
+            
+            bands = {
+                '160m': {'freq': 1.8, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '80m': {'freq': 3.5, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '40m': {'freq': 7.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '30m': {'freq': 10.1, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '20m': {'freq': 14.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '17m': {'freq': 18.1, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '15m': {'freq': 21.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '12m': {'freq': 24.9, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '10m': {'freq': 28.0, 'day_rating': '', 'night_rating': '', 'notes': ''},
+                '6m': {'freq': 50.0, 'day_rating': '', 'night_rating': '', 'notes': ''}
+            }
+            
+            for band_name, band_info in bands.items():
+                freq = band_info['freq']
+                notes = []
+                # MUF check
+                if freq > muf:
+                    band_info['day_rating'] = 'Poor'
+                    band_info['night_rating'] = 'Poor'
+                    notes.append(f"Above MUF ({muf:.1f} MHz)")
+                else:
+                    # SFI/K/A-index logic
+                    for period, label in [('day_rating', True), ('night_rating', False)]:
+                        # Start with Good if below MUF
+                        rating = 'Good'
+                        # SFI
+                        if sfi < 70:
+                            rating = 'Fair'
+                            notes.append('Low SFI')
+                        elif sfi < 90:
+                            rating = 'Fair'
+                        # K-index
+                        if k_index > 6:
+                            rating = 'Poor'
+                            notes.append(f'Severe geomagnetic storm (K={k_index})')
+                        elif k_index > 4:
+                            rating = 'Poor'
+                            notes.append(f'High K-index ({k_index})')
+                        elif k_index > 2:
+                            if rating != 'Poor':
+                                rating = 'Fair'
+                                notes.append(f'Elevated K-index ({k_index})')
+                        # A-index
+                        if a_index > 30:
+                            rating = 'Poor'
+                            notes.append(f'High A-index ({a_index})')
+                        elif a_index > 20:
+                            if rating != 'Poor':
+                                rating = 'Fair'
+                                notes.append(f'Elevated A-index ({a_index})')
+                        # Time of day adjustments
+                        if label:  # Day
+                            if freq < 7:
+                                rating = 'Poor'
+                                notes.append('Daytime - lower bands poor')
+                        else:  # Night
+                            if freq > 21:
+                                rating = 'Poor'
+                                notes.append('Nighttime - higher bands poor')
+                        band_info[period] = rating
+                band_info['notes'] = '; '.join(notes) if notes else ''
+            return bands
+        except Exception as e:
+            logger.error(f"Error calculating detailed band conditions: {e}")
+            return {}
+
+    def grid_to_latlon(self, grid_square: str) -> tuple:
+        """Convert grid square to latitude and longitude."""
+        try:
+            return grid_to_latlon(grid_square)
+        except Exception as e:
+            logger.error(f"Error converting grid to lat/lon: {e}")
+            return (0.0, 0.0)
+
+    def latlon_to_grid(self, lat: float, lon: float) -> str:
+        """Convert latitude and longitude to grid square."""
+        try:
+            # Simple grid square calculation
+            # This is a simplified version - for more accurate results, use a proper library
+            lon = lon + 180
+            lat = lat + 90
+            
+            # Calculate grid square
+            lon_field = int(lon / 20)
+            lat_field = int(lat / 10)
+            lon_square = int((lon % 20) / 2)
+            lat_square = int((lat % 10) / 1)
+            lon_sub = int(((lon % 20) % 2) / (2/24))
+            lat_sub = int(((lat % 10) % 1) / (1/24))
+            
+            # Convert to characters
+            lon_field_char = chr(ord('A') + lon_field)
+            lat_field_char = chr(ord('A') + lat_field)
+            lon_square_char = str(lon_square)
+            lat_square_char = str(lat_square)
+            lon_sub_char = chr(ord('a') + lon_sub)
+            lat_sub_char = chr(ord('a') + lat_sub)
+            
+            return f"{lon_field_char}{lat_field_char}{lon_square_char}{lat_square_char}{lon_sub_char}{lat_sub_char}"
+        except Exception as e:
+            logger.error(f"Error converting lat/lon to grid: {e}")
+            return "AA00aa"
+
+    def zip_to_latlon(self, zip_code: str) -> tuple:
+        """Convert ZIP code to latitude and longitude using geocoding service."""
+        try:
+            # Try to use OpenCage Geocoding API if available
+            opencage_api_key = os.getenv('OPENCAGE_API_KEY')
+            if opencage_api_key:
+                url = "https://api.opencagedata.com/geocode/v1/json"
+                params = {
+                    'q': f"{zip_code}, USA",
+                    'key': opencage_api_key,
+                    'limit': 1
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data['results']:
+                        result = data['results'][0]
+                        lat = result['geometry']['lat']
+                        lon = result['geometry']['lng']
+                        logger.info(f"Geocoded ZIP {zip_code} to lat={lat}, lon={lon}")
+                        return (lat, lon)
+            
+            # Fallback: Use a simple ZIP code database for common US ZIP codes
+            # This is a limited fallback - in production, you'd want a comprehensive database
+            zip_coords = {
+                '90210': (34.1030, -118.4105),  # Beverly Hills, CA
+                '10001': (40.7505, -73.9965),   # New York, NY
+                '20001': (38.9097, -77.0169),   # Washington, DC
+                '33101': (25.7743, -80.1937),   # Miami, FL
+                '60601': (41.8857, -87.6228),   # Chicago, IL
+                '77001': (29.7604, -95.3698),   # Houston, TX
+                '85001': (33.4484, -112.0740),  # Phoenix, AZ
+                '98101': (47.6062, -122.3321),  # Seattle, WA
+                '80201': (39.7392, -104.9903),  # Denver, CO
+                '02101': (42.3601, -71.0589),   # Boston, MA
+                '85630': (31.9686, -110.7856),  # Sierra Vista, AZ
+                '85701': (32.2226, -110.9747),  # Tucson, AZ
+                '85001': (33.4484, -112.0740),  # Phoenix, AZ
+                '85201': (33.4152, -111.8315),  # Mesa, AZ
+                '85301': (33.4353, -112.3576),  # Glendale, AZ
+                '85364': (33.5387, -112.1860),  # Peoria, AZ
+                '85381': (33.5722, -112.0891),  # Sun City, AZ
+                '85382': (33.6389, -112.1429),  # Sun City West, AZ
+                '85383': (33.6389, -112.1429),  # Surprise, AZ
+                '85396': (33.6389, -112.1429),  # Youngtown, AZ
+            }
+            
+            if zip_code in zip_coords:
+                lat, lon = zip_coords[zip_code]
+                logger.info(f"Using fallback coordinates for ZIP {zip_code}: lat={lat}, lon={lon}")
+                return (lat, lon)
+            
+            # If no match found, return default coordinates
+            logger.warning(f"ZIP code {zip_code} not found in database, using default coordinates")
+            return (34.0522, -118.2437)  # Default to Los Angeles
+            
+        except Exception as e:
+            logger.error(f"Error converting ZIP {zip_code} to lat/lon: {e}")
+            return (34.0522, -118.2437)  # Default to Los Angeles
+
+    def update_location(self, zip_code: str) -> bool:
+        """Update the location with a new ZIP code."""
+        try:
+            lat, lon = self.zip_to_latlon(zip_code)
+            if lat and lon:
+                self.lat = lat
+                self.lon = lon
+                self.grid_square = self.latlon_to_grid(lat, lon)
+                self.timezone = self._get_timezone_from_coords(lat, lon)
+                
+                # Clear caches to force refresh with new location
+                self.clear_cache()
+                
+                logger.info(f"Location updated to ZIP {zip_code}: lat={lat}, lon={lon}, grid={self.grid_square}")
+                return True
+            else:
+                logger.error(f"Failed to get coordinates for ZIP {zip_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Error updating location to ZIP {zip_code}: {e}")
+            return False
+
+    def _get_timezone_from_coords(self, lat: float, lon: float) -> pytz.timezone:
+        """Get timezone from coordinates."""
+        try:
+            # This is a simplified version - in a real application, you'd use a timezone service
+            # For now, return a default timezone based on longitude
+            if lon < -100:
+                return pytz.timezone('America/Los_Angeles')
+            elif lon < -80:
+                return pytz.timezone('America/New_York')
+            else:
+                return pytz.timezone('UTC')
+        except Exception as e:
+            logger.error(f"Error getting timezone from coordinates: {e}")
+            return pytz.timezone('America/Los_Angeles')
+
+    def get_spots_status(self):
+        """Get status of spots loading and caching."""
+        try:
+            cached_spots = cache_get('spots', 'current')
+            if cached_spots:
+                return {
+                    'loading': False,
+                    'cached': True,
+                    'source': cached_spots.get('summary', {}).get('source', 'Unknown'),
+                    'cache_age': time.time() - cached_spots.get('_cache_time', time.time())
+                }
+            else:
+                return {
+                    'loading': True,
+                    'cached': False,
+                    'source': 'None',
+                    'cache_age': None
+                }
+        except Exception as e:
+            logger.error(f"Error getting spots status: {e}")
+            return {
+                'loading': False,
+                'cached': False,
+                'source': 'Error',
+                'cache_age': None
+            }
+
+    def print_report(self, report):
+        """Print a formatted report to console."""
+        if not report:
+            print("No report available")
+            return
+        
+        print("\n" + "="*60)
+        print("HAM RADIO CONDITIONS REPORT")
+        print("="*60)
+        print(f"Time: {report.get('timestamp', 'N/A')}")
+        print(f"Location: {report.get('propagation_summary', {}).get('location', {}).get('location_name', 'N/A')}")
+        
+        # Solar conditions
+        solar = report.get('solar_conditions', {})
+        print(f"\nSOLAR CONDITIONS:")
+        print(f"  SFI: {solar.get('sfi', 'N/A')}")
+        print(f"  A-Index: {solar.get('a_index', 'N/A')}")
+        print(f"  K-Index: {solar.get('k_index', 'N/A')}")
+        print(f"  Sunspots: {solar.get('sunspots', 'N/A')}")
+        
+        # Weather conditions
+        weather = report.get('weather_conditions', {})
+        if weather:
+            print(f"\nWEATHER CONDITIONS:")
+            print(f"  Temperature: {weather.get('temperature', 'N/A')}")
+            print(f"  Humidity: {weather.get('humidity', 'N/A')}")
+            print(f"  Pressure: {weather.get('pressure', 'N/A')}")
+        
+        # Propagation summary
+        prop = report.get('propagation_summary', {})
+        if prop:
+            print(f"\nPROPAGATION SUMMARY:")
+            print(f"  Current Time: {prop.get('current_time', 'N/A')}")
+            print(f"  Day/Night: {prop.get('day_night', 'N/A')}")
+            print(f"  Sunrise: {prop.get('sunrise', 'N/A')}")
+            print(f"  Sunset: {prop.get('sunset', 'N/A')}")
+            print(f"  Overall Quality: {prop.get('propagation_parameters', {}).get('quality', 'N/A')}")
+            print(f"  MUF: {prop.get('propagation_parameters', {}).get('muf', 'N/A')}")
+            
+            # Best bands
+            best_bands = prop.get('propagation_parameters', {}).get('best_bands', [])
+            if best_bands:
+                print(f"  Best Bands: {', '.join(best_bands[:3])}")
+        
+        print("="*60)
 
 
 def main():

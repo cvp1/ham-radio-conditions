@@ -10,6 +10,7 @@ from flask import Flask, render_template
 from config import get_config
 from utils.logging_config import get_logger, setup_logging
 from utils.background_tasks import setup_background_tasks, create_conditions_updater, create_database_cleanup
+from utils.cache_manager import get_cache_manager, cache_get, cache_set, cache_clear
 from routes.api import api_bp
 from routes.pwa import pwa_bp
 from database import Database
@@ -44,6 +45,9 @@ def create_app(config_name: str = None) -> Flask:
     # Set up logging
     setup_logging('ham_radio_conditions', log_file='logs/ham_radio_conditions.log' if config.is_production() else None)
     
+    # Initialize cache manager
+    cache_manager = get_cache_manager()
+    
     # Create Flask app
     app = Flask(__name__, static_folder='static')
     app.config.from_object(config)
@@ -56,6 +60,7 @@ def create_app(config_name: str = None) -> Flask:
     app.config['HAM_CONDITIONS'] = services['ham_conditions']
     app.config['QRZ_LOOKUP'] = services['qrz_lookup']
     app.config['TASK_MANAGER'] = services['task_manager']
+    app.config['CACHE_MANAGER'] = cache_manager
     
     # Register blueprints
     register_blueprints(app)
@@ -154,13 +159,20 @@ def register_routes(app: Flask) -> None:
         """Render the main page with cached conditions data."""
         ham_conditions = app.config.get('HAM_CONDITIONS')
         
-        if ham_conditions._conditions_cache is None:
-            # If no cache exists yet, generate conditions immediately
-            with threading.Lock():
-                ham_conditions._conditions_cache = ham_conditions.generate_report()
-                ham_conditions._conditions_cache_time = time.time()
+        # Try to get cached conditions first
+        cached_conditions = cache_get('conditions', 'current')
+        if cached_conditions:
+            logger.debug("Using cached conditions for main page")
+            return render_template('index.html', data=cached_conditions)
         
-        return render_template('index.html', data=ham_conditions._conditions_cache)
+        # Generate new conditions if not cached
+        logger.debug("Generating new conditions for main page")
+        new_conditions = ham_conditions.generate_report()
+        if new_conditions:
+            return render_template('index.html', data=new_conditions)
+        else:
+            # Return empty data if generation fails
+            return render_template('index.html', data={})
     
     logger.info("Routes registered")
 

@@ -1,184 +1,246 @@
 """
 Background tasks for Ham Radio Conditions app.
-Handles periodic tasks like cache updates and database cleanup.
+Handles periodic updates and cleanup operations.
 """
 
-import threading
 import time
-import atexit
-from typing import Optional, Callable
-from utils.logging_config import get_logger
-from config import get_config
+import threading
+import schedule
+import logging
+from typing import Callable, Optional
+from utils.cache_manager import cache_get, cache_set, cache_delete
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-class BackgroundTaskManager:
-    """Manages background tasks for the application."""
+class TaskManager:
+    """Manages background tasks with scheduling and monitoring."""
     
     def __init__(self):
         self.tasks = {}
         self.running = False
-        self.threads = {}
-        self._shutdown_registered = False
+        self.thread = None
+        self.lock = threading.Lock()
     
-    def add_task(
-        self,
-        name: str,
-        task_func: Callable,
-        interval: int,
-        daemon: bool = True
-    ) -> None:
-        """
-        Add a background task.
-        
-        Args:
-            name: Task name
-            task_func: Function to run
-            interval: Interval in seconds
-            daemon: Whether the thread should be daemon
-        """
-        self.tasks[name] = {
-            'func': task_func,
-            'interval': interval,
-            'daemon': daemon
-        }
-        logger.info(f"Added background task: {name} (interval: {interval}s)")
+    def add_task(self, name: str, task_func: Callable, interval_seconds: int = 300):
+        """Add a new background task."""
+        with self.lock:
+            self.tasks[name] = {
+                'func': task_func,
+                'interval': interval_seconds,
+                'last_run': None,
+                'next_run': time.time() + interval_seconds,
+                'runs': 0,
+                'errors': 0,
+                'last_error': None
+            }
+            logger.info(f"Added task: {name} (interval: {interval_seconds}s)")
     
-    def start_task(self, name: str) -> None:
-        """Start a specific background task."""
-        if name not in self.tasks:
-            logger.error(f"Task {name} not found")
-            return
-        
-        if name in self.threads and self.threads[name].is_alive():
-            logger.warning(f"Task {name} is already running")
-            return
-        
-        task = self.tasks[name]
-        thread = threading.Thread(
-            target=self._run_task,
-            args=(name, task['func'], task['interval']),
-            daemon=task['daemon'],
-            name=f"BackgroundTask-{name}"
-        )
-        
-        self.threads[name] = thread
-        thread.start()
-        logger.info(f"Started background task: {name}")
+    def remove_task(self, name: str):
+        """Remove a background task."""
+        with self.lock:
+            if name in self.tasks:
+                del self.tasks[name]
+                logger.info(f"Removed task: {name}")
     
-    def stop_task(self, name: str) -> None:
-        """Stop a specific background task."""
-        if name in self.threads:
-            # Note: We can't actually stop threads, but we can mark them for cleanup
-            logger.info(f"Marked task {name} for cleanup")
-    
-    def start_all(self) -> None:
+    def start_all(self):
         """Start all background tasks."""
-        if self.running:
-            logger.warning("Background tasks already running")
-            return
+        with self.lock:
+            if self.running:
+                logger.warning("Task manager already running")
+                return
             
-        self.running = True
-        
-        # Register shutdown handler only once
-        if not self._shutdown_registered:
-            atexit.register(self.stop_all)
-            self._shutdown_registered = True
-        
-        for name in self.tasks:
-            self.start_task(name)
-        logger.info("Started all background tasks")
+            self.running = True
+            self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
+            self.thread.start()
+            logger.info("Task manager started")
     
-    def stop_all(self) -> None:
+    def stop_all(self):
         """Stop all background tasks."""
-        if not self.running:
-            return
-            
-        self.running = False
-        logger.info("Stopped all background tasks")
+        with self.lock:
+            self.running = False
+            if self.thread:
+                self.thread.join(timeout=5)
+            logger.info("Task manager stopped")
     
-    def _run_task(self, name: str, task_func: Callable, interval: int) -> None:
-        """Run a background task in a loop."""
-        logger.info(f"Background task {name} started")
-        
+    def _run_scheduler(self):
+        """Main scheduler loop."""
         while self.running:
             try:
-                task_func()
-                logger.debug(f"Background task {name} completed successfully")
-            except Exception as e:
-                logger.error(f"Error in background task {name}: {e}")
-            
-            # Sleep for the interval, but check running status periodically
-            for _ in range(interval):
-                if not self.running:
-                    break
+                current_time = time.time()
+                
+                with self.lock:
+                    for name, task_info in self.tasks.items():
+                        if current_time >= task_info['next_run']:
+                            # Run task in separate thread to avoid blocking
+                            threading.Thread(
+                                target=self._run_task,
+                                args=(name, task_info),
+                                daemon=True
+                            ).start()
+                
+                # Sleep for a short interval
                 time.sleep(1)
-        
-        logger.info(f"Background task {name} stopped")
+                
+            except Exception as e:
+                logger.error(f"Error in scheduler loop: {e}")
+                time.sleep(5)
+    
+    def _run_task(self, name: str, task_info: dict):
+        """Run a single task with error handling."""
+        try:
+            logger.debug(f"Running task: {name}")
+            start_time = time.time()
+            
+            # Execute the task
+            task_info['func']()
+            
+            # Update task info
+            with self.lock:
+                task_info['last_run'] = time.time()
+                task_info['next_run'] = time.time() + task_info['interval']
+                task_info['runs'] += 1
+                task_info['last_error'] = None
+            
+            execution_time = time.time() - start_time
+            logger.debug(f"Task {name} completed in {execution_time:.2f}s")
+            
+        except Exception as e:
+            logger.error(f"Error running task {name}: {e}")
+            
+            with self.lock:
+                task_info['errors'] += 1
+                task_info['last_error'] = str(e)
+                # Don't update next_run on error - let it retry on next cycle
+    
+    def get_status(self) -> dict:
+        """Get status of all tasks."""
+        with self.lock:
+            status = {
+                'running': self.running,
+                'tasks': {}
+            }
+            
+            for name, task_info in self.tasks.items():
+                status['tasks'][name] = {
+                    'interval': task_info['interval'],
+                    'last_run': task_info['last_run'],
+                    'next_run': task_info['next_run'],
+                    'runs': task_info['runs'],
+                    'errors': task_info['errors'],
+                    'last_error': task_info['last_error']
+                }
+            
+            return status
 
 
-# Global task manager instance
-task_manager = BackgroundTaskManager()
-
-
-def setup_background_tasks(
-    update_conditions_func: Callable,
-    cleanup_database_func: Callable
-) -> BackgroundTaskManager:
+def setup_background_tasks(conditions_updater: Callable, database_cleanup: Callable) -> TaskManager:
     """
     Set up background tasks for the application.
     
     Args:
-        update_conditions_func: Function to update conditions cache
-        cleanup_database_func: Function to cleanup database
+        conditions_updater: Function to update conditions cache
+        database_cleanup: Function to clean up database
     
     Returns:
-        Configured task manager
+        TaskManager instance
     """
-    config = get_config()
+    task_manager = TaskManager()
     
-    # Add tasks
-    task_manager.add_task(
-        'update_conditions',
-        update_conditions_func,
-        config.CACHE_UPDATE_INTERVAL
-    )
+    # Add conditions update task (every 5 minutes)
+    task_manager.add_task('conditions_update', conditions_updater, 300)
     
-    task_manager.add_task(
-        'cleanup_database',
-        cleanup_database_func,
-        config.CLEANUP_INTERVAL
-    )
+    # Add database cleanup task (every hour)
+    task_manager.add_task('database_cleanup', database_cleanup, 3600)
+    
+    # Add cache cleanup task (every 10 minutes)
+    task_manager.add_task('cache_cleanup', cache_cleanup_task, 600)
     
     return task_manager
 
 
-def create_conditions_updater(ham_conditions, cache_lock):
-    """Create a conditions cache updater function."""
+def create_conditions_updater(ham_conditions, lock: threading.Lock) -> Callable:
+    """
+    Create a conditions update function.
+    
+    Args:
+        ham_conditions: HamRadioConditions instance
+        lock: Threading lock for synchronization
+    
+    Returns:
+        Update function
+    """
     def update_conditions_cache():
-        """Update the conditions cache in the background."""
+        """Update the conditions cache."""
         try:
-            with cache_lock:
-                ham_conditions._conditions_cache = ham_conditions.generate_report()
-                ham_conditions._conditions_cache_time = time.time()
-            logger.info("Updated conditions cache")
+            with lock:
+                logger.debug("Starting conditions cache update")
+                
+                # Generate new conditions
+                new_conditions = ham_conditions.generate_report()
+                
+                if new_conditions:
+                    # Cache the new conditions
+                    cache_set('conditions', 'current', new_conditions, max_age=300)  # 5 minutes
+                    logger.info("Conditions cache updated successfully")
+                else:
+                    logger.warning("Failed to generate new conditions")
+                    
         except Exception as e:
             logger.error(f"Error updating conditions cache: {e}")
     
     return update_conditions_cache
 
 
-def create_database_cleanup(db):
-    """Create a database cleanup function."""
-    config = get_config()
+def create_database_cleanup(database) -> Callable:
+    """
+    Create a database cleanup function.
     
+    Args:
+        database: Database instance
+    
+    Returns:
+        Cleanup function
+    """
     def cleanup_database():
-        """Clean up old database data periodically."""
+        """Clean up old database entries."""
         try:
-            db.cleanup_old_data(days=config.DATA_RETENTION_DAYS)
-            logger.info("Database cleanup completed")
+            logger.debug("Starting database cleanup")
+            
+            # Clean up old spots and QRZ cache
+            cleanup_result = database.cleanup_old_data()
+            
+            if cleanup_result:
+                spots_deleted, qrz_deleted = cleanup_result
+                logger.info(f"Database cleanup completed: {spots_deleted} spots, {qrz_deleted} QRZ entries deleted")
+            else:
+                logger.warning("Database cleanup failed")
+                
         except Exception as e:
             logger.error(f"Error in database cleanup: {e}")
     
-    return cleanup_database 
+    return cleanup_database
+
+
+def cache_cleanup_task():
+    """Clean up expired cache entries."""
+    try:
+        logger.debug("Starting cache cleanup")
+        
+        # The cache manager handles cleanup automatically, but we can add additional logic here
+        # For now, just log that cleanup is happening
+        logger.debug("Cache cleanup cycle completed")
+        
+    except Exception as e:
+        logger.error(f"Error in cache cleanup: {e}")
+
+
+def get_task_manager_status() -> dict:
+    """Get status of the task manager."""
+    # This would need to be called from a context where we have access to the task manager
+    # For now, return a placeholder
+    return {
+        'running': False,
+        'tasks': {},
+        'message': 'Task manager status not available'
+    } 

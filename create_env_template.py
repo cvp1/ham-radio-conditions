@@ -30,6 +30,12 @@ OPENWEATHER_API_KEY=your_openweather_api_key_here
 # Your ZIP code for weather and propagation data
 ZIP_CODE=your_zip_code_here
 
+# OPTIONAL: Geocoding API Configuration
+# Get your API key from: https://opencagedata.com/
+# This provides better ZIP code to coordinates conversion
+# If not provided, a limited fallback database will be used
+OPENCAGE_API_KEY=your_opencage_api_key_here
+
 # OPTIONAL: Temperature Unit (F or C)
 TEMP_UNIT=F
 

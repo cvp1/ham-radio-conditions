@@ -1,6 +1,6 @@
 """
 API routes for Ham Radio Conditions app.
-Contains all API endpoints for the application.
+Provides RESTful endpoints for conditions data, spots, and QRZ lookups.
 """
 
 from flask import Blueprint, jsonify, request, current_app
@@ -9,6 +9,9 @@ from utils.logging_config import get_logger
 from database import Database
 from qrz_data import QRZLookup
 from ham_radio_conditions import HamRadioConditions
+from utils.cache_manager import cache_get, cache_set, cache_delete, get_cache_stats
+import time
+import threading
 
 logger = get_logger(__name__)
 
@@ -16,140 +19,314 @@ logger = get_logger(__name__)
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 
-@api_bp.route('/spots')
-def get_spots():
-    """Get live spots data - async, non-blocking"""
+@api_bp.route('/conditions', methods=['GET'])
+def get_conditions():
+    """Get current ham radio conditions."""
     try:
-        # Get ham_conditions from app context
-        ham_conditions = current_app.config.get('HAM_CONDITIONS')
-        db = current_app.config.get('DATABASE')
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
         
-        logger.debug(f"Ham conditions object: {ham_conditions}")
-        logger.debug(f"Database object: {db}")
-        
-        if not ham_conditions:
-            logger.error("Ham conditions not initialized")
-            return jsonify({'error': 'Ham conditions not initialized'}), 500
-        
-        # Get spots from ham conditions
-        logger.debug("Calling ham_conditions.get_live_activity()")
-        spots_data = ham_conditions.get_live_activity()
-        logger.debug(f"Spots data received: {type(spots_data)}")
-        
-        # Store spots in database for persistence
-        if spots_data and spots_data.get('spots') and db:
-            try:
-                db.store_spots(spots_data['spots'])
-                logger.debug(f"Stored {len(spots_data['spots'])} spots in database")
-            except Exception as db_error:
-                logger.warning(f"Failed to store spots in database: {db_error}")
-        
-        return jsonify(spots_data)
-        
+        with app.app_context():
+            ham_conditions = app.config.get('HAM_CONDITIONS')
+            if not ham_conditions:
+                return jsonify({'error': 'Ham conditions service not available'}), 503
+            
+            # Try to get from cache first
+            cached_conditions = cache_get('conditions', 'current')
+            if cached_conditions:
+                logger.debug("Returning cached conditions")
+                return jsonify(cached_conditions)
+            
+            # Generate new conditions
+            conditions = ham_conditions.generate_report()
+            if conditions:
+                return jsonify(conditions)
+            else:
+                return jsonify({'error': 'Failed to generate conditions'}), 500
+                
     except Exception as e:
-        logger.error(f"Error in spots route: {e}")
-        logger.error(f"Exception type: {type(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({
-            'spots': [],
-            'summary': {'total_spots': 0, 'source': 'Error'},
-            'error': str(e)
-        }), 500
+        logger.error(f"Error getting conditions: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 
-@api_bp.route('/spots/history')
-def get_spots_history():
-    """Get historical spots from database"""
+@api_bp.route('/spots', methods=['GET'])
+def get_spots():
+    """Get live spots data."""
     try:
-        hours = request.args.get('hours', 24, type=int)
-        limit = request.args.get('limit', 100, type=int)
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
         
-        db = current_app.config.get('DATABASE')
-        if not db:
-            return jsonify({'error': 'Database not initialized'}), 500
+        with app.app_context():
+            ham_conditions = app.config.get('HAM_CONDITIONS')
+            if not ham_conditions:
+                return jsonify({'error': 'Ham conditions service not available'}), 503
+            
+            # Try to get from cache first
+            cached_spots = cache_get('spots', 'current')
+            if cached_spots:
+                logger.debug("Returning cached spots")
+                return jsonify(cached_spots)
+            
+            # Get fresh spots
+            spots = ham_conditions.get_live_activity()
+            if spots:
+                return jsonify(spots)
+            else:
+                return jsonify({'error': 'Failed to get spots'}), 500
+                
+    except Exception as e:
+        logger.error(f"Error getting spots: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/spots/history', methods=['GET'])
+def get_spots_history():
+    """Get spots history from database."""
+    try:
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
         
-        spots = db.get_recent_spots(hours=hours, limit=limit)
-        summary = db.get_spots_summary(hours=hours)
-        
-        return jsonify({
-            'spots': spots,
-            'summary': summary
-        })
-        
+        with app.app_context():
+            database = app.config.get('DATABASE')
+            if not database:
+                return jsonify({'error': 'Database not available'}), 503
+            
+            # Get limit from query parameters
+            limit = request.args.get('limit', 50, type=int)
+            limit = min(limit, 100)  # Cap at 100
+            
+            spots = database.get_recent_spots(limit)
+            return jsonify({
+                'spots': spots,
+                'total': len(spots),
+                'limit': limit
+            })
+                
     except Exception as e:
         logger.error(f"Error getting spots history: {e}")
-        return jsonify({
-            'spots': [],
-            'summary': {'total_spots': 0, 'source': 'Database Error'},
-            'error': str(e)
-        }), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 
-@api_bp.route('/spots/status')
+@api_bp.route('/spots/status', methods=['GET'])
 def get_spots_status():
-    """Get spots loading status"""
+    """Get spots loading status."""
     try:
-        ham_conditions = current_app.config.get('HAM_CONDITIONS')
-        if ham_conditions:
-            status = ham_conditions.get_spots_status()
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
+        
+        with app.app_context():
+            ham_conditions = app.config.get('HAM_CONDITIONS')
+            if not ham_conditions:
+                return jsonify({'error': 'Ham conditions service not available'}), 503
+            
+            # Check cache status
+            cached_spots = cache_get('spots', 'current')
+            status = {
+                'cached': cached_spots is not None,
+                'source': cached_spots.get('summary', {}).get('source', 'None') if cached_spots else 'None',
+                'total_spots': cached_spots.get('summary', {}).get('total_spots', 0) if cached_spots else 0,
+                'timestamp': time.time()
+            }
+            
             return jsonify(status)
-        else:
-            return jsonify({'error': 'Ham conditions not initialized'}), 500
+                
     except Exception as e:
         logger.error(f"Error getting spots status: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 
-@api_bp.route('/qrz/<callsign>')
-def get_qrz_info(callsign: str):
-    """Get QRZ information for a callsign."""
+@api_bp.route('/qrz/<callsign>', methods=['GET'])
+def qrz_lookup(callsign):
+    """Look up a callsign in QRZ database."""
     try:
-        if not callsign:
-            return jsonify({'error': 'Callsign is required'}), 400
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
         
-        # Clean and validate callsign
-        callsign = callsign.strip().upper()
-        if not callsign:
-            return jsonify({'error': 'Invalid callsign'}), 400
-
-        db = current_app.config.get('DATABASE')
-        qrz_lookup = current_app.config.get('QRZ_LOOKUP')
-        
-        if not db:
-            return jsonify({'error': 'Database not initialized'}), 500
-        
-        if not qrz_lookup:
-            return jsonify({'error': 'QRZ lookup service not available - credentials not configured'}), 503
-
-        # Check cache first
-        cached_data = db.get_qrz_cache(callsign)
-        if cached_data:
-            logger.debug(f"Returning cached QRZ data for {callsign}")
-            return jsonify(cached_data)
-
-        # Get QRZ data using the new formatted info method
-        formatted_info = qrz_lookup.get_formatted_info(callsign)
-        if formatted_info.startswith('Callsign not found'):
-            return jsonify({'error': 'Callsign not found'}), 404
-        elif formatted_info.startswith('Error retrieving'):
-            return jsonify({'error': formatted_info}), 500
-
-        # Get the raw data for additional fields
-        qrz_data = qrz_lookup.lookup(callsign)
-        if not qrz_data:
-            return jsonify({'error': 'Callsign not found'}), 404
-
-        # Add formatted info to the response
-        qrz_data['formatted_info'] = formatted_info
-
-        # Cache the result
-        db.store_qrz_cache(callsign, qrz_data)
-
-        return jsonify(qrz_data)
+        with app.app_context():
+            database = app.config.get('DATABASE')
+            qrz_lookup = app.config.get('QRZ_LOOKUP')
+            
+            if not database:
+                return jsonify({'error': 'Database not available'}), 503
+            
+            # Check cache first
+            cached_data = cache_get('qrz', callsign.upper())
+            if cached_data:
+                logger.debug(f"Returning cached QRZ data for {callsign}")
+                return jsonify(cached_data)
+            
+            # If QRZ lookup is not available, return cached data only
+            if not qrz_lookup:
+                return jsonify({
+                    'error': 'QRZ lookup not configured',
+                    'callsign': callsign.upper(),
+                    'cached_only': True
+                }), 503
+            
+            # Perform QRZ lookup
+            try:
+                qrz_data = qrz_lookup.lookup_callsign(callsign)
+                
+                if qrz_data:
+                    # Cache the result
+                    cache_set('qrz', callsign.upper(), qrz_data, max_age=3600)  # 1 hour
+                    
+                    # Also store in database for persistence
+                    database.store_qrz_cache(callsign.upper(), qrz_data)
+                    
+                    return jsonify(qrz_data)
+                else:
+                    return jsonify({
+                        'error': 'Callsign not found',
+                        'callsign': callsign.upper()
+                    }), 404
+                    
+            except Exception as e:
+                logger.error(f"QRZ lookup error for {callsign}: {e}")
+                return jsonify({
+                    'error': 'QRZ lookup failed',
+                    'callsign': callsign.upper(),
+                    'details': str(e)
+                }), 500
+                
     except Exception as e:
-        logger.error(f"Error fetching QRZ data: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in QRZ lookup: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/weather', methods=['GET'])
+def get_weather():
+    """Get current weather conditions."""
+    try:
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
+        
+        with app.app_context():
+            ham_conditions = app.config.get('HAM_CONDITIONS')
+            if not ham_conditions:
+                return jsonify({'error': 'Ham conditions service not available'}), 503
+            
+            # Try to get from cache first
+            cached_weather = cache_get('weather', 'current')
+            if cached_weather:
+                logger.debug("Returning cached weather")
+                return jsonify(cached_weather)
+            
+            # Get fresh weather data
+            weather = ham_conditions.get_weather_conditions()
+            if weather:
+                return jsonify(weather)
+            else:
+                return jsonify({'error': 'Failed to get weather data'}), 500
+                
+    except Exception as e:
+        logger.error(f"Error getting weather: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/refresh', methods=['POST'])
+def refresh_data():
+    """Manually refresh all data."""
+    try:
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
+        
+        with app.app_context():
+            ham_conditions = app.config.get('HAM_CONDITIONS')
+            if not ham_conditions:
+                return jsonify({'error': 'Ham conditions service not available'}), 503
+            
+            # Clear all caches to force refresh
+            cache_delete('conditions', 'current')
+            cache_delete('spots', 'current')
+            cache_delete('weather', 'current')
+            
+            # Generate new conditions
+            new_conditions = ham_conditions.generate_report()
+            
+            return jsonify({
+                'message': 'Data refreshed successfully',
+                'conditions_generated': bool(new_conditions),
+                'timestamp': time.time()
+            })
+                
+    except Exception as e:
+        logger.error(f"Error refreshing data: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/cache/stats', methods=['GET'])
+def get_cache_statistics():
+    """Get cache statistics."""
+    try:
+        stats = get_cache_stats()
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/cache/clear', methods=['POST'])
+def clear_cache():
+    """Clear all caches."""
+    try:
+        # Get cache type from request body
+        data = request.get_json() or {}
+        cache_type = data.get('cache_type')
+        
+        if cache_type:
+            cache_delete(cache_type, 'current')
+            logger.info(f"Cleared {cache_type} cache")
+            return jsonify({
+                'message': f'{cache_type} cache cleared successfully',
+                'cache_type': cache_type
+            })
+        else:
+            # Clear all caches
+            cache_delete('conditions', 'current')
+            cache_delete('spots', 'current')
+            cache_delete('weather', 'current')
+            logger.info("Cleared all caches")
+            return jsonify({
+                'message': 'All caches cleared successfully'
+            })
+                
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/debug/update-cache', methods=['POST'])
+def manual_update_cache():
+    """Manually trigger a cache update for testing"""
+    try:
+        from app_factory import create_app_with_error_handling
+        app = create_app_with_error_handling()
+        
+        with app.app_context():
+            ham_conditions = app.config.get('HAM_CONDITIONS')
+            if not ham_conditions:
+                return jsonify({'error': 'Ham conditions service not available'}), 503
+            
+            # Clear existing cache
+            cache_delete('conditions', 'current')
+            
+            # Generate new cache
+            new_cache = ham_conditions.generate_report()
+            
+            # Update cache
+            if new_cache:
+                cache_set('conditions', 'current', new_cache, max_age=300)
+            
+            return jsonify({
+                'message': 'Cache updated manually',
+                'cache_generated': bool(new_cache),
+                'timestamp': time.time()
+            })
+                
+    except Exception as e:
+        logger.error(f"Error in manual cache update: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @api_bp.route('/preferences', methods=['GET', 'POST'])
@@ -226,13 +403,14 @@ def update_location():
             
             # Update ham conditions if available
             ham_conditions = current_app.config.get('HAM_CONDITIONS')
-            if ham_conditions and hasattr(ham_conditions, 'zip_code'):
-                ham_conditions.zip_code = zip_code
-                # Clear cache to force refresh
-                if hasattr(ham_conditions, '_conditions_cache'):
-                    ham_conditions._conditions_cache = None
-                if hasattr(ham_conditions, '_conditions_cache_time'):
-                    ham_conditions._conditions_cache_time = None
+            if ham_conditions and hasattr(ham_conditions, 'update_location'):
+                success = ham_conditions.update_location(zip_code)
+                if success:
+                    logger.info(f"Successfully updated ham conditions location to ZIP: {zip_code}")
+                else:
+                    logger.warning(f"Failed to update ham conditions location to ZIP: {zip_code}")
+            else:
+                logger.warning("Ham conditions service not available for location update")
             
             return jsonify({
                 'success': True,
@@ -261,6 +439,21 @@ def update_location():
             db.store_user_preference('latitude', str(lat))
             db.store_user_preference('longitude', str(lon))
             logger.info(f"Updated user location: {lat}, {lon}")
+            
+            # Update ham conditions if available
+            ham_conditions = current_app.config.get('HAM_CONDITIONS')
+            if ham_conditions:
+                # For lat/lon, we need to update the instance directly
+                ham_conditions.lat = lat
+                ham_conditions.lon = lon
+                ham_conditions.grid_square = ham_conditions.latlon_to_grid(lat, lon)
+                ham_conditions.timezone = ham_conditions._get_timezone_from_coords(lat, lon)
+                
+                # Clear caches to force refresh with new location
+                if hasattr(ham_conditions, 'clear_cache'):
+                    ham_conditions.clear_cache()
+                
+                logger.info(f"Successfully updated ham conditions location to lat/lon: {lat}, {lon}")
             
             return jsonify({
                 'success': True,
@@ -305,45 +498,4 @@ def debug_ham_conditions():
             'error': str(e),
             'traceback': traceback.format_exc(),
             'config_keys': list(current_app.config.keys()) if current_app else []
-        }), 500
-
-
-@api_bp.route('/debug/update-cache', methods=['POST'])
-def manual_update_cache():
-    """Manually trigger a cache update for testing"""
-    try:
-        ham_conditions = current_app.config.get('HAM_CONDITIONS')
-        if not ham_conditions:
-            return jsonify({'error': 'Ham conditions not initialized'}), 500
-        
-        # Clear existing cache
-        if hasattr(ham_conditions, '_conditions_cache'):
-            ham_conditions._conditions_cache = None
-        if hasattr(ham_conditions, '_conditions_cache_time'):
-            ham_conditions._conditions_cache_time = None
-        
-        # Generate new report
-        import time
-        start_time = time.time()
-        new_cache = ham_conditions.generate_report()
-        end_time = time.time()
-        
-        # Update cache
-        ham_conditions._conditions_cache = new_cache
-        ham_conditions._conditions_cache_time = time.time()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Cache updated manually',
-            'cache_generated': bool(new_cache),
-            'generation_time': f"{end_time - start_time:.2f}s",
-            'cache_time': ham_conditions._conditions_cache_time
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in manual cache update: {e}")
-        import traceback
-        return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc()
         }), 500 
