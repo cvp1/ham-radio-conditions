@@ -10,8 +10,6 @@ services:
       - ZIP_CODE=${ZIP_CODE}
       - TEMP_UNIT=${TEMP_UNIT:-F}
       - CALLSIGN=${CALLSIGN}
-      - QRZ_USERNAME=${QRZ_USERNAME}
-      - QRZ_PASSWORD=${QRZ_PASSWORD:-}
       - DATABASE_PATH=/app/data/ham_radio.db
       - DATA_RETENTION_DAYS=7
     volumes:

@@ -49,8 +49,8 @@ def check_env_file():
     required_vars = [
         'OPENWEATHER_API_KEY',
         'ZIP_CODE',
-        'QRZ_USERNAME',
-        'QRZ_PASSWORD'
+        'CALLSIGN',
+        'TEMP_UNIT',
     ]
     
     missing_vars = []

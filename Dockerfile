@@ -7,6 +7,13 @@ ENV FLASK_APP=wsgi.py
 ENV FLASK_ENV=production
 ENV TEMP_UNIT=F
 
+# Install system dependencies including build tools
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /app
 

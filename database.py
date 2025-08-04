@@ -52,22 +52,10 @@ class Database:
                     )
                 ''')
                 
-                # Create qrz_cache table for caching QRZ lookups
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS qrz_cache (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        callsign TEXT UNIQUE NOT NULL,
-                        data TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
                 # Create indexes for better performance
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_timestamp ON spots(timestamp)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_callsign ON spots(callsign)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_frequency ON spots(frequency)')
-                cursor.execute('CREATE INDEX IF NOT EXISTS idx_qrz_cache_callsign ON qrz_cache(callsign)')
-                cursor.execute('CREATE INDEX IF NOT EXISTS idx_qrz_cache_created_at ON qrz_cache(created_at)')
                 
                 conn.commit()
                 logger.info(f"Database initialized successfully at {self.db_path}")
@@ -219,49 +207,7 @@ class Database:
                 return result[0] if result else None
                 
         except Exception as e:
-            logger.error(f"Error getting user preference: {e}")
-            return None
-    
-    def store_qrz_cache(self, callsign: str, data: Dict) -> bool:
-        """Store QRZ lookup result in cache"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                
-                cursor.execute('''
-                    INSERT OR REPLACE INTO qrz_cache (callsign, data, created_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                ''', (callsign, json.dumps(data)))
-                
-                conn.commit()
-                logger.debug(f"Cached QRZ data for {callsign}")
-                return True
-                
-        except Exception as e:
-            logger.error(f"Error storing QRZ cache: {e}")
-            return False
-    
-    def get_qrz_cache(self, callsign: str, max_age_hours: int = 24) -> Optional[Dict]:
-        """Get QRZ lookup result from cache"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Calculate time threshold
-                threshold = datetime.now() - timedelta(hours=max_age_hours)
-                
-                cursor.execute('''
-                    SELECT data FROM qrz_cache 
-                    WHERE callsign = ? AND datetime(created_at) >= datetime(?)
-                ''', (callsign, threshold.strftime('%Y-%m-%d %H:%M:%S')))
-                
-                result = cursor.fetchone()
-                if result:
-                    return json.loads(result[0])
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error getting QRZ cache: {e}")
+            logger.error(f"Error getting user preference {key}: {e}")
             return None
     
     def cleanup_old_data(self, days: int = 7):
@@ -280,15 +226,8 @@ class Database:
                 ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
                 spots_deleted = cursor.rowcount
                 
-                # Clean up old QRZ cache
-                cursor.execute('''
-                    DELETE FROM qrz_cache 
-                    WHERE datetime(created_at) < datetime(?)
-                ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
-                qrz_deleted = cursor.rowcount
-                
                 conn.commit()
-                logger.info(f"Cleaned up {spots_deleted} old spots and {qrz_deleted} old QRZ cache entries")
+                logger.info(f"Cleaned up {spots_deleted} old spots")
                 
         except Exception as e:
             logger.error(f"Error cleaning up old data: {e}")
@@ -303,9 +242,6 @@ class Database:
                 cursor.execute('SELECT COUNT(*) FROM spots')
                 total_spots = cursor.fetchone()[0]
                 
-                cursor.execute('SELECT COUNT(*) FROM qrz_cache')
-                total_qrz_cache = cursor.fetchone()[0]
-                
                 cursor.execute('SELECT COUNT(*) FROM user_preferences')
                 total_preferences = cursor.fetchone()[0]
                 
@@ -314,11 +250,39 @@ class Database:
                 
                 return {
                     'total_spots': total_spots,
-                    'total_qrz_cache': total_qrz_cache,
                     'total_preferences': total_preferences,
                     'file_size_mb': round(file_size / (1024 * 1024), 2)
                 }
                 
         except Exception as e:
             logger.error(f"Error getting database stats: {e}")
-            return {} 
+            return {}
+
+# Global database instance
+_db_instance = None
+
+def init_database():
+    """Initialize the database globally."""
+    global _db_instance
+    try:
+        _db_instance = Database()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+
+def get_database():
+    """Get the global database instance."""
+    global _db_instance
+    if _db_instance is None:
+        init_database()
+    return _db_instance
+
+def get_stored_zip_code():
+    """Get the stored ZIP code from user preferences."""
+    try:
+        db = get_database()
+        return db.get_user_preference('zip_code')
+    except Exception as e:
+        logger.error(f"Error getting stored ZIP code: {e}")
+        return None 

@@ -88,7 +88,6 @@ class TaskManager:
     def _run_task(self, name: str, task_info: dict):
         """Run a single task with error handling."""
         try:
-            logger.debug(f"Running task: {name}")
             start_time = time.time()
             
             # Execute the task
@@ -102,7 +101,7 @@ class TaskManager:
                 task_info['last_error'] = None
             
             execution_time = time.time() - start_time
-            logger.debug(f"Task {name} completed in {execution_time:.2f}s")
+            logger.info(f"Task {name} completed in {execution_time:.2f}s")
             
         except Exception as e:
             logger.error(f"Error running task {name}: {e}")
@@ -146,14 +145,14 @@ def setup_background_tasks(conditions_updater: Callable, database_cleanup: Calla
     """
     task_manager = TaskManager()
     
-    # Add conditions update task (every 5 minutes)
-    task_manager.add_task('conditions_update', conditions_updater, 300)
+    # Add conditions update task (every 10 minutes for production)
+    task_manager.add_task('conditions_update', conditions_updater, 600)
     
     # Add database cleanup task (every hour)
     task_manager.add_task('database_cleanup', database_cleanup, 3600)
     
-    # Add cache cleanup task (every 10 minutes)
-    task_manager.add_task('cache_cleanup', cache_cleanup_task, 600)
+    # Add cache cleanup task (every 15 minutes)
+    task_manager.add_task('cache_cleanup', cache_cleanup_task, 900)
     
     return task_manager
 
@@ -173,14 +172,12 @@ def create_conditions_updater(ham_conditions, lock: threading.Lock) -> Callable:
         """Update the conditions cache."""
         try:
             with lock:
-                logger.debug("Starting conditions cache update")
-                
                 # Generate new conditions
                 new_conditions = ham_conditions.generate_report()
                 
                 if new_conditions:
-                    # Cache the new conditions
-                    cache_set('conditions', 'current', new_conditions, max_age=300)  # 5 minutes
+                    # Cache the new conditions with production-optimized duration
+                    cache_set('conditions', 'current', new_conditions, max_age=600)  # 10 minutes
                     logger.info("Conditions cache updated successfully")
                 else:
                     logger.warning("Failed to generate new conditions")
@@ -204,8 +201,6 @@ def create_database_cleanup(database) -> Callable:
     def cleanup_database():
         """Clean up old database entries."""
         try:
-            logger.debug("Starting database cleanup")
-            
             # Clean up old spots and QRZ cache
             cleanup_result = database.cleanup_old_data()
             
@@ -224,11 +219,9 @@ def create_database_cleanup(database) -> Callable:
 def cache_cleanup_task():
     """Clean up expired cache entries."""
     try:
-        logger.debug("Starting cache cleanup")
-        
         # The cache manager handles cleanup automatically, but we can add additional logic here
         # For now, just log that cleanup is happening
-        logger.debug("Cache cleanup cycle completed")
+        pass
         
     except Exception as e:
         logger.error(f"Error in cache cleanup: {e}")

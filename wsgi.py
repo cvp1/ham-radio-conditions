@@ -1,12 +1,17 @@
+#!/usr/bin/env python3
 """
-WSGI entry point for production deployment.
-This file exposes the Flask application instance for Gunicorn.
+Production WSGI entry point for Ham Radio Conditions app.
 """
 
-from app_factory import create_app_with_error_handling
+import os
+from app_factory import create_app
+from config import Config
 
-# Create the application instance
-app = create_app_with_error_handling('production')
+# Set production environment
+os.environ['FLASK_ENV'] = 'production'
+
+# Create the application
+app = create_app(Config)
 
 if __name__ == '__main__':
-    app.run() 
+    app.run(host='0.0.0.0', port=8087) 

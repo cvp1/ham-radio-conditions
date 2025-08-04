@@ -1,162 +1,116 @@
 """
-Application factory for Ham Radio Conditions app.
-Creates and configures the Flask application with all its components.
+Flask Application Factory
+Creates and configures the Flask application with all necessary components.
 """
 
 import os
-import threading
-import time
-from flask import Flask, render_template
-from config import get_config
-from utils.logging_config import get_logger, setup_logging
-from utils.background_tasks import setup_background_tasks, create_conditions_updater, create_database_cleanup
-from utils.cache_manager import get_cache_manager, cache_get, cache_set, cache_clear
+import logging
+from flask import Flask
+from flask_caching import Cache
+from flask_cors import CORS
+from datetime import datetime
+import pytz
+
+from config import Config
+from database import init_database
+from ham_radio_conditions import HamRadioConditions
+from utils.background_tasks import TaskManager
+from utils.logging_config import setup_logging
 from routes.api import api_bp
 from routes.pwa import pwa_bp
-from database import Database
-from qrz_data import QRZLookup
-from ham_radio_conditions import HamRadioConditions
 
-logger = get_logger(__name__)
+# Configure logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
-def create_app(config_name: str = None) -> Flask:
-    """
-    Create and configure the Flask application.
+def create_app(config_class=Config):
+    """Create and configure the Flask application."""
+    app = Flask(__name__)
+    app.config.from_object(config_class)
     
-    Args:
-        config_name: Configuration name to use
+    # Initialize logging
+    logger.info("Initializing services...")
     
-    Returns:
-        Configured Flask application
-    """
-    # Get configuration
-    config = get_config(config_name)
+    # Initialize database
+    init_database()
+    logger.info("Database initialized")
     
-    # Validate configuration
-    errors = config.validate()
-    if errors:
-        logger.error("Configuration errors:")
-        for error in errors:
-            logger.error(f"  - {error}")
-        logger.error("Please check your environment variables and .env file")
-        raise ValueError(f"Invalid configuration: {', '.join(errors)}")
+    # Initialize CORS
+    CORS(app)
     
-    # Set up logging
-    setup_logging('ham_radio_conditions', log_file='logs/ham_radio_conditions.log' if config.is_production() else None)
-    
-    # Initialize cache manager
-    cache_manager = get_cache_manager()
-    
-    # Create Flask app
-    app = Flask(__name__, static_folder='static')
-    app.config.from_object(config)
+    # Initialize cache
+    cache = Cache(app)
     
     # Initialize services
-    services = initialize_services(config)
-    
-    # Store services in app config for access in routes
-    app.config['DATABASE'] = services['database']
-    app.config['HAM_CONDITIONS'] = services['ham_conditions']
-    app.config['QRZ_LOOKUP'] = services['qrz_lookup']
-    app.config['TASK_MANAGER'] = services['task_manager']
-    app.config['CACHE_MANAGER'] = cache_manager
+    services = initialize_services(app)
     
     # Register blueprints
     register_blueprints(app)
     
+    # Configure app with services
+    app.config['HAM_CONDITIONS'] = services['ham_conditions']
+    app.config['TASK_MANAGER'] = services['task_manager']
+    
     # Register routes
     register_routes(app)
     
-    # Set up background tasks
-    setup_app_background_tasks(app, services)
+    # Configure background tasks
+    configure_background_tasks(app, services)
     
     logger.info("Application created successfully")
     return app
 
 
-def initialize_services(config) -> dict:
-    """
-    Initialize all application services.
-    
-    Args:
-        config: Application configuration
-    
-    Returns:
-        Dictionary of initialized services
-    """
-    logger.info("Initializing services...")
-    
-    # Initialize database
-    database = Database()
-    logger.info("Database initialized")
-    
-    # Load zip code from database if available, otherwise use environment variable
-    stored_zip_code = database.get_user_preference('zip_code')
-    if stored_zip_code:
-        zip_code = stored_zip_code
-        logger.info(f"Using stored ZIP code: {zip_code}")
-    elif config.ZIP_CODE:
-        zip_code = config.ZIP_CODE
-        # Store the environment variable zip code in the database
-        database.store_user_preference('zip_code', zip_code)
-        logger.info(f"Stored environment ZIP code: {zip_code}")
-    else:
-        zip_code = None
-        logger.warning("No ZIP code configured")
+def initialize_services(app):
+    """Initialize all application services."""
+    services = {}
     
     # Initialize HamRadioConditions
-    ham_conditions = HamRadioConditions(zip_code=zip_code)
-    logger.info("HamRadioConditions initialized")
-    
-    # Initialize QRZ lookup (optional)
-    qrz_lookup = None
-    if config.QRZ_USERNAME and config.QRZ_PASSWORD:
-        try:
-            qrz_lookup = QRZLookup(config.QRZ_USERNAME, config.QRZ_PASSWORD)
-            logger.info("QRZ lookup initialized")
-        except Exception as e:
-            logger.warning(f"Failed to initialize QRZ lookup: {e}")
-    else:
-        logger.info("QRZ lookup not configured - QRZ functionality will be disabled")
+    try:
+        # Get stored ZIP code from database or use default
+        from database import get_stored_zip_code
+        stored_zip = get_stored_zip_code()
+        
+        if stored_zip:
+            logger.info(f"Using stored ZIP code: {stored_zip}")
+            ham_conditions = HamRadioConditions(zip_code=stored_zip)
+        else:
+            ham_conditions = HamRadioConditions()
+        
+        services['ham_conditions'] = ham_conditions
+        logger.info("HamRadioConditions initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize HamRadioConditions: {e}")
+        raise
     
     # Initialize task manager
-    task_manager = setup_background_tasks(
-        create_conditions_updater(ham_conditions, threading.Lock()),
-        create_database_cleanup(database)
-    )
-    logger.info("Task manager initialized")
+    try:
+        task_manager = TaskManager()
+        services['task_manager'] = task_manager
+        logger.info("Task manager initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize task manager: {e}")
+        raise
     
-    return {
-        'database': database,
-        'ham_conditions': ham_conditions,
-        'qrz_lookup': qrz_lookup,
-        'task_manager': task_manager
-    }
+    return services
 
 
-def register_blueprints(app: Flask) -> None:
-    """
-    Register Flask blueprints.
-    
-    Args:
-        app: Flask application
-    """
-    app.register_blueprint(api_bp)
+def register_blueprints(app):
+    """Register Flask blueprints."""
+    app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(pwa_bp)
     logger.info("Blueprints registered")
 
 
-def register_routes(app: Flask) -> None:
-    """
-    Register application routes.
-    
-    Args:
-        app: Flask application
-    """
+def register_routes(app):
+    """Register application routes."""
     @app.route('/')
     def index():
         """Render the main page with cached conditions data."""
+        from flask import render_template
+        from utils.cache_manager import cache_get
+        
         ham_conditions = app.config.get('HAM_CONDITIONS')
         
         # Try to get cached conditions first
@@ -177,42 +131,15 @@ def register_routes(app: Flask) -> None:
     logger.info("Routes registered")
 
 
-def setup_app_background_tasks(app: Flask, services: dict) -> None:
-    """
-    Set up background tasks for the application.
-    
-    Args:
-        app: Flask application
-        services: Dictionary of services
-    """
+def configure_background_tasks(app, services):
+    """Configure background tasks."""
     task_manager = services['task_manager']
     
-    # Start background tasks
-    task_manager.start_all()
+    # Configure periodic tasks
+    task_manager.add_task(
+        'update_conditions',
+        lambda: services['ham_conditions'].generate_report(),
+        interval_seconds=300  # 5 minutes
+    )
     
-    # Register cleanup on app shutdown
-    @app.teardown_appcontext
-    def cleanup(error):
-        """Cleanup on application context teardown."""
-        if error:
-            logger.error(f"Application context error: {error}")
-        # Don't stop background tasks on context teardown - they should keep running
-    
-    logger.info("Background tasks configured")
-
-
-def create_app_with_error_handling(config_name: str = None) -> Flask:
-    """
-    Create application with error handling.
-    
-    Args:
-        config_name: Configuration name to use
-    
-    Returns:
-        Configured Flask application
-    """
-    try:
-        return create_app(config_name)
-    except Exception as e:
-        logger.error(f"Failed to create application: {e}")
-        raise 
+    logger.info("Background tasks configured") 

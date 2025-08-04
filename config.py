@@ -17,7 +17,7 @@ class Config:
     # Flask Configuration
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     DEBUG = os.getenv('FLASK_ENV') == 'development'
-    PORT = int(os.getenv('PORT', 5001))
+    PORT = int(os.getenv('PORT', 8087))  # Default to production port
     
     # Weather API Configuration
     OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
@@ -27,17 +27,18 @@ class Config:
     # Ham Radio Configuration
     CALLSIGN = os.getenv('CALLSIGN', 'N/A')
     
-    # QRZ XML Database API Configuration
-    QRZ_USERNAME = os.getenv('QRZ_USERNAME')
-    QRZ_PASSWORD = os.getenv('QRZ_PASSWORD')
-    
     # Database Configuration
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/ham_radio.db')
     DATA_RETENTION_DAYS = int(os.getenv('DATA_RETENTION_DAYS', 7))
     
-    # Cache Configuration
-    CACHE_UPDATE_INTERVAL = int(os.getenv('CACHE_UPDATE_INTERVAL', 300))  # 5 minutes
+    # Cache Configuration - Production optimized
+    CACHE_UPDATE_INTERVAL = int(os.getenv('CACHE_UPDATE_INTERVAL', 600))  # 10 minutes
     CLEANUP_INTERVAL = int(os.getenv('CLEANUP_INTERVAL', 3600))  # 1 hour
+    
+    # Flask-Caching Configuration
+    CACHE_TYPE = 'simple'
+    CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes default
+    CACHE_KEY_PREFIX = 'ham_radio_'
     
     # PWA Configuration
     PWA_NAME = "Ham Radio Conditions"
@@ -57,10 +58,6 @@ class Config:
         if not cls.ZIP_CODE:
             errors.append("ZIP_CODE is required")
         
-        # QRZ credentials are optional - app will work without them
-        if not cls.QRZ_USERNAME or not cls.QRZ_PASSWORD:
-            print("Warning: QRZ_USERNAME and QRZ_PASSWORD not set - QRZ lookup functionality will be disabled")
-        
         return errors
     
     @classmethod
@@ -77,12 +74,16 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
+    PORT = 5001  # Development port
+    CACHE_UPDATE_INTERVAL = 300  # 5 minutes for development
     TEMP_UNIT = 'F'
 
 
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
+    PORT = 8087  # Production port
+    CACHE_UPDATE_INTERVAL = 600  # 10 minutes for production
     
     @classmethod
     def validate(cls) -> list[str]:
@@ -100,6 +101,7 @@ class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
     DATABASE_PATH = ':memory:'  # Use in-memory database for tests
+    CACHE_UPDATE_INTERVAL = 60  # 1 minute for testing
 
 
 # Configuration mapping
@@ -107,7 +109,7 @@ config_map = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'testing': TestingConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig  # Default to production
 }
 
 

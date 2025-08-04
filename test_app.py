@@ -18,8 +18,8 @@ def test_app_creation():
             env_content = """
 OPENWEATHER_API_KEY=test_key
 ZIP_CODE=12345
-QRZ_USERNAME=test_user
-QRZ_PASSWORD=test_pass
+CALLSIGN=TEST
+TEMP_UNIT=F
 FLASK_ENV=testing
             """.strip()
             
@@ -35,8 +35,8 @@ FLASK_ENV=testing
             with patch.dict(os.environ, {
                 'OPENWEATHER_API_KEY': 'test_key',
                 'ZIP_CODE': '12345',
-                'QRZ_USERNAME': 'test_user',
-                'QRZ_PASSWORD': 'test_pass',
+                'CALLSIGN': 'TEST',
+                'TEMP_UNIT': 'F',
                 'FLASK_ENV': 'testing'
             }):
                 # Try to import and create the app

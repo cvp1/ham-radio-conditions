@@ -37,10 +37,6 @@ TEMP_UNIT=F
 # Ham Radio Configuration
 CALLSIGN=your_callsign_here
 
-# QRZ XML Database API Configuration
-QRZ_USERNAME=your_qrz_username_here
-QRZ_PASSWORD=your_qrz_password_here
-
 # Flask Configuration
 FLASK_ENV=development
 SECRET_KEY=dev-secret-key-change-in-production

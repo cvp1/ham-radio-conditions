@@ -8,7 +8,6 @@ This application fetches real-time ham radio band conditions and environmental d
 - Detailed propogation report
 - DXCC entity information and conditions
 - Live spots from the PSK Network
-- QRZ XML Database API integration for callsign information
 - **Persistent SQLite database for storing spots, QRZ cache, and user preferences**
 - **Progressive Web App (PWA) with offline support and install capability**
 
@@ -123,46 +122,21 @@ This will:
 
 ## Features
 
-- Real-time solar and geomagnetic data from HamQSL
-- Detailed band condition forecasts for day and night
-- Detailed propogation summary and recommendations
-- Weather conditions
-- Comprehensive propagation reports
-- DXCC entity information with ITU and CQ zones
-- Live spots from the PSK Network
-- **Persistent SQLite database with automatic data retention**
-- **Historical spots data with customizable time ranges**
-- **QRZ lookup caching for improved performance**
-- **User preferences storage**
-- QRZ XML Database API integration with comprehensive callsign information:
-  - Basic info (callsign, name, location)
-  - License details (class, effective date, expiration)
-  - Location data (country, state, county, grid)
-  - DXCC and zone information
-  - QSL information (manager, LoTW, eQSL)
-  - IOTA and other awards
-  - Contact information
-- Modern, responsive UI with real-time updates
+- **Real-time propagation conditions** with solar flux, A-index, K-index, and MUF calculations
+- **Live ham radio spots** from PSKReporter and Reverse Beacon Network
+- **Weather integration** with current conditions and forecasts
+- **DXCC information** with current location and nearby entities
+- **Operating recommendations** based on current conditions
+- **PWA support** for mobile and desktop installation
+- **Caching system** for improved performance
+- **Background task management** for data updates
 
 ## Database Features
 
-The application now uses SQLite for persistent storage with the following capabilities:
-
-### Data Storage
-- **Spots History**: All live spots are automatically stored in the database
-- **QRZ Cache**: QRZ lookups are cached to reduce API calls and improve performance
-- **User Preferences**: User settings and preferences are stored persistently
-
-### Data Management
-- **Automatic Cleanup**: Old data is automatically cleaned up (7 days retention by default)
-- **Database Statistics**: View database size and record counts via API
-- **Historical Queries**: Query spots data with customizable time ranges
-
-### API Endpoints
-- `GET /api/spots/history?hours=24&limit=100` - Get historical spots
-- `GET /api/preferences` - Get user preferences
-- `POST /api/preferences` - Save user preferences
-- `GET /api/database/stats` - Get database statistics
+- **Persistent SQLite database** for storing spots and user preferences
+- **Automatic data retention** with configurable cleanup intervals
+- **Historical spots data** with customizable time ranges
+- **User preferences storage** for personalized settings
 
 ## Project Structure
 
@@ -173,37 +147,22 @@ ham-radio-conditions/
 ├── wsgi_dev.py                # WSGI entry point for development
 ├── app_factory.py            # Application factory for creating Flask app
 ├── config.py                 # Configuration management
-├── ham_radio_conditions.py   # Core functionality for ham radio conditions
-├── dxcc_data.py              # DXCC entity information handling
-├── qrz_data.py               # QRZ XML Database API integration
-├── database.py               # SQLite database management and operations
-├── requirements.txt          # Python dependencies
-├── Dockerfile                # Container configuration
-├── docker-compose.yml        # Docker Compose configuration
-├── setup_dev.py              # Development setup script
-├── test_app.py               # Basic test suite
-├── test_docker.py            # Docker testing script
-├── docker_commands.py        # Docker Compose command helper
-├── .env                      # Environment variables (create this)
-├── .gitignore               # Git ignore patterns
-├── README.md                # This file
-├── utils/                   # Utility modules
-│   ├── __init__.py
-│   ├── logging_config.py    # Logging configuration
-│   └── background_tasks.py  # Background task management
-├── routes/                  # Route modules
-│   ├── __init__.py
-│   ├── api.py              # API endpoints
-│   └── pwa.py              # PWA-specific routes
-├── templates/               # HTML templates
-│   └── index.html          # Main application template
-├── static/                  # Static files for PWA functionality
-│   ├── manifest.json       # PWA manifest file
-│   ├── sw.js              # Service worker for offline functionality
-│   ├── offline.html       # Offline page
-│   └── icons/             # App icons for various sizes
-├── data/                   # SQLite database files (created automatically)
-└── logs/                   # Application logs (created automatically)
+├── ham_radio_conditions.py  # Main propagation conditions logic
+├── dxcc_data.py            # DXCC entity data and calculations
+├── database.py             # Database operations and management
+├── utils/
+│   ├── background_tasks.py # Background task management
+│   ├── cache_manager.py    # Caching system
+│   └── logging_config.py   # Logging configuration
+├── routes/
+│   ├── api.py             # REST API endpoints
+│   └── pwa.py             # PWA service worker routes
+├── templates/
+│   └── index.html         # Main application interface
+└── static/
+    ├── manifest.json      # PWA manifest
+    ├── sw.js             # Service worker
+    └── icons/            # PWA icons
 ```
 
 ## Data Sources
@@ -212,7 +171,6 @@ ham-radio-conditions/
 - OpenWeatherMap API for weather data
 - PSK API https://pskreporter.info/pskmap.html for live spots
 - DXCC database for entity information
-- QRZ XML Database API (https://xmldata.qrz.com) for callsign lookups
 - **SQLite database for persistent local storage**
 
 ## UI Features
@@ -229,52 +187,31 @@ ham-radio-conditions/
   - Mode
   - DXCC entity
   - Comments
-  - QRZ lookup integration with detailed callsign information:
-    - Basic info display
-    - License details
-    - Location information
-    - DXCC and zone data
-    - QSL preferences
-    - Awards and achievements
-    - Contact information
 
 ## Update Frequency
 
 - Propagation data: Updates every hour to respect the HamQSL feed's update frequency
 - Live spots: Updates every 5 minutes
 - Weather data: Updates on each request
-- QRZ lookups: On-demand when viewing spot details or using the QRZ lookup feature
 - **Database cleanup: Runs every hour to maintain optimal performance**
-
-## QRZ Integration
-
-The application uses the QRZ XML Database API to provide comprehensive callsign information. The integration includes:
-
-- Authentication using QRZ.com login credentials
-- Session management with automatic re-authentication
-- **Caching of lookup results in SQLite database for improved performance**
-- Comprehensive data extraction including:
-  - Basic operator information
-  - License details
-  - Location data
-  - DXCC and zone information
-  - QSL preferences
-  - Awards and achievements
-  - Contact information
-- Error handling and retry logic
-- Formatted display of all available information
-- Automatic session expiration handling
 
 ## Database Configuration
 
 The SQLite database is automatically created in the `data/` directory and includes:
 
 - **Spots Table**: Stores all live spots with timestamps
-- **QRZ Cache Table**: Caches QRZ lookup results
 - **User Preferences Table**: Stores user settings
 - **Automatic Indexing**: Optimized queries for better performance
 - **Data Retention**: Configurable cleanup of old data
 
 ## Docker Volume Persistence
 
-When using Docker, the database is stored in a named volume (`ham_radio_data`) to ensure data persistence across container restarts and updates. 
+When using Docker, the database is stored in a named volume (`ham_radio_data`) to ensure data persistence across container restarts and updates.
+
+## API Endpoints
+
+- `GET /api/conditions` - Get current propagation conditions
+- `GET /api/spots` - Get live spots data
+- `GET /api/weather` - Get current weather conditions
+- `GET /api/cache/stats` - Get cache statistics
+- `POST /api/cache/clear` - Clear specific or all caches 

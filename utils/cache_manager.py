@@ -84,7 +84,7 @@ class CacheManager:
         """Background worker for cache cleanup."""
         while self.running:
             try:
-                time.sleep(60)  # Run cleanup every minute
+                time.sleep(300)  # Run cleanup every 5 minutes (production optimized)
                 self.cleanup_expired()
                 self.cleanup_oversized()
             except Exception as e:
@@ -117,7 +117,6 @@ class CacheManager:
             # Check if expired
             if entry.is_expired():
                 del cache[key]
-                logger.debug(f"Cache entry expired: {cache_name}:{key}")
                 return None
             
             # Mark as accessed
@@ -151,7 +150,6 @@ class CacheManager:
             
             # Store the entry
             cache[key] = entry
-            logger.debug(f"Cached: {cache_name}:{key} (size: {entry.size})")
             return True
     
     def delete(self, cache_name: str, key: str) -> bool:
@@ -163,7 +161,6 @@ class CacheManager:
             cache = self.caches[cache_name]
             if key in cache:
                 del cache[key]
-                logger.debug(f"Deleted cache entry: {cache_name}:{key}")
                 return True
             return False
     
@@ -230,8 +227,6 @@ class CacheManager:
             if i < len(entries):
                 key = entries[i][0]
                 del cache[key]
-        
-        logger.debug(f"Evicted {count} entries from cache: {cache_name}")
     
     def _evict_entries_by_memory(self, cache_name: str, memory_to_free: int):
         """Evict entries to free specific amount of memory."""
@@ -247,8 +242,6 @@ class CacheManager:
             
             freed_memory += entry.size
             del cache[key]
-        
-        logger.debug(f"Freed {freed_memory} bytes from cache: {cache_name}")
     
     def _get_cache_memory_usage(self, cache_name: str) -> int:
         """Get current memory usage of a cache."""
@@ -333,6 +326,12 @@ def get_cache_manager() -> CacheManager:
         _cache_manager = CacheManager()
         
         # Register default caches
+        _cache_manager.register_cache('default', {
+            'max_size': 20,
+            'max_age': 300,  # 5 minutes
+            'max_memory_bytes': 5 * 1024 * 1024  # 5MB
+        })
+        
         _cache_manager.register_cache('conditions', {
             'max_size': 10,
             'max_age': 300,  # 5 minutes
@@ -343,12 +342,6 @@ def get_cache_manager() -> CacheManager:
             'max_size': 50,
             'max_age': 120,  # 2 minutes
             'max_memory_bytes': 5 * 1024 * 1024  # 5MB
-        })
-        
-        _cache_manager.register_cache('qrz', {
-            'max_size': 100,
-            'max_age': 3600,  # 1 hour
-            'max_memory_bytes': 2 * 1024 * 1024  # 2MB
         })
         
         _cache_manager.register_cache('weather', {

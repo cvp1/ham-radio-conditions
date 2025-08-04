@@ -37,12 +37,6 @@ TEMP_UNIT=F
 # Your ham radio callsign (for display purposes)
 CALLSIGN=your_callsign_here
 
-# OPTIONAL: QRZ XML Database API Configuration
-# Get credentials from: https://xmldata.qrz.com/
-# Note: QRZ functionality is optional - app works without it
-QRZ_USERNAME=your_qrz_username_here
-QRZ_PASSWORD=your_qrz_password_here
-
 # ========================================
 # Flask Configuration
 # ========================================
@@ -71,8 +65,8 @@ DATA_RETENTION_DAYS=7
 # Cache Configuration
 # ========================================
 
-# How often to update conditions cache (seconds, default: 300 = 5 minutes)
-CACHE_UPDATE_INTERVAL=300
+# How often to update conditions cache (seconds, default: 600 = 10 minutes)
+CACHE_UPDATE_INTERVAL=600
 
 # How often to cleanup old data (seconds, default: 3600 = 1 hour)
 CLEANUP_INTERVAL=3600
@@ -85,8 +79,7 @@ CLEANUP_INTERVAL=3600
         print("\n📋 Next steps:")
         print("1. Edit the .env file with your actual values")
         print("2. At minimum, set OPENWEATHER_API_KEY and ZIP_CODE")
-        print("3. QRZ credentials are optional but recommended")
-        print("4. Run: docker compose up --build")
+        print("3. Run: docker compose up --build")
         
     except Exception as e:
         print(f"❌ Failed to create .env file: {e}")
@@ -103,7 +96,7 @@ def validate_env_file():
         content = f.read()
     
     required_vars = ['OPENWEATHER_API_KEY', 'ZIP_CODE']
-    optional_vars = ['QRZ_USERNAME', 'QRZ_PASSWORD', 'CALLSIGN']
+    optional_vars = ['CALLSIGN']
     
     print("🔍 Validating .env file...")
     

@@ -84,7 +84,6 @@
         .icon-dxcc { color: #8B5CF6; }
         .icon-spots { color: #EC4899; }
         .icon-propagation { color: #8B5CF6; }
-        .icon-qrz { color: #3B82F6; }
         
         .section-icon {
             transition: transform 0.2s ease-in-out;
@@ -288,27 +287,6 @@
                 </div>
             </div>
 
-            <!-- QRZ Lookup -->
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4">
-                    <i class="fas fa-search mr-2 section-icon icon-qrz"></i>QRZ Lookup
-                    <span id="qrz-loading" class="loading-spinner ml-2" style="display: none;"></span>
-                </h2>
-                <div class="mb-4">
-                    <div class="flex gap-2">
-                        <input type="text" id="qrz-callsign" placeholder="Enter callsign" 
-                               class="flex-1 bg-gray-800 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button onclick="lookupQRZ()" 
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                            Lookup
-                        </button>
-                    </div>
-                </div>
-                <div id="qrz-results" class="space-y-4">
-                    <p class="text-gray-400">Enter a callsign to lookup information</p>
-                </div>
-            </div>
-
             <!-- Cache Management Dashboard -->
             <div class="card rounded-lg p-6 col-span-1 md:col-span-2 lg:col-span-3">
                 <h2 class="text-2xl font-semibold mb-4 flex items-center justify-between">
@@ -356,9 +334,21 @@
 
         // Helper: Format value
         function formatValue(key, value) {
-            if (key === 'sfi') return `${value} SFI`;
-            if (key === 'a_index') return `A-Index: ${value}`;
-            if (key === 'k_index') return `K-Index: ${value}`;
+            if (key === 'sfi') {
+                // Remove existing SFI suffix if present and return clean value
+                const cleanValue = value.toString().replace(' SFI', '');
+                return cleanValue;
+            }
+            if (key === 'a_index') {
+                // Remove existing A-Index prefix if present and return clean value
+                const cleanValue = value.toString().replace('A-Index: ', '');
+                return cleanValue;
+            }
+            if (key === 'k_index') {
+                // Remove existing K-Index prefix if present and return clean value
+                const cleanValue = value.toString().replace('K-Index: ', '');
+                return cleanValue;
+            }
             return value;
         }
 
@@ -395,13 +385,24 @@
 
         function updateSolarConditions(data) {
             if (!solarDiv) return;
-            safeSetHTML(solarDiv, Object.entries(data.solar_conditions)
-                .map(([key, value]) => `
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                        <span class="font-semibold">${formatValue(key, value)}</span>
-                    </div>
-                `).join(''));
+            
+            // Define the fields we want to display
+            const displayFields = ['sfi', 'a_index', 'k_index', 'aurora', 'sunspots', 'xray'];
+            
+            safeSetHTML(solarDiv, displayFields
+                .filter(key => data.solar_conditions[key] !== undefined)
+                .map(key => {
+                    const label = key === 'sfi' ? 'SFI' : 
+                                 key === 'a_index' ? 'A-Index' : 
+                                 key === 'k_index' ? 'K-Index' : 
+                                 key.replace('_', ' ').toUpperCase();
+                    return `
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">${label}</span>
+                            <span class="font-semibold">${formatValue(key, data.solar_conditions[key])}</span>
+                        </div>
+                    `;
+                }).join(''));
         }
 
         function updateBandConditions(data) {
@@ -602,15 +603,25 @@
                             <div class="text-lg ${getPropagationQualityClass(summary.propagation_parameters?.quality)}">
                                 ${summary.propagation_parameters?.quality || 'N/A'}
                             </div>
+                            ${summary.propagation_parameters?.quality ? `
+                                <div class="mt-2">
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-green-600 h-2 rounded-full" style="width: ${summary.propagation_parameters.quality === 'Excellent' ? '100' : summary.propagation_parameters.quality === 'Good' ? '75' : summary.propagation_parameters.quality === 'Fair' ? '50' : '25'}%"></div>
+                                    </div>
+                                </div>
+                            ` : ''}
                         </div>
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Best Bands</div>
                             <div class="text-lg font-semibold">${summary.propagation_parameters?.best_bands?.join(', ') || 'N/A'}</div>
                             <div class="text-sm text-gray-400 mt-2">Skip Distances</div>
-                            <div class="text-sm">
+                            <div class="text-sm space-y-1">
                                 ${Object.entries(summary.propagation_parameters?.skip_distances || {}).map(([band, dist]) => 
-                                    `${band}: ${dist}`
-                                ).join(', ')}
+                                    `<div class="flex justify-between">
+                                        <span class="text-blue-300">${band}:</span>
+                                        <span class="font-mono">${dist}</span>
+                                    </div>`
+                                ).join('')}
                             </div>
                         </div>
                     </div>
@@ -620,9 +631,9 @@
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Solar Conditions</div>
                             <div class="space-y-1">
-                                <div>SFI: ${summary.solar_conditions.sfi}</div>
-                                <div>A-Index: ${summary.solar_conditions.a_index}</div>
-                                <div>K-Index: ${summary.solar_conditions.k_index}</div>
+                                <div>SFI: ${formatValue('sfi', summary.solar_conditions.sfi)}</div>
+                                <div>A-Index: ${formatValue('a_index', summary.solar_conditions.a_index)}</div>
+                                <div>K-Index: ${formatValue('k_index', summary.solar_conditions.k_index)}</div>
                                 <div>Aurora: ${summary.solar_conditions.aurora}</div>
                                 <div>Sunspots: ${summary.solar_conditions.sunspots}</div>
                                 <div>X-Ray: ${summary.solar_conditions.xray}</div>
@@ -631,9 +642,12 @@
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Solar Cycle</div>
                             <div class="space-y-1">
-                                <div class="font-semibold">${summary.solar_cycle?.phase || 'N/A'}</div>
-                                <div class="text-sm">${summary.solar_cycle?.prediction || 'N/A'}</div>
-                                <div class="text-sm">Trend: ${summary.solar_cycle?.sfi_trend || 'N/A'}</div>
+                                <div class="font-semibold text-lg">${summary.solar_cycle?.phase || 'N/A'}</div>
+                                <div class="text-sm text-blue-300">${summary.solar_cycle?.prediction || 'N/A'}</div>
+                                <div class="text-sm">Trend: <span class="text-yellow-300">${summary.solar_cycle?.sfi_trend || 'N/A'}</span></div>
+                                ${summary.solar_cycle?.cycle_number ? `
+                                    <div class="text-xs text-gray-400">Cycle ${summary.solar_cycle.cycle_number}</div>
+                                ` : ''}
                             </div>
                         </div>
                         <div class="bg-gray-800 p-4 rounded-lg">
@@ -674,10 +688,16 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-gray-800 p-4 rounded-lg">
                             <div class="text-gray-400">Operating Recommendations</div>
-                            <div class="space-y-1 mt-2">
-                                ${(summary.recommendations || []).map(rec => 
-                                    `<div class="text-sm">• ${rec}</div>`
-                                ).join('')}
+                            <div class="space-y-2 mt-2">
+                                ${(summary.recommendations || []).map(rec => {
+                                    const confidence = rec.includes('(High)') ? 'text-green-400' : 
+                                                     rec.includes('(Medium)') ? 'text-yellow-400' : 
+                                                     rec.includes('(Low)') ? 'text-red-400' : 'text-white';
+                                    const priority = rec.includes('SEVERE') || rec.includes('Strong') ? 'border-l-4 border-red-500 pl-3' :
+                                                   rec.includes('Good') || rec.includes('Excellent') ? 'border-l-4 border-green-500 pl-3' :
+                                                   'border-l-4 border-blue-500 pl-3';
+                                    return `<div class="${priority} ${confidence} text-sm">• ${rec}</div>`;
+                                }).join('')}
                             </div>
                         </div>
                         <div class="bg-gray-800 p-4 rounded-lg">
@@ -694,7 +714,49 @@
                     <div class="bg-gray-800 p-4 rounded-lg">
                         <div class="text-gray-400">Next Hours Outlook</div>
                         <div class="text-lg mt-2">${summary.summary?.next_hours_outlook || 'N/A'}</div>
+                        ${summary.summary?.enhanced_prediction ? `
+                            <div class="text-sm text-blue-300 mt-2">
+                                <strong>Enhanced Prediction:</strong> ${summary.summary.enhanced_prediction}
+                            </div>
+                        ` : ''}
+                        ${summary.summary?.prediction_accuracy ? `
+                            <div class="text-sm text-green-300 mt-1">
+                                <strong>Prediction Accuracy:</strong> ${(summary.summary.prediction_accuracy * 100).toFixed(0)}%
+                            </div>
+                        ` : ''}
+                        ${summary.propagation_parameters?.overall_confidence ? `
+                            <div class="text-sm text-purple-300 mt-1">
+                                <strong>Overall Confidence:</strong> ${(summary.propagation_parameters.overall_confidence * 100).toFixed(0)}%
+                            </div>
+                        ` : ''}
                     </div>
+
+                    <!-- Confidence Metrics -->
+                    ${summary.summary?.confidence_metrics ? `
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400">Prediction Confidence</div>
+                            <div class="grid grid-cols-3 gap-4 mt-2">
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400">Solar Trend</div>
+                                    <div class="text-lg font-semibold ${summary.summary.confidence_metrics.solar_trend >= 0.8 ? 'text-green-400' : summary.summary.confidence_metrics.solar_trend >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
+                                        ${(summary.summary.confidence_metrics.solar_trend * 100).toFixed(0)}%
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400">Overall</div>
+                                    <div class="text-lg font-semibold ${summary.summary.confidence_metrics.overall >= 0.8 ? 'text-green-400' : summary.summary.confidence_metrics.overall >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
+                                        ${(summary.summary.confidence_metrics.overall * 100).toFixed(0)}%
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400">Accuracy</div>
+                                    <div class="text-lg font-semibold ${summary.summary.confidence_metrics.prediction_accuracy >= 0.8 ? 'text-green-400' : summary.summary.confidence_metrics.prediction_accuracy >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
+                                        ${(summary.summary.confidence_metrics.prediction_accuracy * 100).toFixed(0)}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
 
                     <!-- Current Band Conditions -->
                     <div class="mt-4">
@@ -948,80 +1010,7 @@
             }
         }
 
-        // Add QRZ lookup functionality
-        async function lookupQRZ() {
-            const callsign = document.getElementById('qrz-callsign').value.trim().toUpperCase();
-            if (!callsign) {
-                alert('Please enter a callsign');
-                return;
-            }
-
-            const loadingSpinner = document.getElementById('qrz-loading');
-            const resultsDiv = document.getElementById('qrz-results');
-            
-            loadingSpinner.style.display = 'inline-block';
-            resultsDiv.innerHTML = '<p class="text-gray-400">Looking up callsign...</p>';
-
-            try {
-                const response = await fetchWithRetry(`/api/qrz/${callsign}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    if (response.status === 503) {
-                        resultsDiv.innerHTML = `
-                            <div class="text-yellow-500 p-4 bg-yellow-900/20 rounded-lg">
-                                <h3 class="font-semibold mb-2">QRZ Lookup Not Available</h3>
-                                <p class="text-sm">QRZ lookup service is not configured. To enable QRZ lookups, please configure QRZ_USERNAME and QRZ_PASSWORD in your environment variables.</p>
-                                <p class="text-sm mt-2">Callsign: <strong>${callsign}</strong></p>
-                            </div>
-                        `;
-                    } else {
-                        resultsDiv.innerHTML = `<p class="text-red-500">${data.error}</p>`;
-                    }
-                    return;
-                }
-
-                resultsDiv.innerHTML = `
-                    <div class="space-y-4">
-                        ${data.image ? `
-                            <div class="mt-4">
-                                <img src="${data.image}" alt="QRZ Image" class="max-w-full rounded-lg">
-                            </div>
-                        ` : ''}
-                        <div class="mt-4 p-4 bg-gray-800 rounded-lg">
-                            <pre class="whitespace-pre-wrap text-sm">${data.formatted_info || ''}</pre>
-                        </div>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error fetching QRZ data:', error);
-                if (error.message.includes('503')) {
-                    resultsDiv.innerHTML = `
-                        <div class="text-yellow-500 p-4 bg-yellow-900/20 rounded-lg">
-                            <h3 class="font-semibold mb-2">QRZ Lookup Not Available</h3>
-                            <p class="text-sm">QRZ lookup service is not configured. To enable QRZ lookups, please configure QRZ_USERNAME and QRZ_PASSWORD in your environment variables.</p>
-                            <p class="text-sm mt-2">Callsign: <strong>${callsign}</strong></p>
-                        </div>
-                    `;
-                } else {
-                    resultsDiv.innerHTML = `
-                        <div class="text-red-500">
-                            Error looking up callsign: ${error.message}
-                        </div>
-                    `;
-                }
-            } finally {
-                loadingSpinner.style.display = 'none';
-            }
-        }
-
         // Add enter key support for QRZ lookup
-        document.getElementById('qrz-callsign').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                lookupQRZ();
-            }
-        });
-
         // PWA Service Worker Registration with improved update handling
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
@@ -1244,9 +1233,6 @@
                     </button>
                     <button onclick="clearSpecificCache('weather')" class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm transition-colors">
                         Clear Weather
-                    </button>
-                    <button onclick="clearSpecificCache('qrz')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                        Clear QRZ
                     </button>
                 </div>
             `;
