@@ -1801,7 +1801,23 @@ class HamRadioConditions:
                 avg_confidence = 0.7
                 confidence_level = "Medium"
             
-            # Combine outlook components
+            # Create structured outlook data
+            outlook_data = {
+                'summary': " - ".join(outlook_components[:3]),  # First 3 components as summary
+                'details': outlook_components[3:],  # Remaining components as details
+                'confidence_level': confidence_level,
+                'confidence_score': avg_confidence,
+                'key_points': [
+                    outlook_components[0] if outlook_components else "Unknown conditions",
+                    outlook_components[1] if len(outlook_components) > 1 else "",
+                    outlook_components[2] if len(outlook_components) > 2 else ""
+                ],
+                'time_context': "Daytime" if is_daytime else "Nighttime",
+                'solar_flux_level': "High" if sfi >= 150 else "Good" if sfi >= 120 else "Moderate" if sfi >= 100 else "Low" if sfi >= 80 else "Very Low",
+                'geomagnetic_status': "Storm" if k_index > 4 else "Elevated" if k_index > 2 else "Quiet"
+            }
+            
+            # Return formatted string for backward compatibility
             outlook = " - ".join(outlook_components)
             outlook += f" (Confidence: {confidence_level})"
             
@@ -2377,7 +2393,22 @@ class HamRadioConditions:
                     predictions.append("Transitioning to daytime")
                     predictions.append("F2 layer becoming active")
             
-            # Combine predictions
+            # Create structured prediction data
+            prediction_data = {
+                'summary': " - ".join(predictions[:2]),  # First 2 predictions as summary
+                'details': predictions[2:],  # Remaining predictions as details
+                'confidence_level': "High" if confidence >= 0.8 else "Medium" if confidence >= 0.6 else "Low",
+                'confidence_score': confidence,
+                'key_predictions': [
+                    predictions[0] if predictions else "No predictions available",
+                    predictions[1] if len(predictions) > 1 else "",
+                    predictions[2] if len(predictions) > 2 else ""
+                ],
+                'timeframe': "6-12 hours",
+                'trend_direction': "Improving" if any("improving" in p.lower() for p in predictions) else "Declining" if any("worsen" in p.lower() or "decline" in p.lower() for p in predictions) else "Stable"
+            }
+            
+            # Return formatted string for backward compatibility
             prediction_text = " - ".join(predictions)
             confidence_level = "High" if confidence >= 0.8 else "Medium" if confidence >= 0.6 else "Low"
             

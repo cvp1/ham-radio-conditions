@@ -373,6 +373,31 @@
             return '';
         }
 
+        // Helper: Format outlook text for better readability
+        function formatOutlookText(text) {
+            if (!text) return 'N/A';
+            
+            // Split by common separators and format
+            const parts = text.split(' - ').filter(part => part.trim());
+            
+            if (parts.length === 0) return 'N/A';
+            
+            // If it's a single long sentence, try to break it up
+            if (parts.length === 1 && parts[0].length > 100) {
+                const sentences = parts[0].split('. ').filter(s => s.trim());
+                return sentences.map(sentence => sentence.trim()).join('. ');
+            }
+            
+            return parts.join('. ');
+        }
+
+        // Helper: Get confidence color class
+        function getConfidenceColorClass(confidence) {
+            if (confidence >= 0.8) return 'text-green-400';
+            if (confidence >= 0.6) return 'text-yellow-400';
+            return 'text-red-400';
+        }
+
         // UI update functions
         function updateTimestampAndLocation(data) {
             if (timestampEl) timestampEl.textContent = `Last Updated: ${data.timestamp}`;
@@ -712,21 +737,93 @@
 
                     <!-- Next Hours Outlook -->
                     <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400">Next Hours Outlook</div>
-                        <div class="text-lg mt-2">${summary.summary?.next_hours_outlook || 'N/A'}</div>
+                        <div class="text-gray-400 mb-3">Next Hours Outlook</div>
+                        
+                        <!-- Main Outlook -->
+                        ${summary.summary?.next_hours_outlook ? `
+                            <div class="mb-4">
+                                <div class="text-sm text-gray-400 mb-2">Primary Outlook</div>
+                                <div class="text-lg leading-relaxed">${formatOutlookText(summary.summary.next_hours_outlook)}</div>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- Key Outlook Points -->
+                        ${summary.summary?.next_hours_outlook ? `
+                            <div class="mb-4">
+                                <div class="text-sm text-gray-400 mb-2">Key Points</div>
+                                <div class="space-y-2">
+                                    ${(() => {
+                                        const outlook = summary.summary.next_hours_outlook;
+                                        const parts = outlook.split(' - ').filter(part => part.trim());
+                                        return parts.slice(0, 3).map(part => 
+                                            `<div class="flex items-start">
+                                                <span class="text-blue-400 mr-2">•</span>
+                                                <span class="text-sm">${part.trim()}</span>
+                                            </div>`
+                                        ).join('');
+                                    })()}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- Enhanced Prediction -->
                         ${summary.summary?.enhanced_prediction ? `
-                            <div class="text-sm text-blue-300 mt-2">
-                                <strong>Enhanced Prediction:</strong> ${summary.summary.enhanced_prediction}
+                            <div class="mb-4 p-3 bg-blue-900/30 rounded-lg border-l-4 border-blue-500">
+                                <div class="text-sm text-blue-300 font-semibold mb-1">Enhanced Prediction</div>
+                                <div class="text-sm leading-relaxed">${formatOutlookText(summary.summary.enhanced_prediction)}</div>
                             </div>
                         ` : ''}
-                        ${summary.summary?.prediction_accuracy ? `
-                            <div class="text-sm text-green-300 mt-1">
-                                <strong>Prediction Accuracy:</strong> ${(summary.summary.prediction_accuracy * 100).toFixed(0)}%
-                            </div>
-                        ` : ''}
-                        ${summary.propagation_parameters?.overall_confidence ? `
-                            <div class="text-sm text-purple-300 mt-1">
-                                <strong>Overall Confidence:</strong> ${(summary.propagation_parameters.overall_confidence * 100).toFixed(0)}%
+                        
+                        <!-- Confidence Metrics -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                            ${summary.summary?.prediction_accuracy ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-xs text-gray-400 mb-1">Prediction Accuracy</div>
+                                    <div class="text-lg font-semibold text-green-400">${(summary.summary.prediction_accuracy * 100).toFixed(0)}%</div>
+                                </div>
+                            ` : ''}
+                            ${summary.propagation_parameters?.overall_confidence ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-xs text-gray-400 mb-1">Overall Confidence</div>
+                                    <div class="text-lg font-semibold text-purple-400">${(summary.propagation_parameters.overall_confidence * 100).toFixed(0)}%</div>
+                                </div>
+                            ` : ''}
+                            ${summary.summary?.confidence_metrics?.overall ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-xs text-gray-400 mb-1">Model Confidence</div>
+                                    <div class="text-lg font-semibold text-blue-400">${(summary.summary.confidence_metrics.overall * 100).toFixed(0)}%</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Confidence Level Indicator -->
+                        ${summary.summary?.prediction_accuracy || summary.propagation_parameters?.overall_confidence ? `
+                            <div class="mt-3">
+                                <div class="text-xs text-gray-400 mb-1">Confidence Level</div>
+                                <div class="flex items-center">
+                                    ${(() => {
+                                        const accuracy = summary.summary?.prediction_accuracy || 0;
+                                        const confidence = summary.propagation_parameters?.overall_confidence || 0;
+                                        const avgConfidence = (accuracy + confidence) / 2;
+                                        
+                                        if (avgConfidence >= 0.8) {
+                                            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300">
+                                                <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                                                High Confidence
+                                            </span>`;
+                                        } else if (avgConfidence >= 0.6) {
+                                            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-900 text-yellow-300">
+                                                <span class="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
+                                                Medium Confidence
+                                            </span>`;
+                                        } else {
+                                            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-300">
+                                                <span class="w-2 h-2 bg-red-400 rounded-full mr-2"></span>
+                                                Low Confidence
+                                            </span>`;
+                                        }
+                                    })()}
+                                </div>
                             </div>
                         ` : ''}
                     </div>
