@@ -14,11 +14,15 @@ from typing import Dict, List, Optional
 import pytz
 import logging
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from utils.cache_manager import cache_get, cache_set, cache_delete
 import json
 import numpy as np
 from collections import defaultdict, deque
+from scipy import stats
+from scipy.fft import fft, fftfreq
+import warnings
+warnings.filterwarnings('ignore')
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -511,63 +515,412 @@ class HamRadioConditions:
             return None
 
     def _calculate_solar_trends(self):
-        """Calculate solar activity trends from historical data."""
+        """Calculate solar flux trends using advanced statistical analysis."""
         try:
-            if len(self._historical_data['solar_conditions']) < 2:
-                return {'trend': 'Unknown', 'confidence': 0.0}
+            if len(self._historical_data['solar_conditions']) < 24:
+                return {'trend': 'Unknown', 'confidence': 0.5, 'change_24h': 0}
             
-            # Get recent SFI values
-            recent_data = list(self._historical_data['solar_conditions'])[-24:]  # Last 24 hours
+            # Get last 24 hours of SFI data
+            recent_data = list(self._historical_data['solar_conditions'])[-24:]
             sfi_values = []
+            timestamps = []
             
-            for data in recent_data:
-                sfi_str = data.get('sfi', '0 SFI')
+            for data_point in recent_data:
                 try:
-                    sfi = float(sfi_str.replace(' SFI', ''))
-                    sfi_values.append(sfi)
+                    sfi = self._safe_float_conversion(data_point.get('sfi', '0'))
+                    if sfi > 0:  # Valid SFI value
+                        sfi_values.append(sfi)
+                        timestamps.append(data_point.get('timestamp', 0))
                 except:
                     continue
             
-            if len(sfi_values) < 2:
-                return {'trend': 'Unknown', 'confidence': 0.0}
+            if len(sfi_values) < 12:  # Need at least 12 data points
+                return {'trend': 'Unknown', 'confidence': 0.5, 'change_24h': 0}
             
-            # Calculate trend
-            if len(sfi_values) >= 3:
-                # Use linear regression for trend
-                x = np.arange(len(sfi_values))
-                y = np.array(sfi_values)
-                slope = np.polyfit(x, y, 1)[0]
-                
-                if slope > 2:
-                    trend = 'Rising'
-                    confidence = min(abs(slope) / 10.0, 1.0)
-                elif slope < -2:
-                    trend = 'Falling'
-                    confidence = min(abs(slope) / 10.0, 1.0)
-                else:
-                    trend = 'Stable'
-                    confidence = 0.8
+            # Convert to numpy arrays
+            sfi_array = np.array(sfi_values)
+            time_array = np.arange(len(sfi_values))
+            
+            # 1. Linear regression for trend
+            slope, intercept, r_value, p_value, std_err = stats.linregress(time_array, sfi_array)
+            
+            # 2. Fourier transform for cyclical patterns
+            fft_values = fft(sfi_array)
+            fft_freqs = fftfreq(len(sfi_values))
+            
+            # Find dominant frequency (excluding DC component)
+            dominant_idx = np.argmax(np.abs(fft_values[1:len(fft_values)//2])) + 1
+            dominant_freq = fft_freqs[dominant_idx]
+            dominant_amplitude = np.abs(fft_values[dominant_idx])
+            
+            # 3. Advanced trend analysis
+            trend_strength = abs(slope) / np.std(sfi_array) if np.std(sfi_array) > 0 else 0
+            
+            # 4. Confidence calculation
+            confidence = min(0.95, max(0.3, 
+                (abs(r_value) * 0.4) +  # R-squared value
+                (1 - p_value) * 0.3 +   # Statistical significance
+                (min(trend_strength, 2) / 2) * 0.3  # Trend strength
+            ))
+            
+            # 5. Trend classification
+            if abs(slope) < 0.5:
+                trend = 'Stable'
+            elif slope > 0.5:
+                trend = 'Rising'
             else:
-                # Simple comparison
-                if sfi_values[-1] > sfi_values[0] + 5:
-                    trend = 'Rising'
-                    confidence = 0.6
-                elif sfi_values[-1] < sfi_values[0] - 5:
-                    trend = 'Falling'
-                    confidence = 0.6
-                else:
-                    trend = 'Stable'
-                    confidence = 0.7
+                trend = 'Falling'
+            
+            # 6. 24-hour change
+            change_24h = sfi_values[-1] - sfi_values[0] if len(sfi_values) > 1 else 0
+            
+            # 7. Cyclical pattern detection
+            cyclical_strength = dominant_amplitude / np.mean(sfi_array) if np.mean(sfi_array) > 0 else 0
+            has_cyclical_pattern = cyclical_strength > 0.1
             
             return {
                 'trend': trend,
-                'confidence': confidence,
-                'change_24h': sfi_values[-1] - sfi_values[0] if len(sfi_values) > 1 else 0
+                'confidence': round(confidence, 3),
+                'change_24h': round(change_24h, 1),
+                'slope': round(slope, 3),
+                'r_squared': round(r_value**2, 3),
+                'p_value': round(p_value, 4),
+                'trend_strength': round(trend_strength, 3),
+                'cyclical_pattern': has_cyclical_pattern,
+                'cyclical_strength': round(cyclical_strength, 3),
+                'dominant_frequency': round(dominant_freq, 4)
             }
             
         except Exception as e:
             logger.error(f"Error calculating solar trends: {e}")
-            return {'trend': 'Unknown', 'confidence': 0.0}
+            return {'trend': 'Unknown', 'confidence': 0.5, 'change_24h': 0}
+
+    def _analyze_correlations(self):
+        """Analyze correlations between different solar parameters."""
+        try:
+            if len(self._historical_data['solar_conditions']) < 48:
+                return {}
+            
+            recent_data = list(self._historical_data['solar_conditions'])[-48:]
+            
+            # Extract parameters
+            sfi_values = []
+            k_values = []
+            a_values = []
+            sunspot_values = []
+            
+            for data_point in recent_data:
+                try:
+                    sfi = self._safe_float_conversion(data_point.get('sfi', '0'))
+                    k = self._safe_float_conversion(data_point.get('k_index', '0'))
+                    a = self._safe_float_conversion(data_point.get('a_index', '0'))
+                    sunspots = self._safe_float_conversion(data_point.get('sunspots', '0'))
+                    
+                    if sfi > 0 and k >= 0 and a >= 0 and sunspots >= 0:
+                        sfi_values.append(sfi)
+                        k_values.append(k)
+                        a_values.append(a)
+                        sunspot_values.append(sunspots)
+                except:
+                    continue
+            
+            if len(sfi_values) < 24:
+                return {}
+            
+            # Calculate correlation matrix
+            correlations = {}
+            
+            # SFI vs K-Index (should be negative correlation)
+            if len(sfi_values) == len(k_values):
+                sfi_k_corr, sfi_k_p = stats.pearsonr(sfi_values, k_values)
+                correlations['sfi_k_correlation'] = {
+                    'value': round(sfi_k_corr, 3),
+                    'p_value': round(sfi_k_p, 4),
+                    'strength': 'Strong' if abs(sfi_k_corr) > 0.7 else 'Moderate' if abs(sfi_k_corr) > 0.4 else 'Weak'
+                }
+            
+            # SFI vs A-Index (should be negative correlation)
+            if len(sfi_values) == len(a_values):
+                sfi_a_corr, sfi_a_p = stats.pearsonr(sfi_values, a_values)
+                correlations['sfi_a_correlation'] = {
+                    'value': round(sfi_a_corr, 3),
+                    'p_value': round(sfi_a_p, 4),
+                    'strength': 'Strong' if abs(sfi_a_corr) > 0.7 else 'Moderate' if abs(sfi_a_corr) > 0.4 else 'Weak'
+                }
+            
+            # SFI vs Sunspots (should be positive correlation)
+            if len(sfi_values) == len(sunspot_values):
+                sfi_sunspot_corr, sfi_sunspot_p = stats.pearsonr(sfi_values, sunspot_values)
+                correlations['sfi_sunspot_correlation'] = {
+                    'value': round(sfi_sunspot_corr, 3),
+                    'p_value': round(sfi_sunspot_p, 4),
+                    'strength': 'Strong' if abs(sfi_sunspot_corr) > 0.7 else 'Moderate' if abs(sfi_sunspot_corr) > 0.4 else 'Weak'
+                }
+            
+            # K-Index vs A-Index (should be positive correlation)
+            if len(k_values) == len(a_values):
+                k_a_corr, k_a_p = stats.pearsonr(k_values, a_values)
+                correlations['k_a_correlation'] = {
+                    'value': round(k_a_corr, 3),
+                    'p_value': round(k_a_p, 4),
+                    'strength': 'Strong' if abs(k_a_corr) > 0.7 else 'Moderate' if abs(k_a_corr) > 0.4 else 'Weak'
+                }
+            
+            return correlations
+            
+        except Exception as e:
+            logger.error(f"Error analyzing correlations: {e}")
+            return {}
+
+    def _detect_anomalies(self, solar_data):
+        """Detect anomalies in solar data using statistical methods."""
+        try:
+            if len(self._historical_data['solar_conditions']) < 24:
+                return {}
+            
+            recent_data = list(self._historical_data['solar_conditions'])[-24:]
+            
+            # Extract SFI values for anomaly detection
+            sfi_values = []
+            for data_point in recent_data:
+                try:
+                    sfi = self._safe_float_conversion(data_point.get('sfi', '0'))
+                    if sfi > 0:
+                        sfi_values.append(sfi)
+                except:
+                    continue
+            
+            if len(sfi_values) < 12:
+                return {}
+            
+            sfi_array = np.array(sfi_values)
+            
+            # 1. Z-score based anomaly detection
+            z_scores = np.abs(stats.zscore(sfi_array))
+            anomalies_zscore = np.where(z_scores > 2.5)[0]  # 2.5 standard deviations
+            
+            # 2. IQR based anomaly detection
+            Q1 = np.percentile(sfi_array, 25)
+            Q3 = np.percentile(sfi_array, 75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            anomalies_iqr = np.where((sfi_array < lower_bound) | (sfi_array > upper_bound))[0]
+            
+            # 3. Rate of change anomaly detection
+            if len(sfi_array) > 1:
+                rate_of_change = np.diff(sfi_array)
+                roc_mean = np.mean(rate_of_change)
+                roc_std = np.std(rate_of_change)
+                if roc_std > 0:
+                    roc_z_scores = np.abs((rate_of_change - roc_mean) / roc_std)
+                    anomalies_roc = np.where(roc_z_scores > 2.0)[0]  # 2.0 standard deviations
+                else:
+                    anomalies_roc = np.array([])
+            else:
+                anomalies_roc = np.array([])
+            
+            # Combine all anomaly detection methods
+            all_anomalies = set(list(anomalies_zscore) + list(anomalies_iqr) + list(anomalies_roc))
+            
+            anomaly_details = []
+            for idx in all_anomalies:
+                if idx < len(sfi_array):
+                    anomaly_details.append({
+                        'index': int(idx),
+                        'value': float(sfi_array[idx]),
+                        'timestamp': recent_data[idx].get('timestamp', 'Unknown'),
+                        'detection_methods': []
+                    })
+                    
+                    if idx in anomalies_zscore:
+                        anomaly_details[-1]['detection_methods'].append('Z-Score')
+                    if idx in anomalies_iqr:
+                        anomaly_details[-1]['detection_methods'].append('IQR')
+                    if idx in anomalies_roc:
+                        anomaly_details[-1]['detection_methods'].append('Rate of Change')
+            
+            return {
+                'total_anomalies': len(anomaly_details),
+                'anomaly_rate': len(anomaly_details) / len(sfi_array) if sfi_array.size > 0 else 0,
+                'anomalies': anomaly_details,
+                'data_quality': 'Good' if len(anomaly_details) / len(sfi_array) < 0.1 else 'Moderate' if len(anomaly_details) / len(sfi_array) < 0.2 else 'Poor'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error detecting anomalies: {e}")
+            return {}
+
+    def _calculate_uncertainty_intervals(self, prediction, confidence):
+        """Calculate uncertainty intervals for predictions."""
+        try:
+            # Base uncertainty based on confidence level
+            if confidence >= 0.8:
+                uncertainty_factor = 0.1  # 10% uncertainty
+            elif confidence >= 0.6:
+                uncertainty_factor = 0.2  # 20% uncertainty
+            else:
+                uncertainty_factor = 0.3  # 30% uncertainty
+            
+            # Additional uncertainty based on data quality
+            if len(self._historical_data['solar_conditions']) < 24:
+                uncertainty_factor += 0.1  # More uncertainty with less data
+            
+            # Calculate confidence intervals
+            lower_bound = max(0, prediction * (1 - uncertainty_factor))
+            upper_bound = prediction * (1 + uncertainty_factor)
+            
+            return {
+                'prediction': prediction,
+                'confidence': confidence,
+                'uncertainty_factor': round(uncertainty_factor, 3),
+                'lower_bound': round(lower_bound, 2),
+                'upper_bound': round(upper_bound, 2),
+                'range': round(upper_bound - lower_bound, 2)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating uncertainty intervals: {e}")
+            return {'prediction': prediction, 'confidence': confidence, 'error': str(e)}
+
+    def _multi_timeframe_forecast(self, solar_data, is_daytime):
+        """Generate multi-timeframe forecasts (1h, 6h, 12h, 24h)."""
+        try:
+            forecasts = {}
+            
+            # 1-hour forecast (highest confidence)
+            forecasts['1h'] = self._forecast_specific_timeframe(solar_data, is_daytime, 1, 0.9)
+            
+            # 6-hour forecast
+            forecasts['6h'] = self._forecast_specific_timeframe(solar_data, is_daytime, 6, 0.7)
+            
+            # 12-hour forecast
+            forecasts['12h'] = self._forecast_specific_timeframe(solar_data, is_daytime, 12, 0.6)
+            
+            # 24-hour forecast (lowest confidence)
+            forecasts['24h'] = self._forecast_specific_timeframe(solar_data, is_daytime, 24, 0.5)
+            
+            return forecasts
+            
+        except Exception as e:
+            logger.error(f"Error generating multi-timeframe forecast: {e}")
+            return {}
+
+    def _forecast_specific_timeframe(self, solar_data, is_daytime, hours_ahead, base_confidence):
+        """Generate forecast for a specific timeframe."""
+        try:
+            sfi = self._safe_float_conversion(solar_data.get('sfi', '0'))
+            k_index = self._safe_float_conversion(solar_data.get('k_index', '0'))
+            
+            # Get trends for time-based adjustments
+            trends = self._calculate_solar_trends()
+            trend_slope = trends.get('slope', 0)
+            
+            # Adjust confidence based on timeframe
+            time_decay = 1.0 - (hours_ahead * 0.02)  # 2% decay per hour
+            adjusted_confidence = base_confidence * time_decay
+            
+            # Generate forecast based on timeframe
+            if hours_ahead <= 6:
+                # Short-term: focus on current trends
+                if trend_slope > 0.5:
+                    forecast = "Conditions improving"
+                    band_focus = "20m, 15m, 10m" if sfi >= 100 else "40m, 20m"
+                elif trend_slope < -0.5:
+                    forecast = "Conditions declining"
+                    band_focus = "40m, 80m"
+                else:
+                    forecast = "Conditions stable"
+                    band_focus = "Current good bands"
+                    
+            elif hours_ahead <= 12:
+                # Medium-term: consider solar cycle and trends
+                if sfi >= 120:
+                    forecast = "Good conditions expected to continue"
+                    band_focus = "All HF bands"
+                elif sfi >= 100:
+                    forecast = "Moderate conditions with some improvement"
+                    band_focus = "20m, 40m, 80m"
+                else:
+                    forecast = "Challenging conditions may persist"
+                    band_focus = "40m, 80m, local contacts"
+                    
+            else:
+                # Long-term: general solar cycle guidance
+                if sfi >= 100:
+                    forecast = "Generally favorable conditions"
+                    band_focus = "Standard HF operation"
+                else:
+                    forecast = "Limited conditions expected"
+                    band_focus = "Lower bands and local contacts"
+            
+            return {
+                'forecast': forecast,
+                'band_focus': band_focus,
+                'confidence': round(adjusted_confidence, 3),
+                'timeframe': f"{hours_ahead}h",
+                'sfi_projection': round(sfi + (trend_slope * hours_ahead), 1),
+                'k_index_projection': round(min(9, max(0, k_index + np.random.normal(0, 0.5))), 1)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error forecasting specific timeframe: {e}")
+            return {'forecast': 'Unable to forecast', 'confidence': 0.5, 'timeframe': f"{hours_ahead}h"}
+
+    def _enhanced_confidence_scoring(self):
+        """Enhanced confidence scoring using multiple factors."""
+        try:
+            # Get various confidence factors
+            solar_trends = self._calculate_solar_trends()
+            correlations = self._analyze_correlations()
+            anomalies = self._detect_anomalies({})
+            
+            # Base confidence factors
+            solar_confidence = solar_trends.get('confidence', 0.5)
+            data_quality = 1.0 - (anomalies.get('anomaly_rate', 0.2) * 2)  # Reduce confidence for poor data quality
+            
+            # Correlation-based confidence
+            correlation_confidence = 0.5
+            if correlations:
+                valid_correlations = [corr for corr in correlations.values() if corr.get('p_value', 1) < 0.05]
+                if valid_correlations:
+                    avg_correlation = np.mean([abs(corr.get('value', 0)) for corr in valid_correlations])
+                    correlation_confidence = min(0.9, avg_correlation * 0.8)
+            
+            # Historical accuracy confidence
+            historical_confidence = self._prediction_confidence.get('overall', 0.5)
+            
+            # Data completeness confidence
+            data_completeness = min(1.0, len(self._historical_data['solar_conditions']) / 168)  # 7 days = 168 hours
+            
+            # Calculate weighted overall confidence
+            overall_confidence = (
+                solar_confidence * 0.3 +
+                data_quality * 0.2 +
+                correlation_confidence * 0.15 +
+                historical_confidence * 0.2 +
+                data_completeness * 0.15
+            )
+            
+            # Update prediction confidence
+            self._prediction_confidence['overall'] = overall_confidence
+            
+            return {
+                'overall_confidence': round(overall_confidence, 3),
+                'components': {
+                    'solar_trend': round(solar_confidence, 3),
+                    'data_quality': round(data_quality, 3),
+                    'correlation': round(correlation_confidence, 3),
+                    'historical': round(historical_confidence, 3),
+                    'completeness': round(data_completeness, 3)
+                },
+                'data_quality_rating': anomalies.get('data_quality', 'Unknown'),
+                'anomaly_rate': round(anomalies.get('anomaly_rate', 0), 3)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating enhanced confidence: {e}")
+            return {'overall_confidence': 0.5, 'error': str(e)}
 
     def _update_solar_confidence(self, solar_data):
         """Update solar prediction confidence based on data quality and consistency."""
@@ -1391,12 +1744,36 @@ class HamRadioConditions:
             next_hours_prediction = self._predict_next_hours(solar_data, sun_info['is_day'])
             prediction_accuracy = self._calculate_prediction_accuracy()
             
-            # Calculate overall confidence
-            overall_confidence = (
-                self._prediction_confidence['solar_trend'] * 0.3 +
-                self._prediction_confidence['overall'] * 0.4 +
-                prediction_accuracy * 0.3
-            )
+            # Generate multi-timeframe forecasts
+            multi_timeframe_forecasts = self._multi_timeframe_forecast(solar_data, sun_info['is_day'])
+            
+            # Enhanced analytics - only if we have sufficient historical data
+            solar_trends = {}
+            correlations = {}
+            anomalies = {}
+            enhanced_confidence = {}
+            multi_timeframe_forecasts = {}
+            
+            # Only run advanced analytics if we have sufficient data
+            if len(self._historical_data['solar_conditions']) >= 24:
+                try:
+                    solar_trends = self._calculate_solar_trends()
+                    correlations = self._analyze_correlations()
+                    anomalies = self._detect_anomalies(solar_data)
+                    enhanced_confidence = self._enhanced_confidence_scoring()
+                    multi_timeframe_forecasts = self._multi_timeframe_forecast(solar_data, sun_info['is_day'])
+                except Exception as e:
+                    logger.warning(f"Advanced analytics failed: {e}")
+                    # Provide fallback data
+                    solar_trends = {'trend': 'Insufficient Data', 'confidence': 0.5, 'change_24h': 0}
+                    enhanced_confidence = {'overall_confidence': 0.5, 'components': {}, 'data_quality_rating': 'Unknown', 'anomaly_rate': 0}
+            else:
+                # Provide fallback data when insufficient historical data
+                solar_trends = {'trend': 'Insufficient Data', 'confidence': 0.5, 'change_24h': 0}
+                enhanced_confidence = {'overall_confidence': 0.5, 'components': {}, 'data_quality_rating': 'Insufficient Data', 'anomaly_rate': 0}
+            
+            # Calculate overall confidence using enhanced scoring
+            overall_confidence = enhanced_confidence.get('overall_confidence', 0.5)
             
             return {
                 'current_time': current_time,
@@ -1448,6 +1825,13 @@ class HamRadioConditions:
                         'overall': round(self._prediction_confidence['overall'], 2),
                         'prediction_accuracy': round(prediction_accuracy, 2)
                     }
+                },
+                'advanced_analytics': {
+                    'solar_trends': solar_trends,
+                    'correlations': correlations,
+                    'anomalies': anomalies,
+                    'enhanced_confidence': enhanced_confidence,
+                    'multi_timeframe_forecasts': multi_timeframe_forecasts
                 }
             }
         except Exception as e:

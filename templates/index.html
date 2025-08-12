@@ -1134,6 +1134,125 @@
                             </div>
                         </div>
                     ` : ''}
+                    
+                    <!-- Advanced Analytics -->
+                    ${summary.advanced_analytics ? `
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <div class="text-gray-400 mb-3">Advanced Analytics</div>
+                            
+                            <!-- Data Availability Notice -->
+                            ${summary.advanced_analytics.solar_trends?.trend === 'Insufficient Data' ? `
+                                <div class="mb-4 p-3 bg-yellow-900/30 rounded-lg border-l-4 border-yellow-500">
+                                    <div class="text-sm text-yellow-300 font-semibold mb-1">⚠️ Insufficient Historical Data</div>
+                                    <div class="text-sm text-gray-300">Advanced analytics require at least 24 hours of historical data. Currently collecting data for enhanced analysis.</div>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Multi-Timeframe Forecasts -->
+                            ${summary.advanced_analytics.multi_timeframe_forecasts && Object.keys(summary.advanced_analytics.multi_timeframe_forecasts).length > 0 ? `
+                                <div class="mb-4">
+                                    <div class="text-sm text-gray-400 mb-2">Multi-Timeframe Forecasts</div>
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        ${Object.entries(summary.advanced_analytics.multi_timeframe_forecasts).map(([timeframe, forecast]) => `
+                                            <div class="bg-gray-700 p-3 rounded-lg">
+                                                <div class="text-xs text-gray-400 mb-1">${forecast.timeframe || 'N/A'}</div>
+                                                <div class="text-sm font-semibold text-blue-300 mb-1">${forecast.forecast || 'N/A'}</div>
+                                                <div class="text-xs text-gray-300">${forecast.band_focus || 'N/A'}</div>
+                                                <div class="text-xs text-yellow-300">Confidence: ${forecast.confidence ? (forecast.confidence * 100).toFixed(0) : 'N/A'}%</div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Enhanced Confidence Analysis -->
+                            ${summary.advanced_analytics.enhanced_confidence && Object.keys(summary.advanced_analytics.enhanced_confidence.components || {}).length > 0 ? `
+                                <div class="mb-4">
+                                    <div class="text-sm text-gray-400 mb-2">Enhanced Confidence Analysis</div>
+                                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        ${Object.entries(summary.advanced_analytics.enhanced_confidence.components || {}).map(([component, value]) => `
+                                            <div class="bg-gray-700 p-2 rounded-lg text-center">
+                                                <div class="text-xs text-gray-400 mb-1">${component.replace('_', ' ').toUpperCase()}</div>
+                                                <div class="text-sm font-semibold ${value >= 0.8 ? 'text-green-400' : value >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
+                                                    ${(value * 100).toFixed(0)}%
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <div class="mt-2 text-xs text-gray-400">
+                                        Data Quality: ${summary.advanced_analytics.enhanced_confidence.data_quality_rating || 'Unknown'} | 
+                                        Anomaly Rate: ${summary.advanced_analytics.enhanced_confidence.anomaly_rate ? (summary.advanced_analytics.enhanced_confidence.anomaly_rate * 100).toFixed(1) : 'N/A'}%
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Solar Trends Analysis -->
+                            ${summary.advanced_analytics.solar_trends && summary.advanced_analytics.solar_trends.trend && summary.advanced_analytics.solar_trends.trend !== 'Insufficient Data' ? `
+                                <div class="mb-4">
+                                    <div class="text-sm text-gray-400 mb-2">Solar Trends Analysis</div>
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">Trend</div>
+                                            <div class="text-sm font-semibold text-blue-300">${summary.advanced_analytics.solar_trends.trend || 'N/A'}</div>
+                                            <div class="text-xs text-yellow-300">Slope: ${summary.advanced_analytics.solar_trends.slope || 'N/A'}</div>
+                                        </div>
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">Confidence</div>
+                                            <div class="text-sm font-semibold ${summary.advanced_analytics.solar_trends.confidence >= 0.8 ? 'text-green-400' : summary.advanced_analytics.solar_trends.confidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
+                                                ${summary.advanced_analytics.solar_trends.confidence ? (summary.advanced_analytics.solar_trends.confidence * 100).toFixed(0) : 'N/A'}%
+                                            </div>
+                                            <div class="text-xs text-yellow-300">R²: ${summary.advanced_analytics.solar_trends.r_squared || 'N/A'}</div>
+                                        </div>
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">24h Change</div>
+                                            <div class="text-sm font-semibold ${summary.advanced_analytics.solar_trends.change_24h > 0 ? 'text-green-400' : summary.advanced_analytics.solar_trends.change_24h < 0 ? 'text-red-400' : 'text-yellow-400'}">
+                                                ${summary.advanced_analytics.solar_trends.change_24h > 0 ? '+' : ''}${summary.advanced_analytics.solar_trends.change_24h || 'N/A'}
+                                            </div>
+                                            <div class="text-xs text-yellow-300">Strength: ${summary.advanced_analytics.solar_trends.trend_strength || 'N/A'}</div>
+                                        </div>
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">Cyclical Pattern</div>
+                                            <div class="text-sm font-semibold ${summary.advanced_analytics.solar_trends.cyclical_pattern ? 'text-green-400' : 'text-yellow-400'}">
+                                                ${summary.advanced_analytics.solar_trends.cyclical_pattern ? 'Yes' : 'No'}
+                                            </div>
+                                            <div class="text-xs text-yellow-300">Strength: ${summary.advanced_analytics.solar_trends.cyclical_strength || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Data Quality & Anomalies -->
+                            ${summary.advanced_analytics.anomalies && summary.advanced_analytics.anomalies.total_anomalies !== undefined ? `
+                                <div class="mb-4">
+                                    <div class="text-sm text-gray-400 mb-2">Data Quality & Anomalies</div>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">Total Anomalies</div>
+                                            <div class="text-lg font-semibold ${summary.advanced_analytics.anomalies.total_anomalies === 0 ? 'text-green-400' : summary.advanced_analytics.anomalies.total_anomalies <= 2 ? 'text-yellow-400' : 'text-red-400'}">
+                                                ${summary.advanced_analytics.anomalies.total_anomalies}
+                                            </div>
+                                            <div class="text-xs text-gray-300">Rate: ${summary.advanced_analytics.anomalies.anomaly_rate ? (summary.advanced_analytics.anomalies.anomaly_rate * 100).toFixed(1) : 'N/A'}%</div>
+                                        </div>
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">Data Quality</div>
+                                            <div class="text-sm font-semibold ${summary.advanced_analytics.anomalies.data_quality === 'Good' ? 'text-green-400' : summary.advanced_analytics.anomalies.data_quality === 'Moderate' ? 'text-yellow-400' : 'text-red-400'}">
+                                                ${summary.advanced_analytics.anomalies.data_quality || 'N/A'}
+                                            </div>
+                                        </div>
+                                        <div class="bg-gray-700 p-3 rounded-lg">
+                                            <div class="text-xs text-gray-400">Detection Methods</div>
+                                            <div class="text-xs text-gray-300">
+                                                ${summary.advanced_analytics.anomalies.anomalies && summary.advanced_analytics.anomalies.anomalies.length > 0 ? 
+                                                    summary.advanced_analytics.anomalies.anomalies.slice(0, 3).map(anomaly => 
+                                                        `${anomaly.detection_methods ? anomaly.detection_methods.join(', ') : 'Unknown'}`
+                                                    ).join(', ') : 'None'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
 
                     <!-- Current Band Conditions -->
                     <div class="mt-4">
