@@ -407,27 +407,7 @@
                         </div>
 
                         <!-- Solar Conditions -->
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-3">Solar Conditions</div>
-                            <div class="space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-300 font-body">SFI:</span>
-                                    <span class="font-heading text-white">{{ data.propagation_summary.solar_conditions.sfi }}</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-300 font-body">A-Index:</span>
-                                    <span class="font-heading text-white">{{ data.propagation_summary.solar_conditions.a_index }}</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-300 font-body">K-Index:</span>
-                                    <span class="font-heading text-white">{{ data.propagation_summary.solar_conditions.k_index }}</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-300 font-body">Aurora:</span>
-                                    <span class="font-heading text-white">{{ data.propagation_summary.solar_conditions.aurora }}</span>
-                                </div>
-                            </div>
-                        </div>
+
 
                         <!-- MUF and Best Bands -->
                         <div class="data-card">
@@ -885,6 +865,7 @@
                         <div class="data-card">
                             <div class="text-gray-400 font-body text-sm mb-2">MUF</div>
                             <div class="text-xl font-heading text-white mb-3">${summary.propagation_parameters?.muf || 'N/A'}</div>
+                            <div class="text-xs text-blue-300 mb-2">${summary.propagation_parameters?.muf_source || 'Traditional'} calculation</div>
                             <div class="text-gray-400 font-body text-sm mb-2">Quality</div>
                             <div class="text-lg font-heading ${getPropagationQualityClass(summary.propagation_parameters?.quality)} mb-2">
                                 ${summary.propagation_parameters?.quality || 'N/A'}
@@ -1277,6 +1258,114 @@
                         </div>
                     ` : ''}
                     
+                    <!-- Enhanced Data Sources -->
+                    ${summary.enhanced_data_sources ? `
+                        <div class="mb-4">
+                            <div class="text-sm text-gray-400 mb-2">Enhanced Data Sources</div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- NOAA SWPC Data -->
+                                ${summary.enhanced_data_sources.noaa_swpc && Object.keys(summary.enhanced_data_sources.noaa_swpc).length > 0 ? `
+                                    <div class="bg-gray-700 p-3 rounded-lg">
+                                        <div class="text-xs text-gray-400 mb-2">NOAA SWPC Data</div>
+                                        <div class="text-xs text-gray-300">
+                                            ${Object.keys(summary.enhanced_data_sources.noaa_swpc).map(source => 
+                                                `<div>• ${source.replace('_', ' ').toUpperCase()}</div>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- RBN Propagation Data -->
+                                ${summary.enhanced_data_sources.rbn_propagation && summary.enhanced_data_sources.rbn_propagation.total_spots ? `
+                                    <div class="bg-gray-700 p-3 rounded-lg">
+                                        <div class="text-xs text-gray-400 mb-2">RBN Propagation Data</div>
+                                        <div class="text-xs text-gray-300">
+                                            <div>• Total Spots: ${summary.enhanced_data_sources.rbn_propagation.total_spots}</div>
+                                            <div>• Active Bands: ${Object.keys(summary.enhanced_data_sources.rbn_propagation.band_activity || {}).join(', ')}</div>
+                                            <div>• Distance Range: ${Object.keys(summary.enhanced_data_sources.rbn_propagation.distance_distribution || {}).join(', ')}</div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Ionospheric Data -->
+                                ${summary.enhanced_data_sources.ionospheric && summary.enhanced_data_sources.ionospheric.f2_critical ? `
+                                    <div class="bg-gray-700 p-3 rounded-lg">
+                                        <div class="text-xs text-gray-400 mb-2">Ionospheric Data</div>
+                                        <div class="text-xs text-gray-300">
+                                            <div>• F2 Critical: ${summary.enhanced_data_sources.ionospheric.f2_critical} MHz</div>
+                                            <div>• Calculated MUF: ${summary.enhanced_data_sources.ionospheric.calculated_muf} MHz</div>
+                                            <div>• Adjusted MUF: ${summary.enhanced_data_sources.ionospheric.adjusted_muf} MHz</div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Solar Wind & Proton Flux -->
+                                ${summary.enhanced_data_sources.solar_wind_speed || summary.enhanced_data_sources.proton_flux ? `
+                                    <div class="bg-gray-700 p-3 rounded-lg">
+                                        <div class="text-xs text-gray-400 mb-2">Space Weather</div>
+                                        <div class="text-xs text-gray-300">
+                                            ${summary.enhanced_data_sources.solar_wind_speed ? `<div>• Solar Wind: ${summary.enhanced_data_sources.solar_wind_speed} km/s</div>` : ''}
+                                            ${summary.enhanced_data_sources.proton_flux ? `<div>• Proton Flux: ${summary.enhanced_data_sources.proton_flux}</div>` : ''}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Enhanced Accuracy Analysis -->
+                    ${summary.enhanced_accuracy ? `
+                        <div class="mb-4">
+                            <div class="text-sm text-gray-400 mb-2">Enhanced Accuracy Analysis</div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Overall Accuracy Score -->
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-xs text-gray-400 mb-2">Overall Accuracy Score</div>
+                                    <div class="text-2xl font-bold ${summary.enhanced_accuracy.accuracy_score >= 90 ? 'text-green-400' : summary.enhanced_accuracy.accuracy_score >= 75 ? 'text-blue-400' : summary.enhanced_accuracy.accuracy_score >= 60 ? 'text-yellow-400' : 'text-red-400'}">
+                                        ${summary.enhanced_accuracy.accuracy_score}/100
+                                    </div>
+                                    <div class="text-sm font-semibold text-gray-300">
+                                        ${summary.enhanced_accuracy.confidence_level} Confidence
+                                    </div>
+                                </div>
+                                
+                                <!-- Confidence Factors -->
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-xs text-gray-400 mb-2">Confidence Factors</div>
+                                    <div class="text-xs text-gray-300 space-y-1">
+                                        ${summary.enhanced_accuracy.confidence_factors.map(factor => 
+                                            `<div>• ${factor}</div>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                                
+                                <!-- Detailed Scores -->
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-xs text-gray-400 mb-2">Detailed Scores</div>
+                                    <div class="text-xs text-gray-300 space-y-1">
+                                        <div>• Data Sources: ${summary.enhanced_accuracy.data_source_score}/25</div>
+                                        <div>• Historical Data: ${summary.enhanced_accuracy.historical_score}/25</div>
+                                        <div>• Real-time Validation: ${summary.enhanced_accuracy.validation_score}/25</div>
+                                        <div>• Model Sophistication: ${summary.enhanced_accuracy.model_score}/25</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Additional Sources -->
+                                ${summary.enhanced_data_sources.additional_sources ? `
+                                    <div class="bg-gray-700 p-3 rounded-lg">
+                                        <div class="text-xs text-gray-400 mb-2">Additional Sources</div>
+                                        <div class="text-xs text-gray-300 space-y-1">
+                                            ${summary.enhanced_data_sources.additional_sources.psk_reporter ? 
+                                                `<div>• PSKReporter: ${summary.enhanced_data_sources.additional_sources.psk_reporter.total_reports} reports</div>` : ''}
+                                            ${summary.enhanced_data_sources.additional_sources.wspr_available ? 
+                                                `<div>• WSPRNet: Available</div>` : ''}
+                                            <div>• Propagation Models: ${Object.keys(summary.enhanced_data_sources.additional_sources.propagation_models || {}).filter(key => summary.enhanced_data_sources.additional_sources.propagation_models[key]).join(', ')}</div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
 
                 </div>
             ` : ''}

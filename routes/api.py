@@ -172,6 +172,22 @@ def mark_version_notified():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@api_bp.route('/debug/solar-conditions', methods=['GET'])
+def get_solar_conditions_debug():
+    """Get debug information about solar conditions and MUF calculations."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        debug_info = ham_conditions.get_current_solar_conditions_debug()
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting solar conditions debug: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @api_bp.route('/cache/stats', methods=['GET'])
 def get_cache_stats():
     """Get cache statistics."""
