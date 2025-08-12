@@ -36,6 +36,47 @@ load_dotenv()
 
 class HamRadioConditions:
     def __init__(self, zip_code=None):
+        # Version information
+        self.version = "2.1.0"
+        self.build_date = "2024-12-19"
+        self.changelog = {
+            "2.1.0": {
+                "date": "2024-12-19",
+                "features": [
+                    "Advanced analytics with Fourier transform analysis",
+                    "Multi-timeframe forecasting (1h, 6h, 12h, 24h)",
+                    "Enhanced confidence scoring with data quality metrics",
+                    "Anomaly detection using statistical methods",
+                    "Improved coordination between recommendations and outlook"
+                ],
+                "improvements": [
+                    "Better statistical analysis with scipy integration",
+                    "Enhanced trend detection and cyclical pattern recognition",
+                    "Data quality assessment and anomaly reporting",
+                    "Correlation analysis between solar parameters"
+                ]
+            },
+            "2.0.0": {
+                "date": "2024-12-18",
+                "features": [
+                    "Professional UI redesign",
+                    "Enhanced propagation predictions",
+                    "Improved operating recommendations",
+                    "Better outlook coordination"
+                ],
+                "improvements": [
+                    "Modern design system with CSS variables",
+                    "Enhanced confidence metrics",
+                    "Improved data visualization"
+                ]
+            }
+        }
+        
+        # Update notification settings
+        self.last_update_check = None
+        self.update_check_interval = 3600  # Check every hour
+        self.notified_versions = set()  # Track which versions user has been notified about
+        
         self.openweather_api_key = os.getenv('OPENWEATHER_API_KEY')
         self.callsign = os.getenv('CALLSIGN', 'N/A')
         self.temp_unit = os.getenv('TEMP_UNIT', 'F')
@@ -1832,7 +1873,9 @@ class HamRadioConditions:
                     'anomalies': anomalies,
                     'enhanced_confidence': enhanced_confidence,
                     'multi_timeframe_forecasts': multi_timeframe_forecasts
-                }
+                },
+                'version_info': self.get_version_info(),
+                'update_notification': self.get_update_notification_data()
             }
         except Exception as e:
             logger.error(f"Error generating propagation summary: {e}")
@@ -2913,6 +2956,136 @@ class HamRadioConditions:
         except Exception as e:
             logger.error(f"Error calculating prediction accuracy: {e}")
             return 0.7  # Default accuracy
+
+    def get_version_info(self):
+        """Get current version information."""
+        return {
+            'version': self.version,
+            'build_date': self.build_date,
+            'current_version': self.version,
+            'latest_version': self.version,  # For now, same as current
+            'update_available': False,
+            'last_check': self.last_update_check
+        }
+    
+    def check_for_updates(self, force_check=False):
+        """Check for available updates."""
+        try:
+            current_time = time.time()
+            
+            # Check if we should perform update check
+            if (not force_check and 
+                self.last_update_check and 
+                current_time - self.last_update_check < self.update_check_interval):
+                return self.get_version_info()
+            
+            # In a real implementation, this would check against a remote API
+            # For now, we'll simulate update checking
+            self.last_update_check = current_time
+            
+            # Simulate checking for updates (replace with actual API call)
+            available_updates = self._simulate_update_check()
+            
+            return {
+                'version': self.version,
+                'build_date': self.build_date,
+                'current_version': self.version,
+                'latest_version': available_updates.get('latest_version', self.version),
+                'update_available': available_updates.get('update_available', False),
+                'last_check': self.last_update_check,
+                'update_info': available_updates.get('update_info', {}),
+                'changelog': self._get_relevant_changelog(available_updates.get('latest_version', self.version))
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking for updates: {e}")
+            return self.get_version_info()
+    
+    def _simulate_update_check(self):
+        """Simulate checking for updates (replace with actual API call)."""
+        # This is a placeholder for actual update checking logic
+        # In production, this would call a remote API or check a repository
+        
+        # Simulate different scenarios for testing
+        import random
+        scenario = random.choice(['no_update', 'minor_update', 'major_update'])
+        
+        if scenario == 'no_update':
+            return {
+                'update_available': False,
+                'latest_version': self.version,
+                'update_info': {}
+            }
+        elif scenario == 'minor_update':
+            # Simulate minor version update
+            latest_version = f"{self.version.split('.')[0]}.{int(self.version.split('.')[1]) + 1}.0"
+            return {
+                'update_available': True,
+                'latest_version': latest_version,
+                'update_info': {
+                    'type': 'minor',
+                    'priority': 'medium',
+                    'description': 'Minor update with bug fixes and improvements',
+                    'recommended': True
+                }
+            }
+        else:
+            # Simulate major version update
+            latest_version = f"{int(self.version.split('.')[0]) + 1}.0.0"
+            return {
+                'update_available': True,
+                'latest_version': latest_version,
+                'update_info': {
+                    'type': 'major',
+                    'priority': 'high',
+                    'description': 'Major update with new features and improvements',
+                    'recommended': True
+                }
+            }
+    
+    def _get_relevant_changelog(self, target_version):
+        """Get changelog for a specific version."""
+        if target_version in self.changelog:
+            return self.changelog[target_version]
+        return None
+    
+    def get_full_changelog(self):
+        """Get complete changelog."""
+        return self.changelog
+    
+    def mark_version_notified(self, version):
+        """Mark a version as notified to the user."""
+        self.notified_versions.add(version)
+    
+    def should_show_update_notification(self, version):
+        """Check if we should show update notification for a version."""
+        return version not in self.notified_versions
+    
+    def get_update_notification_data(self):
+        """Get data for update notifications."""
+        update_info = self.check_for_updates()
+        
+        if not update_info.get('update_available'):
+            return None
+        
+        latest_version = update_info.get('latest_version')
+        changelog = update_info.get('changelog')
+        
+        # Check if we should notify about this version
+        if not self.should_show_update_notification(latest_version):
+            return None
+        
+        return {
+            'current_version': update_info.get('current_version'),
+            'latest_version': latest_version,
+            'update_type': update_info.get('update_info', {}).get('type', 'unknown'),
+            'priority': update_info.get('update_info', {}).get('priority', 'medium'),
+            'description': update_info.get('update_info', {}).get('description', 'Update available'),
+            'recommended': update_info.get('update_info', {}).get('recommended', False),
+            'changelog': changelog,
+            'build_date': update_info.get('build_date'),
+            'notification_id': f"update_{latest_version}"
+        }
 
 
 def main():

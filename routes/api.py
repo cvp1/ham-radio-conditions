@@ -4,7 +4,7 @@ Provides RESTful endpoints for conditions, spots, and weather data.
 """
 
 import logging
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify, current_app, request
 from utils.cache_manager import cache_get, cache_set
 
 api_bp = Blueprint('api', __name__)
@@ -98,6 +98,77 @@ def get_weather():
             
     except Exception as e:
         logger.error(f"Error getting weather: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/version', methods=['GET'])
+def get_version():
+    """Get current version information."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        version_info = ham_conditions.get_version_info()
+        return jsonify(version_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting version info: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/version/check', methods=['GET'])
+def check_for_updates():
+    """Check for available updates."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        force_check = request.args.get('force', 'false').lower() == 'true'
+        update_info = ham_conditions.check_for_updates(force_check=force_check)
+        return jsonify(update_info)
+        
+    except Exception as e:
+        logger.error(f"Error checking for updates: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/version/changelog', methods=['GET'])
+def get_changelog():
+    """Get complete changelog."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        changelog = ham_conditions.get_full_changelog()
+        return jsonify(changelog)
+        
+    except Exception as e:
+        logger.error(f"Error getting changelog: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/version/notify', methods=['POST'])
+def mark_version_notified():
+    """Mark a version as notified to the user."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        data = request.get_json()
+        version = data.get('version')
+        
+        if not version:
+            return jsonify({'error': 'Version parameter required'}), 400
+        
+        ham_conditions.mark_version_notified(version)
+        return jsonify({'success': True, 'message': f'Version {version} marked as notified'})
+        
+    except Exception as e:
+        logger.error(f"Error marking version as notified: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
