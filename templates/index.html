@@ -966,6 +966,54 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Coordination Summary -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-gray-400 mb-3">Recommendations & Outlook Coordination</div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-sm text-gray-400 mb-2">Current Strategy</div>
+                                <div class="text-sm text-blue-300">
+                                    ${(() => {
+                                        const recommendations = summary.recommendations || [];
+                                        const outlook = summary.summary?.next_hours_outlook || '';
+                                        
+                                        if (recommendations.length === 0) return 'No recommendations available';
+                                        
+                                        // Find the highest priority recommendation
+                                        const highPriority = recommendations.find(rec => 
+                                            rec.includes('(High)') || rec.includes('SEVERE') || rec.includes('Strong')
+                                        );
+                                        
+                                        if (highPriority) {
+                                            return highPriority.replace(' (High)', '').replace(' (Medium)', '').replace(' (Low)', '');
+                                        }
+                                        
+                                        return recommendations[0].replace(' (High)', '').replace(' (Medium)', '').replace(' (Low)', '');
+                                    })()}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-400 mb-2">Outlook Alignment</div>
+                                <div class="text-sm text-green-300">
+                                    ${(() => {
+                                        const outlook = summary.summary?.next_hours_outlook || '';
+                                        const prediction = summary.summary?.enhanced_prediction || '';
+                                        
+                                        if (outlook.includes('improving') || prediction.includes('improving')) {
+                                            return '✓ Conditions improving - Recommendations align with positive outlook';
+                                        } else if (outlook.includes('worsen') || prediction.includes('worsen')) {
+                                            return '⚠ Conditions may worsen - Recommendations focus on current good bands';
+                                        } else if (outlook.includes('stable') || prediction.includes('stable')) {
+                                            return '→ Conditions stable - Recommendations maintain current strategy';
+                                        }
+                                        
+                                        return 'Recommendations based on current conditions';
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Next Hours Outlook -->
                     <div class="bg-gray-800 p-4 rounded-lg">

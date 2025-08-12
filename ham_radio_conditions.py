@@ -1344,7 +1344,27 @@ class HamRadioConditions:
                 elif trend == 'Falling' and confidence > 0.6:
                     add_recommendation("Solar activity declining - Conditions may worsen, focus on lower bands", 6, confidence)
             
-            # 13. Skip distance recommendations
+            # 13. Outlook-coordinated recommendations (NEW)
+            # Get the outlook first to coordinate recommendations
+            hours_outlook = self._get_hours_outlook(solar_data, sun_info['is_day'])
+            next_hours_prediction = self._predict_next_hours(solar_data, sun_info['is_day'])
+            
+            # Add outlook-based recommendations
+            if hours_outlook and 'Improving' in hours_outlook:
+                add_recommendation("Conditions expected to improve - Prepare for higher band openings", 6, 0.75)
+            elif hours_outlook and 'worsen' in hours_outlook.lower():
+                add_recommendation("Conditions may worsen - Focus on current good bands", 7, 0.70)
+            
+            # Add prediction-based recommendations
+            if next_hours_prediction:
+                if 'improving' in next_hours_prediction.lower():
+                    add_recommendation("6-12 hour forecast: Conditions improving - Monitor 20m, 15m, 10m", 5, 0.70)
+                elif 'worsen' in next_hours_prediction.lower():
+                    add_recommendation("6-12 hour forecast: Conditions may decline - Focus on 40m, 80m", 6, 0.70)
+                elif 'stable' in next_hours_prediction.lower():
+                    add_recommendation("6-12 hour forecast: Conditions stable - Continue current operating strategy", 4, 0.75)
+            
+            # 14. Skip distance recommendations
             if skip_distances:
                 best_skip = max(skip_distances.items(), key=lambda x: x[1])
                 add_recommendation(f"Optimal skip distance on {best_skip[0]}: {best_skip[1]} km", 4, 0.70)
@@ -1792,6 +1812,33 @@ class HamRadioConditions:
                         outlook_components.append("Solar activity declining")
                         outlook_components.append("Conditions may worsen")
                     confidence_factors.append(0.75)
+            
+            # 7. Recommendation-coordinated outlook (NEW)
+            # Add outlook components that align with operating recommendations
+            if sfi >= 120 and k_index <= 2:
+                outlook_components.append("Excellent conditions for DX operation")
+                outlook_components.append("All HF bands should be productive")
+                confidence_factors.append(0.85)
+            elif sfi >= 100 and k_index <= 3:
+                outlook_components.append("Good conditions for regional and DX contacts")
+                outlook_components.append("Focus on 20m, 40m for best results")
+                confidence_factors.append(0.80)
+            elif sfi < 80 or k_index >= 4:
+                outlook_components.append("Challenging conditions for HF operation")
+                outlook_components.append("Focus on local contacts and lower bands")
+                confidence_factors.append(0.75)
+            
+            # 8. Time-based outlook coordination
+            if is_daytime:
+                if sfi >= 100:
+                    outlook_components.append("Daytime F2 layer active - Optimal for 20m, 15m, 10m")
+                else:
+                    outlook_components.append("Daytime with limited solar flux - Focus on 40m and lower")
+            else:
+                if sfi >= 80:
+                    outlook_components.append("Nighttime D layer absent - Good for 80m, 40m DX")
+                else:
+                    outlook_components.append("Nighttime with low solar flux - Focus on 80m and local")
             
             # Calculate overall confidence
             if confidence_factors:
@@ -2392,6 +2439,18 @@ class HamRadioConditions:
                 else:
                     predictions.append("Transitioning to daytime")
                     predictions.append("F2 layer becoming active")
+            
+            # 9. Recommendation-coordinated predictions (NEW)
+            # Add predictions that align with operating recommendations
+            if sfi >= 120 and k_index <= 2:
+                predictions.append("Excellent propagation conditions expected to continue")
+                predictions.append("Ideal for DX and long-distance contacts")
+            elif sfi >= 100 and k_index <= 3:
+                predictions.append("Good conditions likely to persist")
+                predictions.append("Continue focus on 20m, 40m for DX")
+            elif sfi < 80 or k_index >= 4:
+                predictions.append("Challenging conditions may continue")
+                predictions.append("Maintain focus on local contacts and lower bands")
             
             # Create structured prediction data
             prediction_data = {
