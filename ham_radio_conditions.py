@@ -1390,8 +1390,8 @@ class HamRadioConditions:
         # Ensure zone is between 1 and 40
         return max(1, min(base_zone, 40))
 
-    def _determine_best_bands(self, solar_data, is_daytime):
-        """Enhanced band determination with historical analysis and confidence scoring."""
+    def _determine_best_bands(self, solar_data, is_daytime, sun_info=None, weather_data=None):
+        """Enhanced band determination with time-of-day and weather integration."""
         try:
             sfi = self._safe_float_conversion(solar_data.get('sfi', '0'))
             k_index = self._safe_float_conversion(solar_data.get('k_index', '0'))
@@ -1399,6 +1399,16 @@ class HamRadioConditions:
             # Get HamQSL band conditions for validation
             hamqsl_bands = self.get_band_conditions()
             band_conditions = self._convert_hamqsl_to_individual_bands(hamqsl_bands)
+            
+            # Enhanced time-of-day analysis
+            time_factors = {}
+            if sun_info:
+                time_factors = self._calculate_enhanced_time_of_day(sun_info)
+            
+            # Enhanced weather impact analysis
+            weather_impact = {}
+            if weather_data:
+                weather_impact = self._calculate_weather_impact_on_propagation(weather_data)
             
             # Enhanced band scoring system
             band_scores = {}
@@ -1494,11 +1504,34 @@ class HamRadioConditions:
                         else:
                             score += 0
                 
-                # Time of day adjustments
+                # Enhanced time-of-day adjustments
                 if is_daytime:
                     score *= (1 - band_info['day_penalty'])
                 else:
                     score *= (1 + band_info['night_bonus'])
+                
+                # Time-of-day optimization bonus (NEW!)
+                if time_factors and 'band_optimization' in time_factors:
+                    band_opt = time_factors['band_optimization']
+                    if band_name in band_opt.get('optimal', []):
+                        score *= 1.4  # 40% bonus for optimal time
+                        logger.info(f"Time optimization bonus for {band_name}: {time_factors['period']}")
+                    elif band_name in band_opt.get('good', []):
+                        score *= 1.2  # 20% bonus for good time
+                    elif band_name in band_opt.get('poor', []):
+                        score *= 0.8  # 20% penalty for poor time
+                
+                # Weather impact adjustments (NEW!)
+                if weather_impact and 'band_adjustments' in weather_impact:
+                    weather_adj = weather_impact['band_adjustments'].get(band_name, 50)
+                    weather_multiplier = weather_adj / 50.0  # Normalize to 0.5-1.5 range
+                    score *= weather_multiplier
+                    
+                    # Log significant weather effects
+                    if weather_multiplier > 1.2:
+                        logger.info(f"Weather enhancement for {band_name}: {weather_impact['impact']}")
+                    elif weather_multiplier < 0.8:
+                        logger.info(f"Weather degradation for {band_name}: {weather_impact['impact']}")
                 
                 # Geomagnetic activity penalty
                 if k_index > 4:
@@ -1527,9 +1560,9 @@ class HamRadioConditions:
             logger.info(f"Band scores: {band_scores}")
             logger.info(f"Sorted bands: {sorted_bands}")
             
-            # Lower threshold temporarily to see what's happening
-            best_bands = [band for band, score in sorted_bands if score >= 20]  # Lowered from 50
-            logger.info(f"Best bands (score >= 20): {best_bands}")
+            # Use appropriate threshold for band selection with enhanced scoring
+            best_bands = [band for band, score in sorted_bands if score >= 3]  # Adjusted for enhanced scoring
+            logger.info(f"Best bands (score >= 3): {best_bands}")
             
             # Store historical data
             self._historical_data['band_conditions'].append({
@@ -2015,7 +2048,7 @@ class HamRadioConditions:
             iono_data['muf_validation'] = muf_validation
             
             try:
-                best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'])
+                best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'], sun_info, self.get_weather_conditions())
                 logger.info(f"Best bands determined: {best_bands}")
             except Exception as e:
                 logger.error(f"Error determining best bands: {e}")
@@ -2228,9 +2261,11 @@ class HamRadioConditions:
             # Store result in variable and convert NumPy types for JSON serialization
             result = {
                 'current_time': current_time,
-                'day_night': 'Day' if sun_info['is_day'] else 'Night',
-                'sunrise': sun_info['sunrise'],
-                'sunset': sun_info['sunset'],
+                            'day_night': 'Day' if sun_info['is_day'] else 'Night',
+            'sunrise': sun_info['sunrise'],
+            'sunset': sun_info['sunset'],
+            'enhanced_time_analysis': self._calculate_enhanced_time_of_day(sun_info),
+            'enhanced_weather_analysis': self._calculate_weather_impact_on_propagation(self.get_weather_conditions()),
                 'location': {
                     'grid': self.grid_square,
                     'latitude': round(self.lat, 2),
@@ -5820,6 +5855,221 @@ class HamRadioConditions:
         except Exception as e:
             logger.error(f"Error getting debug solar conditions: {e}")
             return {'error': str(e)}
+
+    def _calculate_enhanced_time_of_day(self, sun_info):
+        """Calculate enhanced time-of-day factors for band selection."""
+        try:
+            from datetime import datetime, timedelta
+            
+            now = datetime.now()
+            sunrise_str = sun_info.get('sunrise', '05:00 AM')
+            sunset_str = sun_info.get('sunset', '07:00 PM')
+            
+            # Parse sunrise/sunset times
+            try:
+                if 'AM' in sunrise_str:
+                    sunrise_hour = int(sunrise_str.split(':')[0])
+                else:
+                    sunrise_hour = int(sunrise_str.split(':')[0]) + 12
+                
+                if 'PM' in sunset_str:
+                    sunset_hour = int(sunset_str.split(':')[0]) + 12
+                else:
+                    sunset_hour = int(sunset_str.split(':')[0])
+            except:
+                sunrise_hour = 5
+                sunset_hour = 19
+            
+            current_hour = now.hour
+            is_day = sun_info.get('is_day', True)
+            
+            # Enhanced time-of-day analysis
+            time_factors = {
+                'period': 'unknown',
+                'description': '',
+                'band_optimization': {},
+                'weather_impact': 'normal',
+                'confidence': 0.8
+            }
+            
+            if is_day:
+                if current_hour < sunrise_hour + 2:  # Early morning (dawn)
+                    time_factors['period'] = 'dawn'
+                    time_factors['description'] = 'Dawn - D layer forming, E layer optimal'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['40m', '30m', '20m'],  # 40m shines here!
+                        'good': ['80m', '17m', '15m'],
+                        'poor': ['160m', '10m', '6m']
+                    }
+                    time_factors['weather_impact'] = 'morning_inversion'
+                elif current_hour < sunrise_hour + 4:  # Morning
+                    time_factors['period'] = 'morning'
+                    time_factors['description'] = 'Morning - F2 layer building, excellent HF conditions'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['20m', '15m', '17m'],
+                        'good': ['40m', '30m', '12m', '10m'],
+                        'poor': ['160m', '80m', '6m']
+                    }
+                    time_factors['weather_impact'] = 'morning_optimal'
+                elif current_hour < sunset_hour - 2:  # Afternoon
+                    time_factors['period'] = 'afternoon'
+                    time_factors['description'] = 'Afternoon - Peak F2 layer, best HF conditions'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['15m', '12m', '10m', '6m'],
+                        'good': ['20m', '17m', '30m'],
+                        'poor': ['40m', '80m', '160m']
+                    }
+                    time_factors['weather_impact'] = 'afternoon_peak'
+                else:  # Dusk
+                    time_factors['period'] = 'dusk'
+                    time_factors['description'] = 'Dusk - F2 layer declining, D layer forming'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['17m', '20m', '15m'],
+                        'good': ['30m', '40m', '12m'],
+                        'poor': ['10m', '6m', '80m', '160m']
+                    }
+                    time_factors['weather_impact'] = 'dusk_transition'
+            else:  # Night
+                if current_hour < sunrise_hour - 2:  # Late night
+                    time_factors['period'] = 'late_night'
+                    time_factors['description'] = 'Late night - D layer absent, E/F2 layers active'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['80m', '40m', '160m'],
+                        'good': ['30m', '20m'],
+                        'poor': ['15m', '12m', '10m', '6m']
+                    }
+                    time_factors['weather_impact'] = 'night_optimal'
+                else:  # Early night
+                    time_factors['period'] = 'early_night'
+                    time_factors['description'] = 'Early night - D layer fading, good lower bands'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['40m', '80m', '30m'],
+                        'good': ['20m', '160m', '17m'],
+                        'poor': ['15m', '12m', '10m', '6m']
+                    }
+                    time_factors['weather_impact'] = 'night_transition'
+            
+            return time_factors
+            
+        except Exception as e:
+            logger.debug(f"Error calculating enhanced time-of-day: {e}")
+            return {
+                'period': 'unknown',
+                'description': 'Time calculation error',
+                'band_optimization': {},
+                'weather_impact': 'normal',
+                'confidence': 0.5
+            }
+
+    def _calculate_weather_impact_on_propagation(self, weather_data):
+        """Calculate how weather affects propagation for different bands."""
+        try:
+            if not weather_data:
+                return {'impact': 'unknown', 'band_adjustments': {}, 'confidence': 0.5}
+            
+            weather_impact = {
+                'impact': 'normal',
+                'band_adjustments': {},
+                'confidence': 0.8,
+                'tropospheric_score': 0,
+                'ionospheric_effects': 'none'
+            }
+            
+            # Extract weather parameters
+            temp_str = weather_data.get('temperature', '0°F')
+            humidity_str = weather_data.get('humidity', '0%')
+            pressure_str = weather_data.get('pressure', '1013 hPa')
+            description = weather_data.get('description', '').lower()
+            
+            # Temperature effects
+            temp_val = 0
+            if '°F' in temp_str:
+                temp_val = float(temp_str.replace('°F', ''))
+            
+            # Humidity effects
+            hum_val = 0
+            if '%' in humidity_str:
+                hum_val = float(humidity_str.replace('%', ''))
+            
+            # Pressure effects
+            press_val = 1013
+            if 'hPa' in pressure_str:
+                try:
+                    press_val = float(pressure_str.replace(' hPa', ''))
+                except:
+                    pass
+            
+            # Calculate tropospheric score (0-100)
+            tropospheric_score = 50  # Base score
+            
+            # Temperature adjustments
+            if temp_val > 85:
+                tropospheric_score += 15  # High temp enhances ducting
+                weather_impact['ionospheric_effects'] = 'enhanced_ducting'
+            elif temp_val > 70:
+                tropospheric_score += 10  # Warm temp good for ducting
+            elif temp_val < 32:
+                tropospheric_score -= 10  # Cold temp reduces effects
+                weather_impact['ionospheric_effects'] = 'reduced_ducting'
+            
+            # Humidity adjustments
+            if hum_val > 80:
+                tropospheric_score += 15  # High humidity enhances VHF/UHF
+                weather_impact['ionospheric_effects'] = 'enhanced_vhf'
+            elif hum_val < 30:
+                tropospheric_score -= 10  # Low humidity reduces VHF/UHF
+                weather_impact['ionospheric_effects'] = 'reduced_vhf'
+            
+            # Pressure adjustments
+            if press_val > 1020:
+                tropospheric_score += 10  # High pressure stable conditions
+                weather_impact['ionospheric_effects'] = 'stable_tropo'
+            elif press_val < 1000:
+                tropospheric_score -= 15  # Low pressure unstable conditions
+                weather_impact['ionospheric_effects'] = 'unstable_tropo'
+            
+            # Weather description effects
+            if 'clear' in description or 'sunny' in description:
+                tropospheric_score += 5
+            elif 'cloudy' in description or 'overcast' in description:
+                tropospheric_score += 10  # Clouds can enhance ducting
+            elif 'rain' in description or 'storm' in description:
+                tropospheric_score -= 20  # Rain/storm degrades propagation
+                weather_impact['ionospheric_effects'] = 'degraded_conditions'
+            
+            # Clamp score to 0-100
+            tropospheric_score = max(0, min(100, tropospheric_score))
+            weather_impact['tropospheric_score'] = tropospheric_score
+            
+            # Determine overall impact
+            if tropospheric_score >= 80:
+                weather_impact['impact'] = 'excellent'
+            elif tropospheric_score >= 60:
+                weather_impact['impact'] = 'good'
+            elif tropospheric_score >= 40:
+                weather_impact['impact'] = 'fair'
+            else:
+                weather_impact['impact'] = 'poor'
+            
+            # Calculate band-specific adjustments
+            weather_impact['band_adjustments'] = {
+                '6m': tropospheric_score * 0.8,      # VHF - most affected by weather
+                '10m': tropospheric_score * 0.6,     # Upper HF - moderately affected
+                '12m': tropospheric_score * 0.6,
+                '15m': tropospheric_score * 0.5,    # Mid HF - less affected
+                '17m': tropospheric_score * 0.5,
+                '20m': tropospheric_score * 0.4,
+                '30m': tropospheric_score * 0.3,    # Lower HF - minimal weather effect
+                '40m': tropospheric_score * 0.2,
+                '80m': tropospheric_score * 0.1,    # Lower bands - minimal weather effect
+                '160m': tropospheric_score * 0.1
+            }
+            
+            return weather_impact
+            
+        except Exception as e:
+            logger.debug(f"Error calculating weather impact: {e}")
+            return {'impact': 'unknown', 'band_adjustments': {}, 'confidence': 0.5}
 
 
 def main():
