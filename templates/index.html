@@ -337,6 +337,31 @@
                 padding: 1rem;
             }
         }
+
+        /* Priority indicators */
+        .priority-high {
+            border-left: 4px solid #EF4444;
+        }
+        
+        .priority-medium {
+            border-left: 4px solid #F59E0B;
+        }
+        
+        .priority-low {
+            border-left: 4px solid #10B981;
+        }
+
+        /* Current conditions highlight */
+        .current-conditions {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        /* Future predictions highlight */
+        .future-predictions {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -346,11 +371,12 @@
     </script>
 
     <div class="container mx-auto px-4 py-8">
-        <header class="text-center mb-12">
+        <!-- Header with Current Status -->
+        <header class="text-center mb-8">
             <div class="flex items-center justify-between mb-6">
-                <div></div> <!-- Empty div for spacing -->
-                <h1 class="text-5xl font-display text-white">Ham Radio Conditions</h1>
-                <div></div> <!-- Empty div for spacing -->
+                <div></div>
+                <h1 class="text-4xl font-display text-white">Ham Radio Conditions</h1>
+                <div></div>
             </div>
             <div class="space-y-2">
                 <p class="text-gray-300 font-body" id="timestamp"></p>
@@ -358,104 +384,126 @@
             </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Solar Conditions -->
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-heading mb-6 flex items-center">
-                    <i class="fas fa-sun mr-3 section-icon icon-solar text-2xl"></i>
-                    <span class="text-white">Solar Conditions</span>
-                </h2>
-                <div id="solar-conditions" class="space-y-3"></div>
-            </div>
+        <!-- Current Conditions Section -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-heading mb-4 flex items-center">
+                <i class="fas fa-satellite-dish mr-3 section-icon icon-propagation text-2xl"></i>
+                <span class="text-white">Current Conditions</span>
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Solar Conditions -->
+                <div class="card current-conditions rounded-lg p-4">
+                    <h3 class="text-lg font-heading mb-3 flex items-center">
+                        <i class="fas fa-sun mr-2 icon-solar"></i>
+                        <span>Solar</span>
+                    </h3>
+                    <div id="solar-conditions" class="space-y-2 text-sm"></div>
+                </div>
 
-            <!-- Weather Conditions -->
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-heading mb-6 flex items-center justify-between">
-                    <div class="flex items-center">
-                        <i class="fas fa-cloud-sun mr-3 section-icon icon-weather text-2xl"></i>
-                        <span class="text-white">Weather Conditions</span>
-                    </div>
-                </h2>
-                <div id="weather-conditions" class="space-y-3"></div>
-            </div>
+                <!-- MUF & Propagation -->
+                <div class="card current-conditions rounded-lg p-4">
+                    <h3 class="text-lg font-heading mb-3 flex items-center">
+                        <i class="fas fa-broadcast-tower mr-2 icon-propagation"></i>
+                        <span>Propagation</span>
+                    </h3>
+                    <div id="propagation-current" class="space-y-2 text-sm"></div>
+                </div>
 
-            <!-- DXCC Information -->
-            <div class="card rounded-lg p-6">
-                <h2 class="text-2xl font-heading mb-6 flex items-center">
-                    <i class="fas fa-globe-americas mr-3 section-icon icon-dxcc text-2xl"></i>
-                    <span class="text-white">DXCC Information</span>
-                </h2>
-                <div id="dxcc-conditions" class="space-y-4"></div>
-            </div>
+                <!-- Best Bands -->
+                <div class="card current-conditions rounded-lg p-4">
+                    <h3 class="text-lg font-heading mb-3 flex items-center">
+                        <i class="fas fa-signal mr-2 icon-band"></i>
+                        <span>Best Bands</span>
+                    </h3>
+                    <div id="best-bands-current" class="space-y-2 text-sm"></div>
+                </div>
 
-            <!-- Propagation Summary -->
-            <div class="card rounded-lg p-6 col-span-1 md:col-span-2 lg:col-span-3">
-                <h2 class="text-2xl font-heading mb-6 flex items-center">
-                    <i class="fas fa-broadcast-tower mr-3 section-icon icon-propagation text-2xl"></i>
-                    <span class="text-white">Propagation Summary</span>
-                </h2>
-                <div id="propagation-summary" class="space-y-4">
-                    {% if data.propagation_summary %}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <!-- Time and Day/Night -->
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">Current Time</div>
-                            <div class="text-xl font-heading text-white mb-2">{{ data.propagation_summary.current_time }}</div>
-                            <div class="text-sm text-gray-300 font-body">{{ data.propagation_summary.day_night }}</div>
-                            <div class="text-sm text-gray-400 font-body">Sunrise: {{ data.propagation_summary.sunrise }}</div>
-                            <div class="text-sm text-gray-400 font-body">Sunset: {{ data.propagation_summary.sunset }}</div>
-                        </div>
-
-                        <!-- Solar Conditions -->
-
-
-                        <!-- MUF and Best Bands -->
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">MUF</div>
-                            <div class="text-xl font-heading text-white mb-3">{{ data.propagation_summary.muf }}</div>
-                            <div class="text-gray-400 font-body text-sm mb-2">Best Bands</div>
-                            <div class="text-lg font-heading text-blue-300">{{ data.propagation_summary.best_bands|join(', ') }}</div>
-                        </div>
-
-                        <!-- Propagation Quality -->
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">Overall Quality</div>
-                            <div class="text-xl font-heading {{ data.propagation_summary.propagation_quality|lower }}-quality mb-2">
-                                {{ data.propagation_summary.propagation_quality }}
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: {{ '100%' if data.propagation_summary.propagation_quality == 'Excellent' else '75%' if data.propagation_summary.propagation_quality == 'Good' else '50%' if data.propagation_summary.propagation_quality == 'Fair' else '25%' }}"></div>
-                            </div>
-                        </div>
-
-                        <!-- Aurora Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Aurora Conditions</div>
-                            <div class="text-lg">{{ data.propagation_summary.aurora_conditions }}</div>
-                        </div>
-
-                        <!-- Tropospheric Conditions -->
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Tropospheric Conditions</div>
-                            <div class="text-lg">{{ data.propagation_summary.tropo_conditions }}</div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <p class="text-gray-400">Propagation data not available</p>
-                    {% endif %}
+                <!-- Weather -->
+                <div class="card current-conditions rounded-lg p-4">
+                    <h3 class="text-lg font-heading mb-3 flex items-center">
+                        <i class="fas fa-cloud-sun mr-2 icon-weather"></i>
+                        <span>Weather</span>
+                    </h3>
+                    <div id="weather-conditions" class="space-y-2 text-sm"></div>
                 </div>
             </div>
+        </div>
 
-            <!-- Live Spots -->
-            <div class="card rounded-lg p-6 lg:col-span-2">
-                <h2 class="text-2xl font-heading mb-6 flex items-center">
-                    <i class="fas fa-broadcast-tower mr-3 section-icon icon-spots text-2xl"></i>
-                    <span class="text-white">Live Spots</span>
-                    <span id="spots-loading" class="loading-spinner ml-3"></span>
-                    <span id="spots-status" class="ml-2 text-sm text-gray-400"></span>
-                </h2>
+        <!-- Future Predictions & Analysis Section -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-heading mb-4 flex items-center">
+                <i class="fas fa-chart-line mr-3 section-icon icon-propagation text-2xl"></i>
+                <span class="text-white">Propagation Analysis & Forecast</span>
+            </h2>
+            
+            <div class="space-y-6">
+                <!-- Executive Summary -->
+                <div class="card future-predictions rounded-lg p-6">
+                    <h3 class="text-xl font-heading mb-4 flex items-center">
+                        <i class="fas fa-clipboard-list mr-3 text-blue-400"></i>
+                        <span>Executive Summary</span>
+                    </h3>
+                    <div id="executive-summary" class="space-y-3">
+                        <div class="text-gray-300 text-sm">Loading summary...</div>
+                    </div>
+                </div>
+                
+                <!-- Solar Cycle Analysis -->
+                <div class="card future-predictions rounded-lg p-6">
+                    <h3 class="text-xl font-heading mb-4 flex items-center">
+                        <i class="fas fa-chart-area mr-3 text-purple-400"></i>
+                        <span>Solar Cycle Analysis</span>
+                    </h3>
+                    <div id="solar-cycle-info" class="space-y-3"></div>
+                </div>
+                
+                <!-- Operating Strategy -->
+                <div class="card future-predictions rounded-lg p-6">
+                    <h3 class="text-xl font-heading mb-4 flex items-center">
+                        <i class="fas fa-lightbulb mr-3 text-yellow-400"></i>
+                        <span>Operating Strategy & Recommendations</span>
+                    </h3>
+                    <div id="recommendations" class="space-y-3"></div>
+                </div>
+                
+                <!-- Risk Assessment -->
+                <div class="card future-predictions rounded-lg p-6">
+                    <h3 class="text-xl font-heading mb-4 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-3 text-orange-400"></i>
+                        <span>Risk Assessment & Warnings</span>
+                    </h3>
+                    <div id="risk-assessment" class="space-y-3">
+                        <div class="text-gray-300 text-sm">Analyzing conditions...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Band Conditions -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-heading mb-4 flex items-center">
+                <i class="fas fa-signal mr-3 section-icon icon-band text-2xl"></i>
+                <span class="text-white">Band-by-Band Conditions</span>
+            </h2>
+            
+            <div class="card rounded-lg p-6">
+                <div id="band-conditions-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- Live Activity -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-heading mb-4 flex items-center">
+                <i class="fas fa-broadcast-tower mr-3 section-icon icon-spots text-2xl"></i>
+                <span class="text-white">Live Activity</span>
+                <span id="spots-loading" class="loading-spinner ml-3" style="display: none;"></span>
+                <span id="spots-status" class="ml-2 text-sm text-gray-400">Ready</span>
+            </h2>
+            
+            <div class="card rounded-lg p-6">
                 <div id="live-activity">
-                    <div id="activity-summary" class="mb-4">
+                    <div id="activity-summary" class="mb-6">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="data-card">
                                 <div class="text-gray-400 font-body text-sm mb-2">Total Spots</div>
@@ -475,8 +523,7 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Active DXCC Info (new section) -->
-                    <div id="active-dxcc-info" class="mb-4"></div>
+                    
                     <div class="overflow-x-auto">
                         <table class="table-professional min-w-full">
                             <thead>
@@ -501,32 +548,9 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Cache Management Dashboard -->
-            <div class="card rounded-lg p-6 col-span-1 md:col-span-2 lg:col-span-3">
-                <h2 class="text-2xl font-heading mb-6 flex items-center justify-between">
-                    <div class="flex items-center">
-                        <i class="fas fa-database mr-3 section-icon icon-dxcc text-2xl"></i>
-                        <span class="text-white">Cache Management</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <button onclick="getCacheStats().then(stats => displayCacheStats(stats))" 
-                                class="btn-primary text-sm">
-                            <i class="fas fa-chart-bar mr-2"></i>Stats
-                        </button>
-                        <button onclick="clearAppCache()" 
-                                class="btn-secondary text-sm">
-                            <i class="fas fa-trash mr-2"></i>Clear All
-                        </button>
-                    </div>
-                </h2>
-                <div id="cache-stats" class="space-y-4" style="display:none">
-                    <div class="text-gray-400 text-sm">Click "Stats" to view cache information</div>
-                </div>
-            </div>
         </div>
         
-        <!-- Footer with Version Info -->
+        <!-- Footer -->
         <footer class="mt-16 pt-8 border-t border-gray-800">
             <div class="container mx-auto px-4">
                 <div class="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
@@ -560,10 +584,12 @@
         const timestampEl = document.getElementById('timestamp');
         const locationEl = document.getElementById('location');
         const solarDiv = document.getElementById('solar-conditions');
+        const propagationCurrentDiv = document.getElementById('propagation-current');
+        const bestBandsCurrentDiv = document.getElementById('best-bands-current');
         const bandDiv = document.getElementById('band-conditions-grid');
         const weatherDiv = document.getElementById('weather-conditions');
-        const propagationDiv = document.getElementById('propagation-summary');
-        const dxccDiv = document.getElementById('dxcc-conditions');
+        const recommendationsDiv = document.getElementById('recommendations');
+        const solarCycleDiv = document.getElementById('solar-cycle-info');
         const activityDiv = document.getElementById('live-activity');
         const summaryDiv = document.getElementById('activity-summary');
         const tableBody = document.getElementById('spots-table-body');
@@ -576,17 +602,14 @@
         // Helper: Format value
         function formatValue(key, value) {
             if (key === 'sfi') {
-                // Remove existing SFI suffix if present and return clean value
                 const cleanValue = value.toString().replace(' SFI', '');
                 return cleanValue;
             }
             if (key === 'a_index') {
-                // Remove existing A-Index prefix if present and return clean value
                 const cleanValue = value.toString().replace('A-Index: ', '');
                 return cleanValue;
             }
             if (key === 'k_index') {
-                // Remove existing K-Index prefix if present and return clean value
                 const cleanValue = value.toString().replace('K-Index: ', '');
                 return cleanValue;
             }
@@ -614,36 +637,17 @@
             return '';
         }
 
-        // Helper: Format outlook text for better readability
-        function formatOutlookText(text) {
-            if (!text) return 'N/A';
-            
-            // Split by common separators and format
-            const parts = text.split(' - ').filter(part => part.trim());
-            
-            if (parts.length === 0) return 'N/A';
-            
-            // If it's a single long sentence, try to break it up
-            if (parts.length === 1 && parts[0].length > 100) {
-                const sentences = parts[0].split('. ').filter(s => s.trim());
-                return sentences.map(sentence => sentence.trim()).join('. ');
-            }
-            
-            return parts.join('. ');
-        }
-
-        // Helper: Get confidence color class
-        function getConfidenceColorClass(confidence) {
-            if (confidence >= 0.8) return 'text-green-400';
-            if (confidence >= 0.6) return 'text-yellow-400';
-            return 'text-red-400';
+        // Helper: Get priority class
+        function getPriorityClass(priority) {
+            if (priority >= 8) return 'priority-high';
+            if (priority >= 5) return 'priority-medium';
+            return 'priority-low';
         }
 
         // UI update functions
         function updateTimestampAndLocation(data) {
             if (timestampEl) timestampEl.textContent = `Last Updated: ${data.timestamp}`;
             if (locationEl) {
-                // Use location name from propagation summary if available, otherwise fall back to the raw location
                 const locationName = data.propagation_summary?.location?.location_name || data.location;
                 locationEl.textContent = `Location: ${locationName}`;
             }
@@ -652,7 +656,6 @@
         function updateSolarConditions(data) {
             if (!solarDiv) return;
             
-            // Define the fields we want to display
             const displayFields = ['sfi', 'a_index', 'k_index', 'aurora', 'sunspots', 'xray'];
             
             safeSetHTML(solarDiv, displayFields
@@ -671,12 +674,58 @@
                 }).join(''));
         }
 
+        function updatePropagationCurrent(data) {
+            if (!propagationCurrentDiv || !data.propagation_summary) return;
+            
+            const summary = data.propagation_summary;
+            const params = summary.propagation_parameters || {};
+            
+            safeSetHTML(propagationCurrentDiv, `
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">MUF:</span>
+                        <span class="font-semibold text-lg">${params.muf || 'N/A'} MHz</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Quality:</span>
+                        <span class="font-semibold ${getPropagationQualityClass(params.quality)}">${params.quality || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Day/Night:</span>
+                        <span class="font-semibold">${summary.day_night || 'N/A'}</span>
+                    </div>
+                </div>
+            `);
+        }
+
+        function updateBestBandsCurrent(data) {
+            if (!bestBandsCurrentDiv || !data.propagation_summary) return;
+            
+            const summary = data.propagation_summary;
+            const params = summary.propagation_parameters || {};
+            const bestBands = params.best_bands || [];
+            
+            safeSetHTML(bestBandsCurrentDiv, `
+                <div class="space-y-2">
+                    <div class="text-gray-400 text-sm">Top Bands:</div>
+                    <div class="font-semibold text-blue-300">${bestBands.slice(0, 3).join(', ') || 'N/A'}</div>
+                    <div class="text-gray-400 text-sm">MUF Source:</div>
+                    <div class="text-xs text-gray-300">${params.muf_source || 'Traditional'}</div>
+                    <div class="text-gray-400 text-sm">Skip Distances:</div>
+                    <div class="text-xs space-y-1">
+                        ${Object.entries(params.skip_distances || {}).slice(0, 3).map(([band, dist]) => 
+                            `<div class="flex justify-between">
+                                <span class="text-blue-300">${band}:</span>
+                                <span class="font-mono">${dist}</span>
+                            </div>`
+                        ).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
         function updateBandConditions(data) {
-            // Find the band conditions grid within the propagation summary
-            const bandDiv = document.getElementById('band-conditions-grid');
-            if (!bandDiv) {
-                return;
-            }
+            if (!bandDiv) return;
             
             if (!data.propagation_summary || !data.propagation_summary.band_conditions) {
                 safeSetHTML(bandDiv, '<p class="text-gray-400">Band conditions not available</p>');
@@ -684,26 +733,19 @@
             }
             
             const bandConditions = data.propagation_summary.band_conditions;
-            
-            // Sort bands by frequency (6m to 160m)
-            // Use a predefined order to ensure correct sorting
             const bandOrder = ['6m', '10m', '12m', '15m', '17m', '20m', '30m', '40m', '80m', '160m'];
             
             const sortedBands = Object.entries(bandConditions).sort(([bandA], [bandB]) => {
                 const normalizedA = bandA.toLowerCase().trim();
                 const normalizedB = bandB.toLowerCase().trim();
                 
-                // Helper function to find band index with multiple matching strategies
                 function findBandIndex(bandName) {
-                    // Try exact match first
                     let index = bandOrder.findIndex(band => bandName === band.toLowerCase());
                     if (index !== -1) return index;
                     
-                    // Try without 'm' suffix
                     index = bandOrder.findIndex(band => bandName === band.replace('m', '').toLowerCase());
                     if (index !== -1) return index;
                     
-                    // Try with just the number
                     const numberMatch = bandName.match(/^(\d+)/);
                     if (numberMatch) {
                         const number = numberMatch[1];
@@ -711,41 +753,34 @@
                         if (index !== -1) return index;
                     }
                     
-                    // Try partial match (e.g., "160" matches "160m")
                     index = bandOrder.findIndex(band => band.toLowerCase().includes(bandName) || bandName.includes(band.toLowerCase()));
                     if (index !== -1) return index;
                     
                     return -1;
                 }
                 
-                // Find indices in the predefined order
                 const indexA = findBandIndex(normalizedA);
                 const indexB = findBandIndex(normalizedB);
                 
-                // If both bands are found in the order, sort by their position
                 if (indexA !== -1 && indexB !== -1) {
                     return indexA - indexB;
                 }
                 
-                // If only one is found, prioritize the one in the order
                 if (indexA !== -1) return -1;
                 if (indexB !== -1) return 1;
                 
-                // If neither is found, sort alphabetically
                 return normalizedA.localeCompare(normalizedB);
             });
             
-            // Generate HTML for sorted bands
             const bandHtml = sortedBands.map(([bandName, conditions]) => {
                 const dayClass = `${(conditions.day_rating || '').toLowerCase()}-condition`;
                 const nightClass = `${(conditions.night_rating || '').toLowerCase()}-condition`;
                 
-                // Get color for inline style
                 const getColor = (rating) => {
                     if (rating === 'Good') return '#10B981';
                     if (rating === 'Fair') return '#F59E0B';
                     if (rating === 'Poor') return '#EF4444';
-                    return '#6B7280'; // gray for N/A
+                    return '#6B7280';
                 };
                 
                 const dayColor = getColor(conditions.day_rating);
@@ -753,14 +788,14 @@
                 
                 return `
                 <div class="bg-gray-800 p-3 rounded-lg">
-                    <div class="text-gray-400">${bandName}</div>
-                    <div class="grid grid-cols-2 gap-2 mt-1">
+                    <div class="text-gray-400 font-semibold">${bandName}</div>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
                         <div>
-                            <span class="text-sm text-gray-400">Day:</span>
+                            <span class="text-xs text-gray-400">Day:</span>
                             <span class="ml-1 ${dayClass}" style="color: ${dayColor} !important; font-weight: 600;">${conditions.day_rating || 'N/A'}</span>
                         </div>
                         <div>
-                            <span class="text-sm text-gray-400">Night:</span>
+                            <span class="text-xs text-gray-400">Night:</span>
                             <span class="ml-1 ${nightClass}" style="color: ${nightColor} !important; font-weight: 600;">${conditions.night_rating || 'N/A'}</span>
                         </div>
                     </div>
@@ -775,1395 +810,706 @@
             if (data.weather_conditions) {
                 const w = data.weather_conditions;
                 safeSetHTML(weatherDiv, `
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-400">CALLSIGN</span>
-                        <span class="font-semibold">${data.callsign || 'N/A'}</span>
-                    </div>
-                    ${w.city && w.state ? `
+                    <div class="space-y-2">
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-400">LOCATION</span>
-                            <span class="font-semibold">${w.city}, ${w.state}</span>
+                            <span class="text-gray-400">Location:</span>
+                            <span class="font-semibold">${w.city && w.state ? `${w.city}, ${w.state}` : 'N/A'}</span>
                         </div>
-                    ` : ''}
-                    ${Object.entries(w)
-                        .filter(([key]) => !['source', 'city', 'state'].includes(key))
-                        .map(([key, value]) => `
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                                <span class="font-semibold">${value}</span>
-                            </div>
-                        `).join('')}
-                    <div class="flex justify-between items-center text-sm text-gray-400">
-                        <span>Source:</span>
-                        <span>${w.source}</span>
+                        ${Object.entries(w)
+                            .filter(([key]) => !['source', 'city', 'state'].includes(key))
+                            .map(([key, value]) => `
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
+                                    <span class="font-semibold">${value}</span>
+                                </div>
+                            `).join('')}
                     </div>
                 `);
             } else {
-                safeSetHTML(weatherDiv, `
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-400">CALLSIGN</span>
-                        <span class="font-semibold">${data.callsign || 'N/A'}</span>
-                    </div>
-                    <p class="text-gray-400">Weather data not available</p>
-                `);
+                safeSetHTML(weatherDiv, '<p class="text-gray-400">Weather data not available</p>');
             }
         }
 
-        function updatePropagationSummary(data) {
-            console.log('updatePropagationSummary: Called with data:', {
-                hasPropagationSummary: !!data.propagation_summary,
-                propagationDiv: !!propagationDiv
-            });
+        function updateRecommendations(data) {
+            if (!recommendationsDiv || !data.propagation_summary) return;
             
-            if (!propagationDiv) {
-                console.error('updatePropagationSummary: propagationDiv not found');
-                return;
-            }
-            if (!data.propagation_summary) {
-                console.warn('updatePropagationSummary: No propagation_summary in data');
-                safeSetHTML(propagationDiv, '<p class="text-gray-400">Propagation data not available</p>');
-                return;
-            }
             const summary = data.propagation_summary;
+            const params = summary.propagation_parameters || {};
+            const solarCycle = summary.solar_cycle || {};
+            const recommendations = summary.recommendations || [];
+            const bestBands = params.best_bands || [];
+            const muf = parseFloat(params.muf) || 0;
+            const quality = params.quality || 'Unknown';
+            const dayNight = summary.day_night || 'Unknown';
             
-            console.log('updatePropagationSummary: Updating with summary:', {
-                current_time: summary.current_time,
-                recommendations_count: summary.recommendations?.length || 0,
-                has_solar_conditions: !!summary.solar_conditions,
-                has_aurora_conditions: !!summary.aurora_conditions
+            // Create a strategic operating plan
+            const strategy = createOperatingStrategy({
+                muf, quality, bestBands, dayNight, solarCycle, recommendations
             });
             
-            // Helper function to format aurora conditions
-            function formatAurora(aurora) {
-                if (typeof aurora === 'string') return aurora;
-                return `${aurora.activity} - ${aurora.impact}`;
+            safeSetHTML(recommendationsDiv, strategy);
+        }
+
+        function createOperatingStrategy(data) {
+            const { muf, quality, bestBands, dayNight, solarCycle, recommendations } = data;
+            
+            // Determine overall strategy based on conditions
+            let overallStrategy = '';
+            let strategyColor = '';
+            
+            if (quality === 'Excellent' || muf > 25) {
+                overallStrategy = 'AGGRESSIVE DX OPERATION';
+                strategyColor = 'text-green-400';
+            } else if (quality === 'Good' || muf > 15) {
+                overallStrategy = 'MODERATE DX OPERATION';
+                strategyColor = 'text-blue-400';
+            } else if (quality === 'Fair' || muf > 10) {
+                overallStrategy = 'CONSERVATIVE DX OPERATION';
+                strategyColor = 'text-yellow-400';
+            } else {
+                overallStrategy = 'LOCAL OPERATION FOCUS';
+                strategyColor = 'text-red-400';
             }
             
-            // Helper function to format tropo conditions
-            function formatTropo(tropo) {
-                if (typeof tropo === 'string') return tropo;
-                return `${tropo.condition} - ${tropo.impact}`;
-            }
-            
-            safeSetHTML(propagationDiv, `
+            return `
                 <div class="space-y-6">
-                    <!-- Main Propagation Overview -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">Current Time</div>
-                            <div class="text-xl font-heading text-white mb-2">${summary.current_time}</div>
-                            <div class="text-sm text-gray-300 font-body">${summary.day_night}</div>
-                            <div class="text-sm text-gray-400 font-body">Sunrise: ${summary.sunrise}</div>
-                            <div class="text-sm text-gray-400 font-body">Sunset: ${summary.sunset}</div>
-                        </div>
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">Location</div>
-                            <div class="text-lg font-heading text-white mb-1">${summary.location?.grid || 'N/A'}</div>
-                            <div class="text-sm text-gray-300 font-body">${summary.location?.location_name || summary.location?.latitude + '°N, ' + summary.location?.longitude + '°W'}</div>
-                            <div class="text-sm text-gray-400 font-body">${summary.location?.latitude}°N, ${summary.location?.longitude}°W</div>
-                        </div>
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">MUF</div>
-                            <div class="text-xl font-heading text-white mb-3">${summary.propagation_parameters?.muf || 'N/A'}</div>
-                            <div class="text-xs text-blue-300 mb-2">${summary.propagation_parameters?.muf_source || 'Traditional'} calculation</div>
-                            <div class="text-gray-400 font-body text-sm mb-2">Quality</div>
-                            <div class="text-lg font-heading ${getPropagationQualityClass(summary.propagation_parameters?.quality)} mb-2">
-                                ${summary.propagation_parameters?.quality || 'N/A'}
+                    <!-- Strategic Overview -->
+                    <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="text-sm text-gray-400 mb-2">STRATEGIC ANALYSIS</div>
+                        <div class="space-y-3">
+                            <div class="text-lg font-bold ${strategyColor} mb-2">${overallStrategy}</div>
+                            
+                            <!-- MUF Analysis -->
+                            <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="text-sm text-blue-300 font-semibold mb-1">MUF Analysis</div>
+                                <div class="text-xs text-gray-300">
+                                    Current MUF of ${muf} MHz indicates ${muf > 20 ? 'excellent' : muf > 15 ? 'good' : muf > 10 ? 'moderate' : 'poor'} ionospheric conditions. 
+                                    ${muf > 20 ? 'This high MUF allows operation on multiple bands with strong signal propagation and minimal absorption losses.' : 
+                                    muf > 15 ? 'This MUF supports reliable continental DX with good signal strength on mid-range bands.' : 
+                                    muf > 10 ? 'This moderate MUF limits DX range but provides stable regional communication.' : 
+                                    'This low MUF severely restricts long-distance communication, requiring focus on local and regional contacts.'}
+                                </div>
                             </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${summary.propagation_parameters?.quality === 'Excellent' ? '100%' : summary.propagation_parameters?.quality === 'Good' ? '75%' : summary.propagation_parameters?.quality === 'Fair' ? '50%' : '25%'}"></div>
+                            
+                            <!-- Propagation Quality Impact -->
+                            <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="text-sm text-blue-300 font-semibold mb-1">Propagation Quality Impact</div>
+                                <div class="text-xs text-gray-300">
+                                    ${quality === 'Excellent' ? 'Excellent propagation quality means minimal signal degradation, low noise levels, and stable ionospheric layers. This creates optimal conditions for long-distance communication.' :
+                                    quality === 'Good' ? 'Good propagation quality indicates stable ionospheric conditions with moderate signal strength and acceptable noise levels. DX contacts are achievable with proper antenna setup.' :
+                                    quality === 'Fair' ? 'Fair propagation quality suggests some ionospheric instability with variable signal strength. Careful frequency selection and timing are important for successful contacts.' :
+                                    'Poor propagation quality indicates significant ionospheric disturbances, high noise levels, and unstable conditions. Focus on local contacts and wait for conditions to improve.'}
+                                </div>
                             </div>
-                        </div>
-                        <div class="data-card">
-                            <div class="text-gray-400 font-body text-sm mb-2">Best Bands</div>
-                            <div class="text-lg font-heading text-blue-300 mb-3">${summary.propagation_parameters?.best_bands?.join(', ') || 'N/A'}</div>
-                            <div class="text-sm text-gray-400 font-body mb-2">Skip Distances</div>
-                            <div class="text-sm space-y-1">
-                                ${Object.entries(summary.propagation_parameters?.skip_distances || {}).map(([band, dist]) => 
-                                    `<div class="flex justify-between">
-                                        <span class="text-blue-300">${band}:</span>
-                                        <span class="font-mono">${dist}</span>
-                                    </div>`
-                                ).join('')}
+                            
+                            <!-- Time-of-Day Considerations -->
+                            <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="text-sm text-blue-300 font-semibold mb-1">Time-of-Day Considerations</div>
+                                <div class="text-xs text-gray-300">
+                                    ${dayNight === 'Day' ? 'Daytime operation benefits from strong F2 layer ionization, providing reliable long-distance propagation on higher frequency bands. The D layer is present but manageable with proper frequency selection.' :
+                                    'Nighttime operation occurs without D layer absorption, allowing lower frequency bands to open up for regional communication. However, F2 layer ionization decreases, limiting high-frequency DX opportunities.'}
+                                </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Solar Conditions and Cycle -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Solar Conditions</div>
-                            <div class="space-y-1">
-                                <div>SFI: ${formatValue('sfi', summary.solar_conditions.sfi)}</div>
-                                <div>A-Index: ${formatValue('a_index', summary.solar_conditions.a_index)}</div>
-                                <div>K-Index: ${formatValue('k_index', summary.solar_conditions.k_index)}</div>
-                                <div>Aurora: ${summary.solar_conditions.aurora}</div>
-                                <div>Sunspots: ${summary.solar_conditions.sunspots}</div>
-                                <div>X-Ray: ${summary.solar_conditions.xray}</div>
-                            </div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Solar Cycle</div>
-                            <div class="space-y-1">
-                                <div class="font-semibold text-lg">${summary.solar_cycle?.phase || 'N/A'}</div>
-                                <div class="text-sm text-blue-300">${summary.solar_cycle?.prediction || 'N/A'}</div>
-                                <div class="text-sm">Trend: <span class="text-yellow-300">${summary.solar_cycle?.sfi_trend || 'N/A'}</span></div>
-                                ${summary.solar_cycle?.cycle_number ? `
-                                    <div class="text-xs text-gray-400">Cycle ${summary.solar_cycle.cycle_number}</div>
-                                ` : ''}
-                            </div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Weather Context</div>
-                            <div class="space-y-1">
-                                <div>Temp: ${summary.weather_context?.temperature || 'N/A'}</div>
-                                <div>Humidity: ${summary.weather_context?.humidity || 'N/A'}</div>
-                                <div>Pressure: ${summary.weather_context?.pressure || 'N/A'}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Aurora and Tropospheric Conditions -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Aurora Conditions</div>
-                            <div class="space-y-2">
-                                <div class="font-semibold">${formatAurora(summary.aurora_conditions)}</div>
-                                ${typeof summary.aurora_conditions === 'object' ? `
-                                    <div class="text-sm">Affected Bands: ${summary.aurora_conditions.affected_bands}</div>
-                                    <div class="text-sm">Recommendation: ${summary.aurora_conditions.recommendation}</div>
-                                ` : ''}
-                            </div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Tropospheric Conditions</div>
-                            <div class="space-y-2">
-                                <div class="font-semibold">${formatTropo(summary.tropo_conditions)}</div>
-                                ${typeof summary.tropo_conditions === 'object' ? `
-                                    <div class="text-sm">Score: ${summary.tropo_conditions.score || 'N/A'}</div>
-                                    <div class="text-sm">Recommendation: ${summary.tropo_conditions.recommendation}</div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recommendations and Summary -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Operating Recommendations</div>
-                            <div class="space-y-2 mt-2">
-                                ${(summary.recommendations || []).map(rec => {
-                                    const confidence = rec.includes('(High)') ? 'text-green-400' : 
-                                                     rec.includes('(Medium)') ? 'text-yellow-400' : 
-                                                     rec.includes('(Low)') ? 'text-red-400' : 'text-white';
-                                    const priority = rec.includes('SEVERE') || rec.includes('Strong') ? 'border-l-4 border-red-500 pl-3' :
-                                                   rec.includes('Good') || rec.includes('Excellent') ? 'border-l-4 border-green-500 pl-3' :
-                                                   'border-l-4 border-blue-500 pl-3';
-                                    return `<div class="${priority} ${confidence} text-sm">• ${rec}</div>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Key Factors</div>
-                            <div class="space-y-1 mt-2">
-                                ${(summary.summary?.key_factors || []).map(factor => 
-                                    `<div class="text-sm">• ${factor}</div>`
-                                ).join('')}
+                            
+                            <!-- Strategic Rationale -->
+                            <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="text-sm text-blue-300 font-semibold mb-1">Why This Strategy?</div>
+                                <div class="text-xs text-gray-300">
+                                    ${overallStrategy === 'AGGRESSIVE DX OPERATION' ? 'High MUF and excellent conditions allow maximum exploitation of propagation opportunities. Use full power, directional antennas, and focus on global DX contacts while conditions remain favorable.' :
+                                    overallStrategy === 'MODERATE DX OPERATION' ? 'Good conditions support reliable DX operation with moderate power requirements. Balance between DX achievement and power efficiency, focusing on continental contacts.' :
+                                    overallStrategy === 'CONSERVATIVE DX OPERATION' ? 'Moderate conditions require careful frequency and timing selection. Use lower power and focus on regional contacts with occasional DX opportunities.' :
+                                    'Poor conditions limit communication options. Focus on local contacts, antenna testing, and preparation for when conditions improve. This is not the time for DX attempts.'}
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Coordination Summary -->
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400 mb-3">Recommendations & Outlook Coordination</div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <div class="text-sm text-gray-400 mb-2">Current Strategy</div>
-                                <div class="text-sm text-blue-300">
-                                    ${(() => {
-                                        const recommendations = summary.recommendations || [];
-                                        const outlook = summary.summary?.next_hours_outlook || '';
-                                        
-                                        if (recommendations.length === 0) return 'No recommendations available';
-                                        
-                                        // Find the highest priority recommendation
-                                        const highPriority = recommendations.find(rec => 
-                                            rec.includes('(High)') || rec.includes('SEVERE') || rec.includes('Strong')
-                                        );
-                                        
-                                        if (highPriority) {
-                                            return highPriority.replace(' (High)', '').replace(' (Medium)', '').replace(' (Low)', '');
-                                        }
-                                        
-                                        return recommendations[0].replace(' (High)', '').replace(' (Medium)', '').replace(' (Low)', '');
-                                    })()}
-                                </div>
+                    <!-- Band Strategy -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">BAND STRATEGY</div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${createBandStrategy(bestBands, muf, dayNight)}
+                        </div>
+                    </div>
+                    
+                    <!-- Operating Tactics -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">OPERATING TACTICS</div>
+                        <div class="space-y-2">
+                            ${createOperatingTactics(muf, quality, dayNight, solarCycle)}
+                        </div>
+                    </div>
+                    
+                    <!-- Time-Based Strategy -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">TIME-BASED STRATEGY</div>
+                        <div class="bg-gray-800 p-3 rounded-lg">
+                            ${createTimeBasedStrategy(dayNight, muf, solarCycle)}
+                        </div>
+                    </div>
+                    
+                    <!-- Success Metrics -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">SUCCESS METRICS</div>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-gray-800 p-3 rounded-lg">
+                                <div class="text-gray-400">Target MUF</div>
+                                <div class="font-semibold">${muf > 20 ? '>20 MHz' : muf > 15 ? '>15 MHz' : muf > 10 ? '>10 MHz' : 'Local Only'}</div>
                             </div>
-                            <div>
-                                <div class="text-sm text-gray-400 mb-2">Outlook Alignment</div>
-                                <div class="text-sm text-green-300">
-                                    ${(() => {
-                                        const outlook = summary.summary?.next_hours_outlook || '';
-                                        const prediction = summary.summary?.enhanced_prediction || '';
-                                        
-                                        if (outlook.includes('improving') || prediction.includes('improving')) {
-                                            return '✓ Conditions improving - Recommendations align with positive outlook';
-                                        } else if (outlook.includes('worsen') || prediction.includes('worsen')) {
-                                            return '⚠ Conditions may worsen - Recommendations focus on current good bands';
-                                        } else if (outlook.includes('stable') || prediction.includes('stable')) {
-                                            return '→ Conditions stable - Recommendations maintain current strategy';
-                                        }
-                                        
-                                        return 'Recommendations based on current conditions';
-                                    })()}
-                                </div>
+                            <div class="bg-gray-800 p-3 rounded-lg">
+                                <div class="text-gray-400">Expected Range</div>
+                        <div class="font-semibold">${muf > 20 ? 'Global DX' : muf > 15 ? 'Continental' : muf > 10 ? 'Regional' : 'Local'}</div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Next Hours Outlook -->
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400 mb-3">Next Hours Outlook</div>
-                        
-                        <!-- Main Outlook -->
-                        ${summary.summary?.next_hours_outlook ? `
-                            <div class="mb-4">
-                                <div class="text-sm text-gray-400 mb-2">Primary Outlook</div>
-                                <div class="text-lg leading-relaxed">${formatOutlookText(summary.summary.next_hours_outlook)}</div>
-                            </div>
-                        ` : ''}
-                        
-                        <!-- Key Outlook Points -->
-                        ${summary.summary?.next_hours_outlook ? `
-                            <div class="mb-4">
-                                <div class="text-sm text-gray-400 mb-2">Key Points</div>
-                                <div class="space-y-2">
-                                    ${(() => {
-                                        const outlook = summary.summary.next_hours_outlook;
-                                        const parts = outlook.split(' - ').filter(part => part.trim());
-                                        return parts.slice(0, 3).map(part => 
-                                            `<div class="flex items-start">
-                                                <span class="text-blue-400 mr-2">•</span>
-                                                <span class="text-sm">${part.trim()}</span>
-                                            </div>`
-                                        ).join('');
-                                    })()}
-                                </div>
-                            </div>
-                        ` : ''}
-                        
-                        <!-- Enhanced Prediction -->
-                        ${summary.summary?.enhanced_prediction ? `
-                            <div class="mb-4 p-3 bg-blue-900/30 rounded-lg border-l-4 border-blue-500">
-                                <div class="text-sm text-blue-300 font-semibold mb-1">Enhanced Prediction</div>
-                                <div class="text-sm leading-relaxed">${formatOutlookText(summary.summary.enhanced_prediction)}</div>
-                            </div>
-                        ` : ''}
-                        
-                        <!-- Confidence Metrics -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-                            ${summary.summary?.prediction_accuracy ? `
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400 mb-1">Prediction Accuracy</div>
-                                    <div class="text-lg font-semibold text-green-400">${(summary.summary.prediction_accuracy * 100).toFixed(0)}%</div>
-                                </div>
-                            ` : ''}
-                            ${summary.propagation_parameters?.overall_confidence ? `
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400 mb-1">Overall Confidence</div>
-                                    <div class="text-lg font-semibold text-purple-400">${(summary.propagation_parameters.overall_confidence * 100).toFixed(0)}%</div>
-                                </div>
-                            ` : ''}
-                            ${summary.summary?.confidence_metrics?.overall ? `
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400 mb-1">Model Confidence</div>
-                                    <div class="text-lg font-semibold text-blue-400">${(summary.summary.confidence_metrics.overall * 100).toFixed(0)}%</div>
-                                </div>
-                            ` : ''}
-                        </div>
-                        
-                        <!-- Confidence Level Indicator -->
-                        ${summary.summary?.prediction_accuracy || summary.propagation_parameters?.overall_confidence ? `
-                            <div class="mt-3">
-                                <div class="text-xs text-gray-400 mb-1">Confidence Level</div>
-                                <div class="flex items-center">
-                                    ${(() => {
-                                        const accuracy = summary.summary?.prediction_accuracy || 0;
-                                        const confidence = summary.propagation_parameters?.overall_confidence || 0;
-                                        const avgConfidence = (accuracy + confidence) / 2;
-                                        
-                                        if (avgConfidence >= 0.8) {
-                                            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300">
-                                                <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                                                High Confidence
-                                            </span>`;
-                                        } else if (avgConfidence >= 0.6) {
-                                            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-900 text-yellow-300">
-                                                <span class="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
-                                                Medium Confidence
-                                            </span>`;
-                                        } else {
-                                            return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-300">
-                                                <span class="w-2 h-2 bg-red-400 rounded-full mr-2"></span>
-                                                Low Confidence
-                                            </span>`;
-                                        }
-                                    })()}
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-
-                    <!-- Confidence Metrics -->
-                    ${summary.summary?.confidence_metrics ? `
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400">Prediction Confidence</div>
-                            <div class="grid grid-cols-3 gap-4 mt-2">
-                                <div class="text-center">
-                                    <div class="text-sm text-gray-400">Solar Trend</div>
-                                    <div class="text-lg font-semibold ${summary.summary.confidence_metrics.solar_trend >= 0.8 ? 'text-green-400' : summary.summary.confidence_metrics.solar_trend >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
-                                        ${(summary.summary.confidence_metrics.solar_trend * 100).toFixed(0)}%
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-sm text-gray-400">Overall</div>
-                                    <div class="text-lg font-semibold ${summary.summary.confidence_metrics.overall >= 0.8 ? 'text-green-400' : summary.summary.confidence_metrics.overall >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
-                                        ${(summary.summary.confidence_metrics.overall * 100).toFixed(0)}%
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-sm text-gray-400">Accuracy</div>
-                                    <div class="text-lg font-semibold ${summary.summary.confidence_metrics.prediction_accuracy >= 0.8 ? 'text-green-400' : summary.summary.confidence_metrics.prediction_accuracy >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
-                                        ${(summary.summary.confidence_metrics.prediction_accuracy * 100).toFixed(0)}%
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <!-- Advanced Analytics -->
-                    ${summary.advanced_analytics ? `
-                        <div class="bg-gray-800 p-4 rounded-lg">
-                            <div class="text-gray-400 mb-3">Advanced Analytics</div>
-                            
-                            <!-- Data Availability Notice -->
-                            ${summary.advanced_analytics.solar_trends?.trend === 'Insufficient Data' ? `
-                                <div class="mb-4 p-3 bg-yellow-900/30 rounded-lg border-l-4 border-yellow-500">
-                                    <div class="text-sm text-yellow-300 font-semibold mb-1">⚠️ Insufficient Historical Data</div>
-                                    <div class="text-sm text-gray-300">Advanced analytics require at least 24 hours of historical data. Currently collecting data for enhanced analysis.</div>
-                                </div>
-                            ` : ''}
-                            
-                            <!-- Multi-Timeframe Forecasts -->
-                            ${summary.advanced_analytics.multi_timeframe_forecasts && Object.keys(summary.advanced_analytics.multi_timeframe_forecasts).length > 0 ? `
-                                <div class="mb-4">
-                                    <div class="text-sm text-gray-400 mb-2">Multi-Timeframe Forecasts</div>
-                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        ${Object.entries(summary.advanced_analytics.multi_timeframe_forecasts).map(([timeframe, forecast]) => `
-                                            <div class="bg-gray-700 p-3 rounded-lg">
-                                                <div class="text-xs text-gray-400 mb-1">${forecast.timeframe || 'N/A'}</div>
-                                                <div class="text-sm font-semibold text-blue-300 mb-1">${forecast.forecast || 'N/A'}</div>
-                                                <div class="text-xs text-gray-300">${forecast.band_focus || 'N/A'}</div>
-                                                <div class="text-xs text-yellow-300">Confidence: ${forecast.confidence ? (forecast.confidence * 100).toFixed(0) : 'N/A'}%</div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            <!-- Enhanced Confidence Analysis -->
-                            ${summary.advanced_analytics.enhanced_confidence && Object.keys(summary.advanced_analytics.enhanced_confidence.components || {}).length > 0 ? `
-                                <div class="mb-4">
-                                    <div class="text-sm text-gray-400 mb-2">Enhanced Confidence Analysis</div>
-                                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                        ${Object.entries(summary.advanced_analytics.enhanced_confidence.components || {}).map(([component, value]) => `
-                                            <div class="bg-gray-700 p-2 rounded-lg text-center">
-                                                <div class="text-xs text-gray-400 mb-1">${component.replace('_', ' ').toUpperCase()}</div>
-                                                <div class="text-sm font-semibold ${value >= 0.8 ? 'text-green-400' : value >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
-                                                    ${(value * 100).toFixed(0)}%
-                                                </div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                    <div class="mt-2 text-xs text-gray-400">
-                                        Data Quality: ${summary.advanced_analytics.enhanced_confidence.data_quality_rating || 'Unknown'} | 
-                                        Anomaly Rate: ${summary.advanced_analytics.enhanced_confidence.anomaly_rate ? (summary.advanced_analytics.enhanced_confidence.anomaly_rate * 100).toFixed(1) : 'N/A'}%
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            <!-- Solar Trends Analysis -->
-                            ${summary.advanced_analytics.solar_trends && summary.advanced_analytics.solar_trends.trend && summary.advanced_analytics.solar_trends.trend !== 'Insufficient Data' ? `
-                                <div class="mb-4">
-                                    <div class="text-sm text-gray-400 mb-2">Solar Trends Analysis</div>
-                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div class="bg-gray-700 p-3 rounded-lg">
-                                            <div class="text-xs text-gray-400">Trend</div>
-                                            <div class="text-sm font-semibold text-blue-300">${summary.advanced_analytics.solar_trends.trend || 'N/A'}</div>
-                                            <div class="text-xs text-yellow-300">Slope: ${summary.advanced_analytics.solar_trends.slope || 'N/A'}</div>
-                                        </div>
-                                        <div class="bg-gray-700 p-3 rounded-lg">
-                                            <div class="text-xs text-gray-400">Confidence</div>
-                                            <div class="text-sm font-semibold ${summary.advanced_analytics.solar_trends.confidence >= 0.8 ? 'text-green-400' : summary.advanced_analytics.solar_trends.confidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">
-                                                ${summary.advanced_analytics.solar_trends.confidence ? (summary.advanced_analytics.solar_trends.confidence * 100).toFixed(0) : 'N/A'}%
-                                            </div>
-                                            <div class="text-xs text-yellow-300">R²: ${summary.advanced_analytics.solar_trends.r_squared || 'N/A'}</div>
-                                        </div>
-                                        <div class="bg-gray-700 p-3 rounded-lg">
-                                            <div class="text-xs text-gray-400">24h Change</div>
-                                            <div class="text-sm font-semibold ${summary.advanced_analytics.solar_trends.change_24h > 0 ? 'text-green-400' : summary.advanced_analytics.solar_trends.change_24h < 0 ? 'text-red-400' : 'text-yellow-400'}">
-                                                ${summary.advanced_analytics.solar_trends.change_24h > 0 ? '+' : ''}${summary.advanced_analytics.solar_trends.change_24h || 'N/A'}
-                                            </div>
-                                            <div class="text-xs text-yellow-300">Strength: ${summary.advanced_analytics.solar_trends.trend_strength || 'N/A'}</div>
-                                        </div>
-                                        <div class="bg-gray-700 p-3 rounded-lg">
-                                            <div class="text-xs text-gray-400">Cyclical Pattern</div>
-                                            <div class="text-sm font-semibold ${summary.advanced_analytics.solar_trends.cyclical_pattern ? 'text-green-400' : 'text-yellow-400'}">
-                                                ${summary.advanced_analytics.solar_trends.cyclical_pattern ? 'Yes' : 'No'}
-                                            </div>
-                                            <div class="text-xs text-yellow-300">Strength: ${summary.advanced_analytics.solar_trends.cyclical_strength || 'N/A'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                    <!-- Data Quality & Anomalies -->
-                    ${summary.advanced_analytics.anomalies && summary.advanced_analytics.anomalies.total_anomalies !== undefined ? `
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-400 mb-2">Data Quality & Anomalies</div>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400">Total Anomalies</div>
-                                    <div class="text-lg font-semibold ${summary.advanced_analytics.anomalies.total_anomalies === 0 ? 'text-green-400' : summary.advanced_analytics.anomalies.total_anomalies <= 2 ? 'text-yellow-400' : 'text-red-400'}">
-                                        ${summary.advanced_analytics.anomalies.total_anomalies}
-                                    </div>
-                                    <div class="text-xs text-gray-300">Rate: ${summary.advanced_analytics.anomalies.anomaly_rate ? (summary.advanced_analytics.anomalies.anomaly_rate * 100).toFixed(1) : 'N/A'}%</div>
-                                </div>
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400">Data Quality</div>
-                                    <div class="text-sm font-semibold ${summary.advanced_analytics.anomalies.data_quality === 'Good' ? 'text-green-400' : summary.advanced_analytics.anomalies.data_quality === 'Moderate' ? 'text-yellow-400' : 'text-red-400'}">
-                                        ${summary.advanced_analytics.anomalies.data_quality || 'N/A'}
-                                    </div>
-                                </div>
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400">Detection Methods</div>
-                                    <div class="text-xs text-gray-300">
-                                        ${summary.advanced_analytics.anomalies.anomalies && summary.advanced_analytics.anomalies.anomalies.length > 0 ? 
-                                            summary.advanced_analytics.anomalies.anomalies.slice(0, 3).map(anomaly => 
-                                                `${anomaly.detection_methods ? anomaly.detection_methods.join(', ') : 'Unknown'}`
-                                            ).join(', ') : 'None'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <!-- Enhanced Data Sources -->
-                    ${summary.enhanced_data_sources ? `
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-400 mb-2">Enhanced Data Sources</div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- NOAA SWPC Data -->
-                                ${summary.enhanced_data_sources.noaa_swpc && Object.keys(summary.enhanced_data_sources.noaa_swpc).length > 0 ? `
-                                    <div class="bg-gray-700 p-3 rounded-lg">
-                                        <div class="text-xs text-gray-400 mb-2">NOAA SWPC Data</div>
-                                        <div class="text-xs text-gray-300">
-                                            ${Object.keys(summary.enhanced_data_sources.noaa_swpc).map(source => 
-                                                `<div>• ${source.replace('_', ' ').toUpperCase()}</div>`
-                                            ).join('')}
-                                        </div>
-                                    </div>
-                                ` : ''}
-                                
-                                <!-- RBN Propagation Data -->
-                                ${summary.enhanced_data_sources.rbn_propagation && summary.enhanced_data_sources.rbn_propagation.total_spots ? `
-                                    <div class="bg-gray-700 p-3 rounded-lg">
-                                        <div class="text-xs text-gray-400 mb-2">RBN Propagation Data</div>
-                                        <div class="text-xs text-gray-300">
-                                            <div>• Total Spots: ${summary.enhanced_data_sources.rbn_propagation.total_spots}</div>
-                                            <div>• Active Bands: ${Object.keys(summary.enhanced_data_sources.rbn_propagation.band_activity || {}).join(', ')}</div>
-                                            <div>• Distance Range: ${Object.keys(summary.enhanced_data_sources.rbn_propagation.distance_distribution || {}).join(', ')}</div>
-                                        </div>
-                                    </div>
-                                ` : ''}
-                                
-                                <!-- Ionospheric Data -->
-                                ${summary.enhanced_data_sources.ionospheric && summary.enhanced_data_sources.ionospheric.f2_critical ? `
-                                    <div class="bg-gray-700 p-3 rounded-lg">
-                                        <div class="text-xs text-gray-400 mb-2">Ionospheric Data</div>
-                                        <div class="text-xs text-gray-300">
-                                            <div>• F2 Critical: ${summary.enhanced_data_sources.ionospheric.f2_critical} MHz</div>
-                                            <div>• Calculated MUF: ${summary.enhanced_data_sources.ionospheric.calculated_muf} MHz</div>
-                                            <div>• Adjusted MUF: ${summary.enhanced_data_sources.ionospheric.adjusted_muf} MHz</div>
-                                        </div>
-                                    </div>
-                                ` : ''}
-                                
-                                <!-- Solar Wind & Proton Flux -->
-                                ${summary.enhanced_data_sources.solar_wind_speed || summary.enhanced_data_sources.proton_flux ? `
-                                    <div class="bg-gray-700 p-3 rounded-lg">
-                                        <div class="text-xs text-gray-400 mb-2">Space Weather</div>
-                                        <div class="text-xs text-gray-300">
-                                            ${summary.enhanced_data_sources.solar_wind_speed ? `<div>• Solar Wind: ${summary.enhanced_data_sources.solar_wind_speed} km/s</div>` : ''}
-                                            ${summary.enhanced_data_sources.proton_flux ? `<div>• Proton Flux: ${summary.enhanced_data_sources.proton_flux}</div>` : ''}
-                                        </div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <!-- Enhanced Accuracy Analysis -->
-                    ${summary.enhanced_accuracy ? `
-                        <div class="mb-4">
-                            <div class="text-sm text-gray-400 mb-2">Enhanced Accuracy Analysis</div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Overall Accuracy Score -->
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400 mb-2">Overall Accuracy Score</div>
-                                    <div class="text-2xl font-bold ${summary.enhanced_accuracy.accuracy_score >= 90 ? 'text-green-400' : summary.enhanced_accuracy.accuracy_score >= 75 ? 'text-blue-400' : summary.enhanced_accuracy.accuracy_score >= 60 ? 'text-yellow-400' : 'text-red-400'}">
-                                        ${summary.enhanced_accuracy.accuracy_score}/100
-                                    </div>
-                                    <div class="text-sm font-semibold text-gray-300">
-                                        ${summary.enhanced_accuracy.confidence_level} Confidence
-                                    </div>
-                                </div>
-                                
-                                <!-- Confidence Factors -->
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400 mb-2">Confidence Factors</div>
-                                    <div class="text-xs text-gray-300 space-y-1">
-                                        ${summary.enhanced_accuracy.confidence_factors.map(factor => 
-                                            `<div>• ${factor}</div>`
-                                        ).join('')}
-                                    </div>
-                                </div>
-                                
-                                <!-- Detailed Scores -->
-                                <div class="bg-gray-700 p-3 rounded-lg">
-                                    <div class="text-xs text-gray-400 mb-2">Detailed Scores</div>
-                                    <div class="text-xs text-gray-300 space-y-1">
-                                        <div>• Data Sources: ${summary.enhanced_accuracy.data_source_score}/25</div>
-                                        <div>• Historical Data: ${summary.enhanced_accuracy.historical_score}/25</div>
-                                        <div>• Real-time Validation: ${summary.enhanced_accuracy.validation_score}/25</div>
-                                        <div>• Model Sophistication: ${summary.enhanced_accuracy.model_score}/25</div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Additional Sources -->
-                                ${summary.enhanced_data_sources.additional_sources ? `
-                                    <div class="bg-gray-700 p-3 rounded-lg">
-                                        <div class="text-xs text-gray-400 mb-2">Additional Sources</div>
-                                        <div class="text-xs text-gray-300 space-y-1">
-                                            ${summary.enhanced_data_sources.additional_sources.psk_reporter ? 
-                                                `<div>• PSKReporter: ${summary.enhanced_data_sources.additional_sources.psk_reporter.total_reports} reports</div>` : ''}
-                                            ${summary.enhanced_data_sources.additional_sources.wspr_available ? 
-                                                `<div>• WSPRNet: Available</div>` : ''}
-                                            <div>• Propagation Models: ${Object.keys(summary.enhanced_data_sources.additional_sources.propagation_models || {}).filter(key => summary.enhanced_data_sources.additional_sources.propagation_models[key]).join(', ')}</div>
-                                        </div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    ` : ''}
-
-                </div>
-            ` : ''}
-
-                    <!-- Current Band Conditions -->
-                    <div class="mt-4">
-                        <h3 class="text-lg font-semibold mb-2">Current Band Conditions</h3>
-                        <div id="band-conditions-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            <!-- Band conditions will be populated by updateBandConditions -->
-                        </div>
-                    </div>
-                </div>
-            `);
-            
-            console.log('updatePropagationSummary: Successfully updated propagation summary');
-        }
-
-        function updateDXCCConditions(data) {
-            if (!dxccDiv) return;
-            if (data.dxcc_conditions) {
-                const dxcc = data.dxcc_conditions;
-                safeSetHTML(dxccDiv, `
-                    <div class="space-y-4">
-                        <!-- Current Location -->
-                        <div>
-                            <h3 class="text-lg font-medium mb-2">Current Location</h3>
-                            <div class="space-y-2">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Name:</span>
-                                    <span class="font-semibold">${dxcc.current?.name || 'N/A'}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Continent:</span>
-                                    <span class="font-semibold">${dxcc.current?.continent || 'N/A'}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">ITU Zone:</span>
-                                    <span class="font-semibold">${dxcc.current?.itu_zone || 'N/A'}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">CQ Zone:</span>
-                                    <span class="font-semibold">${dxcc.current?.cq_zone || 'N/A'}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Prefixes:</span>
-                                    <span class="font-semibold">${dxcc.current?.prefixes?.join(', ') || 'N/A'}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Timezone:</span>
-                                    <span class="font-semibold">${dxcc.current?.timezone || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        ${dxcc.nearby && dxcc.nearby.length > 0 ? `
-                            <!-- Nearby DXCC Entities -->
-                            <div>
-                                <h3 class="text-lg font-medium mb-2">Nearby DXCC Entities</h3>
-                                <div class="space-y-2">
-                                    ${dxcc.nearby.map(entity => `
-                                        <div class="flex justify-between text-sm">
-                                            <span class="text-gray-400">${entity.name}:</span>
-                                            <span class="font-semibold">${entity.continent} (ITU: ${entity.itu_zone}, CQ: ${entity.cq_zone})</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                `);
-            } else {
-                safeSetHTML(dxccDiv, '<p class="text-gray-400">DXCC data not available</p>');
-            }
-        }
-
-        // Main UI update
-        function updateConditionsUI(data) {
-            updateTimestampAndLocation(data);
-            updateSolarConditions(data);
-            updateWeatherConditions(data);
-            updatePropagationSummary(data);
-            updateBandConditions(data);
-            updateDXCCConditions(data);
-        }
-
-        // Function to fetch updated conditions data
-        async function fetchUpdatedConditions() {
-            console.log('fetchUpdatedConditions: Starting to fetch updated conditions...');
-            try {
-                const response = await fetchWithRetry('/api/conditions');
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('fetchUpdatedConditions: Received data:', {
-                        hasPropagationSummary: !!data.propagation_summary,
-                        hasSolarConditions: !!data.solar_conditions,
-                        hasWeatherConditions: !!data.weather_conditions,
-                        timestamp: data.timestamp
-                    });
-                    updateConditionsUI(data);
-                    console.log('Updated conditions data fetched successfully');
-                } else {
-                    console.error('fetchUpdatedConditions: Response not ok:', response.status);
-                }
-            } catch (error) {
-                console.error('Error fetching updated conditions:', error);
-            }
-        }
-
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            // Load initial data from server-side rendered data
-            const initialData = JSON.parse(document.getElementById('data').textContent);
-            updateConditionsUI(initialData);
-            
-            // Load initial data
-            fetchSpots();
-            
-            // Set up periodic updates
-            setInterval(fetchSpots, 30000); // Update every 30 seconds
-            
-            // Set up periodic conditions updates (including recommendations)
-            setInterval(fetchUpdatedConditions, 300000); // Update every 5 minutes (300 seconds)
-            
-            // Fetch fresh conditions data immediately
-            fetchUpdatedConditions();
-            
-            // Initialize version and update checking
-            initializeVersionSystem();
-            
-            // Check for updates every hour
-            setInterval(checkForUpdates, 3600000); // 1 hour
-        });
-
-        // Enhanced fetch function with better error handling
-        async function fetchWithRetry(url, options = {}, maxRetries = 3) {
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const response = await fetch(url, options);
-                    
-                    if (response.ok) {
-                        return response;
-                    } else if (response.status === 503 && i < maxRetries - 1) {
-                        // Service unavailable, retry after delay
-                        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-                        continue;
-                    } else {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                } catch (error) {
-                    if (i === maxRetries - 1) {
-                        throw error;
-                    }
-                    // Wait before retry
-                    await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-                }
-            }
-        }
-
-        // Function to fetch spots data
-        async function fetchSpots() {
-            // Get DOM elements each time to ensure they exist
-            const loadingSpinner = document.getElementById('spots-loading');
-            const activityDiv = document.getElementById('live-activity');
-            const summaryDiv = document.getElementById('activity-summary');
-            const tableBody = document.getElementById('spots-table-body');
-            
-            console.log('fetchSpots: DOM elements found:', {
-                loadingSpinner: !!loadingSpinner,
-                activityDiv: !!activityDiv,
-                summaryDiv: !!summaryDiv,
-                tableBody: !!tableBody
-            });
-            
-            if (loadingSpinner) loadingSpinner.style.display = 'inline-block';
-            
-            try {
-                const response = await fetchWithRetry('/api/spots');
-                const spotsData = await response.json();
-                
-                console.log('fetchSpots: Received data:', {
-                    spotsCount: spotsData.spots?.length || 0,
-                    summary: spotsData.summary,
-                    hasSpots: !!spotsData.spots,
-                    hasSummary: !!spotsData.summary
-                });
-                
-                // Update spots UI with proper error handling
-                if (activityDiv) {
-                    // Update summary
-                    if (summaryDiv && spotsData.summary) {
-                        const summaryHtml = `
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div class="data-card">
-                                    <div class="text-gray-400 font-body text-sm mb-2">Total Spots</div>
-                                    <div class="text-xl font-heading text-white">${spotsData.summary.total_spots || 0}</div>
-                                </div>
-                                <div class="data-card">
-                                    <div class="text-gray-400 font-body text-sm mb-2">Active Bands</div>
-                                    <div class="text-xl font-heading text-white">${spotsData.summary.active_bands?.join(', ') || 'None'}</div>
-                                </div>
-                                <div class="data-card">
-                                    <div class="text-gray-400 font-body text-sm mb-2">Active Modes</div>
-                                    <div class="text-xl font-heading text-white">${spotsData.summary.active_modes?.join(', ') || 'None'}</div>
-                                </div>
-                                <div class="data-card">
-                                    <div class="text-gray-400 font-body text-sm mb-2">Active DXCC</div>
-                                    <div class="text-xl font-heading text-white">${spotsData.summary.active_dxcc?.length || 0}</div>
-                                </div>
-                            </div>
-                        `;
-                        summaryDiv.innerHTML = summaryHtml;
-                        console.log('fetchSpots: Updated summary');
-                    }
-                    
-                    // Update spots table
-                    if (tableBody) {
-                        if (spotsData.spots && spotsData.spots.length > 0) {
-                            const tableHtml = spotsData.spots.map(spot => `
-                                <tr class="border-t border-gray-700 hover:bg-gray-800">
-                                    <td class="px-4 py-2">${spot.timestamp || '-'}</td>
-                                    <td class="px-4 py-2 font-mono">${spot.callsign || '-'}</td>
-                                    <td class="px-4 py-2 font-mono">${spot.frequency || '-'}</td>
-                                    <td class="px-4 py-2">${spot.mode || '-'}</td>
-                                    <td class="px-4 py-2">${spot.dxcc || '-'}</td>
-                                    <td class="px-4 py-2">
-                                        <span class="px-2 py-1 rounded text-sm ${spot.source?.includes('RBN') ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}">
-                                            ${spot.source || '-'}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-2 text-gray-400">${spot.comment || '-'}</td>
-                                </tr>
-                            `).join('');
-                            tableBody.innerHTML = tableHtml;
-                            console.log('fetchSpots: Updated table with', spotsData.spots.length, 'spots');
-                        } else {
-                            tableBody.innerHTML = `
-                                <tr>
-                                    <td colspan="7" class="px-4 py-2 text-center text-gray-400">
-                                        No spots available at this time
-                                    </td>
-                                </tr>
-                            `;
-                            console.log('fetchSpots: No spots available');
-                        }
-                    }
-                } else {
-                    console.error('fetchSpots: activityDiv not found');
-                }
-            } catch (error) {
-                console.error('Error fetching spots:', error);
-                if (activityDiv) {
-                    activityDiv.innerHTML = `
-                        <div class="text-red-500">
-                            Error loading live spots: ${error.message}
-                        </div>
-                    `;
-                }
-            } finally {
-                if (loadingSpinner) loadingSpinner.style.display = 'none';
-            }
-        }
-
-        // Add enter key support for QRZ lookup
-        // PWA Service Worker Registration with improved update handling
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                        console.log('Service Worker registered successfully:', registration.scope);
-                        
-                        // Safari-specific: More aggressive update handling
-                        if (isSafari) {
-                            console.log('Safari detected - using enhanced update handling');
-                            
-                            // Force immediate activation for Safari
-                            if (registration.waiting) {
-                                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                            }
-                        }
-                        
-                        // Check for updates
-                        registration.addEventListener('updatefound', function() {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', function() {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // New service worker available
-                                    showUpdateNotification();
-                                }
-                            });
-                        });
-                        
-                        // Handle service worker messages
-                        navigator.serviceWorker.addEventListener('message', function(event) {
-                            if (event.data && event.data.type === 'FORCE_REFRESH') {
-                                console.log('Force refresh message received from service worker');
-                                window.location.reload();
-                            } else if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-                                console.log('Update available message received');
-                                showUpdateNotification(event.data.version);
-                            }
-                        });
-                        
-                        // Check for updates periodically
-                        setInterval(() => {
-                            registration.update();
-                        }, 60000); // Check every minute
-                    })
-                    .catch(function(error) {
-                        console.log('Service Worker registration failed:', error);
-                    });
-            });
-            
-            // Safari-specific: Handle page visibility changes
-            if (isSafari) {
-                document.addEventListener('visibilitychange', function() {
-                    if (!document.hidden) {
-                        console.log('Safari: Page became visible, refreshing data');
-                        // Refresh data when page becomes visible
-                        fetchSpots();
-                    }
-                });
-            }
-        }
-
-        // Show update notification
-        function showUpdateNotification(version = null) {
-            // Check if notification already exists
-            if (document.querySelector('.update-notification')) {
-                return;
-            }
-            
-            const notification = document.createElement('div');
-            notification.className = 'update-notification fixed top-4 right-4 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
-            notification.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <i class="fas fa-sync-alt mr-2"></i>
-                        <div>
-                            <div class="font-semibold">Update Available</div>
-                            <div class="text-sm opacity-90">${version ? `Version ${version}` : 'A new version is available'}</div>
-                        </div>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="mt-3 flex gap-2">
-                    <button onclick="updateApp()" class="bg-white text-blue-600 px-3 py-1 rounded text-sm font-medium hover:bg-gray-100">
-                        Update Now
-                    </button>
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-white opacity-75 hover:opacity-100 text-sm">
-                        Later
-                    </button>
                 </div>
             `;
-            
-            document.body.appendChild(notification);
-            
-            // Auto-remove after 30 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 30000);
         }
 
-        // Update app function
-        function updateApp() {
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                // Send message to service worker to skip waiting
-                navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-                
-                // Reload the page after a short delay
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                // Fallback: force reload
-                window.location.reload();
+        function createBandStrategy(bestBands, muf, dayNight) {
+            if (!bestBands || bestBands.length === 0) {
+                return '<div class="text-gray-400 text-sm">No band strategy available</div>';
             }
-        }
-
-        // Enhanced cache management functions
-        async function clearAppCache() {
-            if ('caches' in window) {
-                try {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(cacheNames.map(name => caches.delete(name)));
-                    console.log('App cache cleared');
-                    showNotification('Cache cleared successfully', 'success');
-                } catch (error) {
-                    console.error('Error clearing cache:', error);
-                    showNotification('Failed to clear cache', 'error');
-                }
-            }
-        }
-
-        async function getCacheStats() {
-            try {
-                const response = await fetch('/api/cache/stats');
-                const stats = await response.json();
-                console.log('Cache statistics:', stats);
-                return stats;
-            } catch (error) {
-                console.error('Error getting cache stats:', error);
-                return null;
-            }
-        }
-
-        // Safari-specific refresh function
-        function safariRefresh() {
-            if (isSafari) {
-                console.log('Safari: Performing enhanced refresh');
-                // Clear any cached data
-                if ('caches' in window) {
-                    caches.keys().then(function(names) {
-                        for (let name of names) {
-                            caches.delete(name);
-                        }
-                    });
-                }
-                // Force a hard refresh
-                window.location.href = window.location.href;
-            } else {
-                window.location.reload();
-            }
-        }
-        
-        // Display cache statistics
-        function displayCacheStats(stats) {
-            const statsContainer = document.getElementById('cache-stats');
-            if (!stats) {
-                statsContainer.style.display = 'block';
-                statsContainer.innerHTML = '<div class="text-red-400">Failed to load cache statistics</div>';
-                return;
-            }
-            statsContainer.style.display = 'block';
             
-            let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">';
+            const primaryBands = bestBands.slice(0, 3);
+            const secondaryBands = bestBands.slice(3, 5);
             
-            // Overall stats
-            html += `
-                <div class="bg-gray-800 p-4 rounded-lg">
-                    <div class="text-gray-400 text-sm">Total Caches</div>
-                    <div class="text-xl font-semibold">${stats.total_caches}</div>
-                    <div class="text-gray-400 text-sm">Total Entries: ${stats.total_entries}</div>
+            return `
+                <div class="bg-gray-800 p-3 rounded-lg">
+                    <div class="text-sm text-blue-300 font-semibold mb-2">Primary Bands</div>
+                    <div class="text-sm text-gray-300 mb-2">${primaryBands.join(', ')}</div>
+                    <div class="text-xs text-gray-400">Focus 80% of operating time here</div>
                 </div>
-                <div class="bg-gray-800 p-4 rounded-lg">
-                    <div class="text-gray-400 text-sm">Total Memory</div>
-                    <div class="text-xl font-semibold">${stats.total_memory_mb} MB</div>
-                    <div class="text-gray-400 text-sm">Memory Usage</div>
+                ${secondaryBands.length > 0 ? `
+                <div class="bg-gray-800 p-3 rounded-lg">
+                    <div class="text-sm text-yellow-300 font-semibold mb-2">Secondary Bands</div>
+                    <div class="text-sm text-gray-300 mb-2">${secondaryBands.join(', ')}</div>
+                    <div class="text-xs text-gray-400">Use for backup and testing</div>
                 </div>
+                ` : ''}
             `;
+        }
+
+        function createOperatingTactics(muf, quality, dayNight, solarCycle) {
+            const tactics = [];
             
-            // Individual cache stats
-            for (const [cacheName, cacheStats] of Object.entries(stats.caches)) {
-                const memoryPercent = cacheStats.max_memory_mb > 0 ? 
-                    Math.round((cacheStats.memory_mb / cacheStats.max_memory_mb) * 100) : 0;
-                
-                html += `
-                    <div class="bg-gray-800 p-4 rounded-lg">
-                        <div class="text-gray-400 text-sm capitalize">${cacheName}</div>
-                        <div class="text-lg font-semibold">${cacheStats.entries}/${cacheStats.max_size}</div>
-                        <div class="text-gray-400 text-sm">${cacheStats.memory_mb} MB</div>
-                        <div class="w-full bg-gray-700 rounded-full h-2 mt-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${memoryPercent}%"></div>
-                        </div>
-                        <div class="text-xs text-gray-400 mt-1">Hit Rate: ${cacheStats.hit_rate}</div>
+            // MUF-based tactics
+            if (muf > 20) {
+                tactics.push({
+                    tactic: 'High Power DX Operation',
+                    description: 'Use maximum power for long-distance contacts',
+                    icon: 'fas fa-satellite-dish',
+                    color: 'text-green-400'
+                });
+            } else if (muf > 15) {
+                tactics.push({
+                    tactic: 'Moderate Power DX',
+                    description: 'Use 100-200W for continental contacts',
+                    icon: 'fas fa-broadcast-tower',
+                    color: 'text-blue-400'
+                });
+            } else if (muf > 10) {
+                tactics.push({
+                    tactic: 'Low Power Regional',
+                    description: 'Use 50-100W for regional contacts',
+                    icon: 'fas fa-signal',
+                    color: 'text-yellow-400'
+                });
+            } else {
+                tactics.push({
+                    tactic: 'Local Operation',
+                    description: 'Focus on local contacts and testing',
+                    icon: 'fas fa-home',
+                    color: 'text-red-400'
+                });
+            }
+            
+            // Time-based tactics
+            if (dayNight === 'Day') {
+                tactics.push({
+                    tactic: 'F2 Layer Exploitation',
+                    description: 'Take advantage of daytime F2 layer for DX',
+                    icon: 'fas fa-sun',
+                    color: 'text-yellow-400'
+                });
+            } else {
+                tactics.push({
+                    tactic: 'D Layer Absence',
+                    description: 'Use lower bands effectively at night',
+                    icon: 'fas fa-moon',
+                    color: 'text-blue-400'
+                });
+            }
+            
+            // Solar cycle tactics
+            if (solarCycle.phase && solarCycle.phase.includes('Maximum')) {
+                tactics.push({
+                    tactic: 'Solar Maximum Advantage',
+                    description: 'Exploit high ionization for all-band DX',
+                    icon: 'fas fa-chart-line',
+                    color: 'text-purple-400'
+                });
+            }
+            
+            return tactics.map(tactic => `
+                <div class="bg-gray-800 p-3 rounded-lg border-l-4 border-gray-600">
+                    <div class="flex items-center mb-2">
+                        <i class="${tactic.icon} ${tactic.color} mr-2"></i>
+                        <span class="font-semibold text-sm">${tactic.tactic}</span>
+                    </div>
+                    <div class="text-xs text-gray-300">${tactic.description}</div>
+                </div>
+            `).join('');
+        }
+
+        function createTimeBasedStrategy(dayNight, muf, solarCycle) {
+            const isDay = dayNight === 'Day';
+            const highMuf = muf > 20;
+            
+            let strategy = '';
+            
+            if (isDay && highMuf) {
+                strategy = `
+                    <div class="text-sm text-gray-300 mb-2">
+                        <strong>Daytime High MUF Strategy:</strong> Focus on 20m, 15m, and 10m bands for global DX contacts.
+                        Use higher power and directional antennas for maximum range.
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        • Peak hours: 10:00-16:00 local time<br>
+                        • Target regions: Global DX<br>
+                        • Power: 200W+ for maximum range
+                    </div>
+                `;
+            } else if (isDay) {
+                strategy = `
+                    <div class="text-sm text-gray-300 mb-2">
+                        <strong>Daytime Moderate MUF Strategy:</strong> Focus on 20m and 40m for continental DX.
+                        Use moderate power and optimize antenna setup.
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        • Peak hours: 12:00-15:00 local time<br>
+                        • Target regions: Continental DX<br>
+                        • Power: 100-150W for efficiency
+                    </div>
+                `;
+            } else if (highMuf) {
+                strategy = `
+                    <div class="text-sm text-gray-300 mb-2">
+                        <strong>Nighttime High MUF Strategy:</strong> Unusual conditions - exploit 20m and 15m for DX.
+                        Monitor for sporadic E or other propagation modes.
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        • Peak hours: 20:00-22:00 local time<br>
+                        • Target regions: Regional to Continental<br>
+                        • Power: 150W+ for DX attempts
+                    </div>
+                `;
+            } else {
+                strategy = `
+                    <div class="text-sm text-gray-300 mb-2">
+                        <strong>Nighttime Low MUF Strategy:</strong> Focus on 80m and 40m for regional contacts.
+                        Use lower power and optimize for local/regional range.
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        • Peak hours: 19:00-23:00 local time<br>
+                        • Target regions: Local to Regional<br>
+                        • Power: 50-100W for efficiency
                     </div>
                 `;
             }
             
-            html += '</div>';
-            
-            // Add cache controls
-            html += `
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <button onclick="clearSpecificCache('conditions')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                        Clear Conditions
-                    </button>
-                    <button onclick="clearSpecificCache('spots')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                        Clear Spots
-                    </button>
-                    <button onclick="clearSpecificCache('weather')" class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                        Clear Weather
-                    </button>
-                </div>
-            `;
-            
-            statsContainer.innerHTML = html;
+            return strategy;
         }
 
-        // Clear specific cache
-        async function clearSpecificCache(cacheType) {
-            try {
-                const response = await fetch('/api/cache/clear', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ cache_type: cacheType })
-                });
-                
-                if (response.ok) {
-                    showNotification(`${cacheType} cache cleared`, 'success');
-                    // Refresh stats
-                    const stats = await getCacheStats();
-                    displayCacheStats(stats);
-                } else {
-                    throw new Error('Failed to clear cache');
-                }
-            } catch (error) {
-                console.error('Error clearing cache:', error);
-                showNotification('Failed to clear cache', 'error');
-            }
+        function updateExecutiveSummary(data) {
+            const executiveSummaryDiv = document.getElementById('executive-summary');
+            if (!executiveSummaryDiv || !data.propagation_summary) return;
+            
+            const summary = data.propagation_summary;
+            const params = summary.propagation_parameters || {};
+            const solarCycle = summary.solar_cycle || {};
+            
+            // Create a coherent executive summary
+            const currentTime = summary.current_time || 'Unknown';
+            const dayNight = summary.day_night || 'Unknown';
+            const muf = params.muf || 'N/A';
+            const quality = params.quality || 'Unknown';
+            const bestBands = params.best_bands || [];
+            const phase = solarCycle.phase || 'Unknown';
+            
+            safeSetHTML(executiveSummaryDiv, `
+                <div class="space-y-4">
+                    <!-- Current Status Overview -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <div class="text-sm text-gray-400 mb-2">Current Status</div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Time:</span>
+                                <span class="ml-2 font-semibold">${currentTime} (${dayNight})</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">MUF:</span>
+                                <span class="ml-2 font-semibold">${muf} MHz</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Quality:</span>
+                                <span class="ml-2 font-semibold ${getPropagationQualityClass(quality)}">${quality}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Solar Phase:</span>
+                                <span class="ml-2 font-semibold">${phase}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Key Findings -->
+                    <div class="space-y-2">
+                        <div class="text-sm text-gray-400 font-semibold">Key Findings:</div>
+                        <div class="text-sm text-gray-300 space-y-1">
+                            <div>• MUF is currently ${muf} MHz, indicating ${muf > 20 ? 'excellent' : muf > 15 ? 'good' : muf > 10 ? 'fair' : 'poor'} HF conditions</div>
+                            <div>• Solar cycle is in ${phase.toLowerCase()} phase</div>
+                            <div>• Best operating bands: ${bestBands.slice(0, 3).join(', ') || 'None identified'}</div>
+                            <div>• Overall propagation quality: ${quality}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Outlook -->
+                    <div class="space-y-2">
+                        <div class="text-sm text-gray-400 font-semibold">Outlook:</div>
+                        <div class="text-sm text-gray-300">
+                            ${solarCycle.prediction || 'Conditions analysis in progress...'}
+                        </div>
+                    </div>
+                </div>
+            `);
         }
 
-        // Show notification function
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification fixed top-4 left-4 bg-${type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue'}-600 text-white px-4 py-2 rounded shadow-lg z-50`;
-            notification.textContent = message;
+                function updateSolarCycleInfo(data) {
+            if (!solarCycleDiv || !data.propagation_summary) return;
             
-            document.body.appendChild(notification);
+            console.log('Solar cycle data:', data.propagation_summary.solar_cycle);
+            const solarCycle = data.propagation_summary.solar_cycle || {};
             
-            // Auto-remove after 3 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 3000);
-        }
-        
-        // Version Management Functions
-        let currentVersion = null;
-        let updateNotificationShown = false;
-        
-        async function initializeVersionSystem() {
-            try {
-                // Get current version info
-                const response = await fetch('/api/version');
-                if (response.ok) {
-                    const versionInfo = await response.json();
-                    currentVersion = versionInfo.version;
-                    updateVersionDisplay(versionInfo);
-                    
-                    // Check for updates
-                    await checkForUpdates();
-                }
-            } catch (error) {
-                console.error('Error initializing version system:', error);
-            }
-        }
-        
-        function updateVersionDisplay(versionInfo) {
-            // Update footer version info
-            const footerVersion = document.getElementById('footer-version');
-            const footerBuildDate = document.getElementById('footer-build-date');
-            
-            if (footerVersion) {
-                footerVersion.textContent = `v${versionInfo.version}`;
-            }
-            if (footerBuildDate) {
-                footerBuildDate.textContent = versionInfo.build_date;
-            }
-        }
-        
-        async function checkForUpdates(force = false) {
-            try {
-                const url = force ? '/api/version/check?force=true' : '/api/version/check';
-                const response = await fetch(url);
-                
-                if (response.ok) {
-                    const updateInfo = await response.json();
-                    
-                    if (updateInfo.update_available && !updateNotificationShown) {
-                        showUpdateNotification(updateInfo);
-                        updateNotificationShown = true;
-                    }
-                    
-                    return updateInfo;
-                }
-            } catch (error) {
-                console.error('Error checking for updates:', error);
-            }
-            return null;
-        }
-        
-        function showUpdateNotification(updateInfo) {
-            // Remove existing update notifications
-            const existingNotifications = document.querySelectorAll('.update-notification');
-            existingNotifications.forEach(notification => notification.remove());
-            
-            const notification = document.createElement('div');
-            notification.className = 'update-notification fixed top-4 right-4 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md';
-            
-            const priorityClass = updateInfo.update_info?.priority === 'high' ? 'bg-red-600' : 'bg-blue-600';
-            notification.className = `update-notification fixed top-4 right-4 ${priorityClass} text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-md`;
-            
-            notification.innerHTML = `
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center">
-                        <i class="fas fa-download mr-2"></i>
-                        <div>
-                            <div class="font-semibold">Update Available!</div>
-                            <div class="text-sm opacity-90">${updateInfo.latest_version} is available</div>
+            safeSetHTML(solarCycleDiv, `
+                <div class="space-y-4">
+                    <!-- Current Status -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Phase:</span>
+                            <span class="font-semibold">${solarCycle.phase || 'N/A'}</span>
                         </div>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="text-sm mb-2">${updateInfo.update_info?.description || 'New version available'}</div>
-                    <div class="text-xs opacity-75">
-                        Current: ${updateInfo.current_version} → Latest: ${updateInfo.latest_version}
-                    </div>
-                </div>
-                
-                <div class="flex gap-2">
-                    <button onclick="showChangelog('${updateInfo.latest_version}')" 
-                            class="bg-white text-blue-600 px-3 py-1 rounded text-sm font-medium hover:bg-gray-100">
-                        View Changes
-                    </button>
-                    <button onclick="dismissUpdateNotification('${updateInfo.latest_version}')" 
-                            class="text-white opacity-75 hover:opacity-100 text-sm">
-                        Dismiss
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Auto-remove after 30 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 30000);
-        }
-        
-        async function showChangelog(version) {
-            try {
-                const response = await fetch('/api/version/changelog');
-                if (response.ok) {
-                    const changelog = await response.json();
-                    const versionInfo = changelog[version];
-                    
-                    if (versionInfo) {
-                        showChangelogModal(version, versionInfo);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching changelog:', error);
-            }
-        }
-        
-        function showChangelogModal(version, versionInfo) {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-            
-            modal.innerHTML = `
-                <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-2xl font-semibold text-white">Version ${version} - ${versionInfo.date}</h2>
-                        <button onclick="this.parentElement.parentElement.parentElement.remove()" 
-                                class="text-gray-400 hover:text-white">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <h3 class="text-lg font-semibold text-green-400 mb-2">New Features</h3>
-                            <ul class="list-disc list-inside space-y-1 text-gray-300">
-                                ${versionInfo.features.map(feature => `<li>${feature}</li>`).join('')}
-                            </ul>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Position:</span>
+                            <span class="font-semibold text-blue-300">${solarCycle.cycle_position || 'N/A'}</span>
                         </div>
-                        
-                        <div>
-                            <h3 class="text-lg font-semibold text-blue-400 mb-2">Improvements</h3>
-                            <ul class="list-disc list-inside space-y-1 text-gray-300">
-                                ${versionInfo.improvements.map(improvement => `<li>${improvement}</li>`).join('')}
-                            </ul>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">SFI:</span>
+                            <span class="font-semibold">${solarCycle.sfi_value || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Sunspots:</span>
+                            <span class="font-semibold">${solarCycle.sunspots || 'N/A'}</span>
                         </div>
                     </div>
                     
-                    <div class="mt-6 flex justify-end">
-                        <button onclick="this.parentElement.parentElement.parentElement.remove()" 
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
-                            Close
-                        </button>
+                    <!-- Trend Analysis -->
+                    <div class="space-y-2">
+                        <div class="text-sm text-gray-400 font-semibold">Trend Analysis:</div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Direction:</span>
+                            <span class="font-semibold ${solarCycle.sfi_trend === 'Strongly Rising' ? 'text-green-400' : solarCycle.sfi_trend === 'Rising' ? 'text-blue-400' : solarCycle.sfi_trend === 'Stable' ? 'text-yellow-400' : 'text-red-400'}">${solarCycle.sfi_trend || 'N/A'}</span>
+                        </div>
+                        <div class="text-xs text-gray-300">
+                            ${solarCycle.trend_description || 'No trend description available'}
+                        </div>
+                    </div>
+                    
+                    <!-- Prediction -->
+                    <div class="space-y-2">
+                        <div class="text-sm text-gray-400 font-semibold">HF Conditions Forecast:</div>
+                        <div class="text-sm text-gray-300">
+                            ${solarCycle.prediction || 'No prediction available'}
+                        </div>
+                        <div class="text-xs text-gray-400">
+                            ${solarCycle.phase_description || 'No phase description available'}
+                        </div>
+                    </div>
+                    
+                    <!-- Calculation Method -->
+                    <div class="text-xs text-gray-500 border-t border-gray-700 pt-2">
+                        ${solarCycle.calculation_method || 'Calculation method not specified'}
                     </div>
                 </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            // Close modal when clicking outside
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            });
+            `);
         }
-        
-        async function dismissUpdateNotification(version) {
-            try {
-                await fetch('/api/version/notify', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ version: version })
+
+        function updateRiskAssessment(data) {
+            const riskAssessmentDiv = document.getElementById('risk-assessment');
+            if (!riskAssessmentDiv || !data.propagation_summary) return;
+            
+            const summary = data.propagation_summary;
+            const params = summary.propagation_parameters || {};
+            const solarCycle = summary.solar_cycle || {};
+            const aurora = summary.aurora_conditions || {};
+            
+            // Analyze risks based on current conditions
+            const risks = [];
+            const warnings = [];
+            
+            // Check geomagnetic activity
+            const kIndex = data.solar_conditions?.k_index || 0;
+            if (kIndex >= 6) {
+                risks.push({
+                    level: 'CRITICAL',
+                    message: 'Severe geomagnetic storm - Avoid HF operation',
+                    impact: 'Complete HF blackout likely',
+                    recommendation: 'Use VHF/UHF for local contacts only'
                 });
-                
-                // Remove the notification
-                const notifications = document.querySelectorAll('.update-notification');
-                notifications.forEach(notification => notification.remove());
-                
-                showNotification('Update notification dismissed', 'success');
-            } catch (error) {
-                console.error('Error dismissing update notification:', error);
+            } else if (kIndex >= 4) {
+                risks.push({
+                    level: 'HIGH',
+                    message: 'Strong geomagnetic activity',
+                    impact: 'HF propagation severely degraded',
+                    recommendation: 'Focus on lower bands (80m, 40m)'
+                });
+            } else if (kIndex >= 2) {
+                warnings.push({
+                    level: 'MODERATE',
+                    message: 'Elevated geomagnetic activity',
+                    impact: 'HF conditions may be unstable',
+                    recommendation: 'Monitor conditions, avoid higher bands'
+                });
             }
-        }
-        
-        async function showFullChangelog() {
-            try {
-                const response = await fetch('/api/version/changelog');
-                if (response.ok) {
-                    const changelog = await response.json();
-                    showFullChangelogModal(changelog);
-                }
-            } catch (error) {
-                console.error('Error fetching full changelog:', error);
-            }
-        }
-        
-        function showFullChangelogModal(changelog) {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             
-            modal.innerHTML = `
-                <div class="bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-semibold text-white">Complete Changelog</h2>
-                        <button onclick="this.parentElement.parentElement.remove()" 
-                                class="text-gray-400 hover:text-white">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
+            // Check solar flux
+            const sfi = solarCycle.sfi_value || 0;
+            if (sfi < 60) {
+                risks.push({
+                    level: 'HIGH',
+                    message: 'Very low solar flux',
+                    impact: 'Poor HF conditions across all bands',
+                    recommendation: 'Focus on local contacts and lower bands'
+                });
+            }
+            
+            // Check aurora conditions
+            if (aurora.activity === 'Strong' || aurora.activity === 'Moderate') {
+                warnings.push({
+                    level: 'MODERATE',
+                    message: 'Auroral activity detected',
+                    impact: 'HF propagation may be affected at high latitudes',
+                    recommendation: 'Monitor conditions, expect unusual propagation'
+                });
+            }
+            
+            // If no risks or warnings, show positive status
+            if (risks.length === 0 && warnings.length === 0) {
+                safeSetHTML(riskAssessmentDiv, `
+                    <div class="space-y-3">
+                        <div class="bg-green-900/20 border border-green-500/30 p-4 rounded-lg">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                                <span class="font-semibold text-green-400">Low Risk Conditions</span>
+                            </div>
+                            <div class="text-sm text-green-300">
+                                Current propagation conditions present minimal risks for HF operation.
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="space-y-6">
-                        ${Object.entries(changelog).map(([version, info]) => `
-                            <div class="border-b border-gray-700 pb-4 last:border-b-0">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h3 class="text-xl font-semibold text-blue-400">Version ${version}</h3>
-                                    <span class="text-sm text-gray-400">${info.date}</span>
+                `);
+                return;
+            }
+            
+            // Display risks and warnings
+            let riskHtml = '';
+            
+            if (risks.length > 0) {
+                riskHtml += `
+                    <div class="space-y-3 mb-4">
+                        <div class="text-sm text-red-400 font-semibold">High Risk Conditions:</div>
+                        ${risks.map(risk => `
+                            <div class="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-exclamation-triangle text-red-400 mr-2"></i>
+                                    <span class="font-semibold text-red-400">${risk.level}</span>
                                 </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <h4 class="text-lg font-semibold text-green-400 mb-2">New Features</h4>
-                                        <ul class="list-disc list-inside space-y-1 text-gray-300">
-                                            ${info.features.map(feature => `<li>${feature}</li>`).join('')}
-                                        </ul>
-                                    </div>
-                                    
-                                    <div>
-                                        <h4 class="text-lg font-semibold text-blue-400 mb-2">Improvements</h4>
-                                        <ul class="list-disc list-inside space-y-1 text-gray-300">
-                                            ${info.improvements.map(improvement => `<li>${improvement}</li>`).join('')}
-                                        </ul>
-                                    </div>
-                                </div>
+                                <div class="text-sm text-red-300 mb-2">${risk.message}</div>
+                                <div class="text-xs text-red-400 mb-1">Impact: ${risk.impact}</div>
+                                <div class="text-xs text-orange-300">Recommendation: ${risk.recommendation}</div>
                             </div>
                         `).join('')}
                     </div>
-                    
-                    <div class="mt-6 flex justify-end">
-                        <button onclick="this.parentElement.parentElement.remove()" 
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
-                            Close
-                        </button>
+                `;
+            }
+            
+            if (warnings.length > 0) {
+                riskHtml += `
+                    <div class="space-y-3">
+                        <div class="text-sm text-yellow-400 font-semibold">Warnings:</div>
+                        ${warnings.map(warning => `
+                            <div class="bg-yellow-900/20 border border-yellow-500/30 p-3 rounded-lg">
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-exclamation-circle text-yellow-400 mr-2"></i>
+                                    <span class="font-semibold text-yellow-400">${warning.level}</span>
+                                </div>
+                                <div class="text-sm text-yellow-300 mb-2">${warning.message}</div>
+                                <div class="text-xs text-yellow-400 mb-1">Impact: ${warning.impact}</div>
+                                <div class="text-xs text-orange-300">Recommendation: ${warning.recommendation}</div>
+                            </div>
+                        `).join('')}
                     </div>
-                </div>
-            `;
+                `;
+            }
             
-            document.body.appendChild(modal);
-            
-            // Close modal when clicking outside
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            });
+            safeSetHTML(riskAssessmentDiv, riskHtml);
         }
+
+        // Main update function
+        function updateAllUI(data) {
+            console.log('Updating UI with data:', data);
+            console.log('Propagation summary structure:', data.propagation_summary);
+            
+            updateTimestampAndLocation(data);
+            updateSolarConditions(data);
+            updatePropagationCurrent(data);
+            updateBestBandsCurrent(data);
+            updateBandConditions(data);
+            updateWeatherConditions(data);
+            updateExecutiveSummary(data);
+            updateSolarCycleInfo(data);
+            updateRecommendations(data);
+            updateRiskAssessment(data);
+            updateLiveActivity(data);
+        }
+
+        // Initialize UI when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const dataElement = document.getElementById('data');
+                if (dataElement && dataElement.textContent) {
+                    const data = JSON.parse(dataElement.textContent);
+                    console.log('Initial data loaded:', data);
+                    updateAllUI(data);
+                } else {
+                    console.warn('No initial data found');
+                }
+            } catch (error) {
+                console.error('Error parsing initial data:', error);
+            }
+        });
+
+        // Live spots functionality
+        function updateLiveActivity(data) {
+            if (!summaryDiv || !tableBody) return;
+            
+            console.log('Live activity data:', data.live_activity);
+            
+            // Update loading status
+            const loadingSpinner = document.getElementById('spots-loading');
+            const statusSpan = document.getElementById('spots-status');
+            
+            if (data.live_activity && data.live_activity.spots && data.live_activity.spots.length > 0) {
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                if (statusSpan) statusSpan.textContent = `${data.live_activity.spots.length} spots loaded`;
+            } else {
+                if (loadingSpinner) loadingSpinner.style.display = 'inline-block';
+                if (statusSpan) statusSpan.textContent = 'Loading spots...';
+            }
+            
+            // Update activity summary
+            if (data.live_activity && data.live_activity.summary) {
+                const summary = data.live_activity.summary;
+                safeSetHTML(summaryDiv, `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="data-card">
+                            <div class="text-gray-400 font-body text-sm mb-2">Total Spots</div>
+                            <div class="text-xl font-heading text-white">${summary.total_spots || 0}</div>
+                        </div>
+                        <div class="data-card">
+                            <div class="text-gray-400 font-body text-sm mb-2">Active Bands</div>
+                            <div class="text-xl font-heading text-white">${summary.active_bands || 0}</div>
+                        </div>
+                        <div class="data-card">
+                            <div class="text-gray-400 font-body text-sm mb-2">Active Modes</div>
+                            <div class="text-xl font-heading text-white">${summary.active_modes || 0}</div>
+                        </div>
+                        <div class="data-card">
+                            <div class="text-gray-400 font-body text-sm mb-2">Active DXCC</div>
+                            <div class="text-xl font-heading text-white">${summary.active_dxcc || 0}</div>
+                        </div>
+                    </div>
+                `);
+            }
+            
+            // Update spots table
+            if (data.live_activity && data.live_activity.spots && data.live_activity.spots.length > 0) {
+                const spots = data.live_activity.spots;
+                const spotsHtml = spots.slice(0, 20).map(spot => `
+                    <tr class="hover:bg-gray-800">
+                        <td class="px-4 py-2 text-sm">${spot.time || spot.timestamp || 'N/A'}</td>
+                        <td class="px-4 py-2 font-mono">${spot.callsign || 'N/A'}</td>
+                        <td class="px-4 py-2 text-sm">${spot.frequency || 'N/A'}</td>
+                        <td class="px-4 py-2 text-sm">${spot.mode || 'N/A'}</td>
+                        <td class="px-4 py-2 text-sm">${spot.dxcc || 'N/A'}</td>
+                        <td class="px-4 py-2 text-sm">${spot.source || 'N/A'}</td>
+                        <td class="px-4 py-2 text-sm text-gray-400">${spot.comment || ''}</td>
+                    </tr>
+                `).join('');
+                
+                safeSetHTML(tableBody, spotsHtml);
+            } else {
+                safeSetHTML(tableBody, `
+                    <tr>
+                        <td colspan="7" class="px-4 py-2 text-center text-gray-400">
+                            No spots data available
+                        </td>
+                    </tr>
+                `);
+            }
+        }
+
+        // Utility functions
+        function checkForUpdates() {
+            console.log('Checking for updates...');
+            // Implementation for update checking
+        }
+
+        function showFullChangelog() {
+            console.log('Showing changelog...');
+            // Implementation for changelog display
+        }
+
+        // Auto-refresh functionality
+        let refreshInterval;
+        
+        function startAutoRefresh() {
+            refreshInterval = setInterval(() => {
+                // Refresh data every 5 minutes
+                console.log('Auto-refreshing data...');
+                // Implement data refresh logic here
+            }, 5 * 60 * 1000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        // Start auto-refresh when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            startAutoRefresh();
+        });
+
+        // Stop auto-refresh when page is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+            }
+        });
     </script>
 </body>
 </html>

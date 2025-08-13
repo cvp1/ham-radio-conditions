@@ -188,6 +188,73 @@ def get_solar_conditions_debug():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@api_bp.route('/debug/location-info', methods=['GET'])
+def get_location_debug_info():
+    """Get debug information about location and geomagnetic calculations."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        debug_info = ham_conditions.get_location_debug_info()
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting location debug info: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/api-status', methods=['GET'])
+def get_api_status():
+    """Get status of external APIs and data sources."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        status_info = ham_conditions.get_api_status()
+        return jsonify(status_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting API status: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/update/install', methods=['POST'])
+def install_update():
+    """Install available updates."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        data = request.get_json() or {}
+        update_type = data.get('update_type', 'manual')
+        
+        result = ham_conditions.install_update(update_type)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error installing update: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/update/status', methods=['GET'])
+def get_update_status():
+    """Get current update installation status."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+        
+        status = ham_conditions.get_update_status()
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error getting update status: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @api_bp.route('/cache/stats', methods=['GET'])
 def get_cache_stats():
     """Get cache statistics."""
