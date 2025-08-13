@@ -2022,6 +2022,13 @@ class HamRadioConditions:
             # Get enhanced ionospheric data for accurate MUF calculation
             iono_data = self._get_ionospheric_data()
             
+            # Debug: Log what's in iono_data
+            logger.info(f"DEBUG: iono_data keys after _get_ionospheric_data: {list(iono_data.keys())}")
+            if 'phase3_enhancements' in iono_data:
+                logger.info(f"DEBUG: Phase 3 data found: {list(iono_data['phase3_enhancements'].keys())}")
+            else:
+                logger.info("DEBUG: No Phase 3 data found in iono_data")
+            
             # Store both calculations for comparison
             traditional_muf = self._calculate_muf(solar_data.get('hamqsl', {}))
             
@@ -2267,7 +2274,8 @@ class HamRadioConditions:
 
             
             # Store result in variable and convert NumPy types for JSON serialization
-            result = {
+            try:
+                result = {
                 'current_time': current_time,
                             'day_night': 'Day' if sun_info['is_day'] else 'Night',
             'sunrise': sun_info['sunrise'],
@@ -2358,14 +2366,49 @@ class HamRadioConditions:
                 'enhanced_accuracy': self._calculate_enhanced_propagation_accuracy(
                     solar_data, 
                     self._get_enhanced_propagation_validation(), 
-                    self._get_ionospheric_data()
+                    iono_data  # Use the existing iono_data instead of calling _get_ionospheric_data() again
                 ),
                 'version_info': self.get_version_info(),
                 'update_notification': self.get_update_notification_data()
             }
+            except Exception as e:
+                logger.error(f"Error constructing result dictionary: {e}")
+                # Fallback to basic result structure
+                result = {
+                    'current_time': current_time,
+                    'day_night': 'Day' if sun_info['is_day'] else 'Night',
+                    'location': {
+                        'grid': self.grid_square,
+                        'latitude': round(self.lat, 2),
+                        'longitude': round(self.lon, 2),
+                        'timezone': str(self.timezone),
+                        'location_name': self._get_location_name()
+                    },
+                    'ionospheric': iono_data  # Ensure iono_data is preserved even in fallback
+                }
+            
+            # Debug: Log what's in iono_data before returning
+            logger.info(f"DEBUG: iono_data keys before return: {list(iono_data.keys())}")
+            if 'phase3_enhancements' in iono_data:
+                logger.info(f"DEBUG: Phase 3 data still present before return: {list(iono_data['phase3_enhancements'].keys())}")
+            else:
+                logger.info("DEBUG: Phase 3 data missing before return")
             
             # Convert NumPy types to Python native types for JSON serialization
-            return convert_numpy_types(result)
+            converted_result = convert_numpy_types(result)
+            
+            # Debug: Check if Phase 3 data survived the conversion
+            if 'enhanced_data_sources' in converted_result and 'ionospheric' in converted_result['enhanced_data_sources']:
+                iono = converted_result['enhanced_data_sources']['ionospheric']
+                logger.info(f"DEBUG: After convert_numpy_types - ionospheric keys: {list(iono.keys())}")
+                if 'phase3_enhancements' in iono:
+                    logger.info(f"DEBUG: After convert_numpy_types - Phase 3 data: {list(iono['phase3_enhancements'].keys())}")
+                else:
+                    logger.info("DEBUG: After convert_numpy_types - No Phase 3 data found")
+            else:
+                logger.info("DEBUG: After convert_numpy_types - No ionospheric section found")
+            
+            return converted_result
         except Exception as e:
             logger.error(f"Error generating propagation summary: {e}")
             # Return a default structure instead of None
@@ -4672,6 +4715,7 @@ class HamRadioConditions:
                                 auroral_analysis = self._analyze_auroral_activity(
                                     self._safe_float_conversion(solar_data.get('k_index', '2')),
                                     self._safe_float_conversion(solar_data.get('a_index', '5')),
+                                    self._safe_float_conversion(solar_data.get('aurora', '0')),
                                     solar_wind_data
                                 )
                                 auroral_muf = seasonal_muf * auroral_analysis['muf_adjustment']
@@ -6604,8 +6648,8 @@ class HamRadioConditions:
         else:
             return 'Unknown'
     
-    def _analyze_auroral_activity(self, k_index, a_index, solar_wind_data=None):
-        """Analyze auroral activity and its impact on propagation."""
+    def _analyze_auroral_activity(self, k_index, a_index, aurora_value=None, solar_wind_data=None):
+        """Analyze auroral activity and its impact on propagation using both K-index and aurora value."""
         try:
             auroral_analysis = {
                 'activity_level': 'quiet',
@@ -6618,8 +6662,10 @@ class HamRadioConditions:
                 'notes': []
             }
             
-            # Determine auroral activity level
-            if k_index >= 6:  # Severe storm
+            # Enhanced auroral activity determination using both K-index and aurora value
+            # This matches the logic used in the solar conditions panel
+            if k_index >= 6 or (aurora_value and aurora_value >= 8):
+                # Severe storm
                 auroral_analysis['activity_level'] = 'severe_storm'
                 auroral_analysis['impact_on_propagation'] = 'severe_degradation'
                 auroral_analysis['muf_adjustment'] = 0.6
@@ -6627,35 +6673,45 @@ class HamRadioConditions:
                 auroral_analysis['storm_probability'] = 'very_high'
                 auroral_analysis['recovery_time'] = '6-12_hours'
                 auroral_analysis['notes'].append("Severe geomagnetic storm - significant propagation degradation")
+                if aurora_value and aurora_value >= 8:
+                    auroral_analysis['notes'].append(f"High aurora value ({aurora_value}) indicates severe activity")
                 
-            elif k_index >= 5:  # Strong storm
-                auroral_analysis['activity_level'] = 'strong_storm'
-                auroral_analysis['impact_on_propagation'] = 'major_degradation'
-                auroral_analysis['muf_adjustment'] = 0.75
-                auroral_analysis['auroral_zone_effects'] = 'heavy_interference'
-                auroral_analysis['storm_probability'] = 'high'
-                auroral_analysis['recovery_time'] = '3-6_hours'
-                auroral_analysis['notes'].append("Strong geomagnetic storm - major propagation degradation")
-                
-            elif k_index >= 4:  # Minor storm
-                auroral_analysis['activity_level'] = 'minor_storm'
+            elif k_index >= 4 or (aurora_value and aurora_value >= 5):
+                # Moderate storm
+                auroral_analysis['activity_level'] = 'moderate_storm'
                 auroral_analysis['impact_on_propagation'] = 'moderate_degradation'
                 auroral_analysis['muf_adjustment'] = 0.85
                 auroral_analysis['auroral_zone_effects'] = 'moderate_interference'
                 auroral_analysis['storm_probability'] = 'moderate'
                 auroral_analysis['recovery_time'] = '1-3_hours'
-                auroral_analysis['notes'].append("Minor geomagnetic storm - moderate propagation degradation")
+                auroral_analysis['notes'].append("Moderate geomagnetic storm - moderate propagation degradation")
+                if aurora_value and aurora_value >= 5:
+                    auroral_analysis['notes'].append(f"Aurora value ({aurora_value}) indicates moderate activity")
                 
-            elif k_index >= 3:  # Unsettled
-                auroral_analysis['activity_level'] = 'unsettled'
+            elif k_index >= 2 or (aurora_value and aurora_value >= 3):
+                # Minor storm
+                auroral_analysis['activity_level'] = 'minor_storm'
                 auroral_analysis['impact_on_propagation'] = 'minor_degradation'
                 auroral_analysis['muf_adjustment'] = 0.95
                 auroral_analysis['auroral_zone_effects'] = 'light_interference'
                 auroral_analysis['storm_probability'] = 'low'
                 auroral_analysis['recovery_time'] = '30_minutes'
-                auroral_analysis['notes'].append("Unsettled conditions - minor propagation degradation")
+                auroral_analysis['notes'].append("Minor geomagnetic storm - minor propagation degradation")
+                if aurora_value and aurora_value >= 3:
+                    auroral_analysis['notes'].append(f"Aurora value ({aurora_value}) indicates minor activity")
                 
-            else:  # Quiet
+            elif aurora_value and aurora_value >= 1:
+                # Very minor activity
+                auroral_analysis['activity_level'] = 'very_minor'
+                auroral_analysis['impact_on_propagation'] = 'very_minor_degradation'
+                auroral_analysis['muf_adjustment'] = 0.98
+                auroral_analysis['auroral_zone_effects'] = 'minimal_interference'
+                auroral_analysis['storm_probability'] = 'very_low'
+                auroral_analysis['recovery_time'] = 'immediate'
+                auroral_analysis['notes'].append(f"Very minor auroral activity (value: {aurora_value}) - minimal propagation impact")
+                
+            else:
+                # Quiet conditions
                 auroral_analysis['activity_level'] = 'quiet'
                 auroral_analysis['impact_on_propagation'] = 'minimal'
                 auroral_analysis['muf_adjustment'] = 1.0
