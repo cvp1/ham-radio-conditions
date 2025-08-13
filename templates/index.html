@@ -924,6 +924,14 @@
                         </div>
                     </div>
                     
+                    <!-- Band Strategy Analysis -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">BAND STRATEGY ANALYSIS</div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            ${createBandStrategyAnalysis(bestBands, muf, dayNight)}
+                        </div>
+                    </div>
+                    
                     <!-- Band Strategy -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">BAND STRATEGY</div>
@@ -1096,6 +1104,163 @@
                     <div class="text-xs text-gray-300">${tactic.description}</div>
                 </div>
             `).join('');
+        }
+
+        function createBandStrategyAnalysis(bestBands, muf, dayNight) {
+            // Define band characteristics and scoring factors
+            const bandInfo = {
+                '160m': { freq: 1.8, day_optimal: false, night_optimal: true, weather_impact: 'low' },
+                '80m': { freq: 3.5, day_optimal: false, night_optimal: true, weather_impact: 'low' },
+                '40m': { freq: 7.0, day_optimal: false, night_optimal: true, weather_impact: 'low' },
+                '30m': { freq: 10.1, day_optimal: true, night_optimal: false, weather_impact: 'medium' },
+                '20m': { freq: 14.0, day_optimal: true, night_optimal: false, weather_impact: 'medium' },
+                '17m': { freq: 18.1, day_optimal: true, night_optimal: false, weather_impact: 'medium' },
+                '15m': { freq: 21.0, day_optimal: true, night_optimal: false, weather_impact: 'medium' },
+                '12m': { freq: 24.9, day_optimal: true, night_optimal: false, weather_impact: 'high' },
+                '10m': { freq: 28.0, day_optimal: true, night_optimal: false, weather_impact: 'high' },
+                '6m': { freq: 50.0, day_optimal: true, night_optimal: false, weather_impact: 'very_high' }
+            };
+            
+            // Calculate strategic analysis for each band
+            const analysis = Object.keys(bandInfo).map(band => {
+                const info = bandInfo[band];
+                const mufRatio = info.freq / muf;
+                const isSelected = bestBands.includes(band);
+                const timeOptimal = (dayNight === 'Day' && info.day_optimal) || 
+                                   (dayNight === 'Night' && info.night_optimal);
+                
+                // Calculate strategic score components
+                let mufScore = 0;
+                let timeScore = 0;
+                let weatherScore = 0;
+                let totalScore = 0;
+                
+                // MUF scoring (highest priority)
+                if (mufRatio <= 0.3) mufScore = 45;      // Very well below MUF
+                else if (mufRatio <= 0.5) mufScore = 42; // Well below MUF
+                else if (mufRatio <= 0.7) mufScore = 38; // Below MUF
+                else if (mufRatio <= 0.9) mufScore = 35; // Near MUF
+                else if (mufRatio <= 1.0) mufScore = 40; // At MUF (optimal)
+                else if (mufRatio <= 1.2) mufScore = 25; // Slightly above MUF
+                else if (mufRatio <= 1.5) mufScore = 15; // Above MUF
+                else mufScore = 5;                        // Well above MUF
+                
+                // Time optimization scoring
+                if (timeOptimal) timeScore = 40;
+                else if (dayNight === 'Day' && info.day_optimal === false) timeScore = 20;
+                else if (dayNight === 'Night' && info.night_optimal === false) timeScore = 20;
+                else timeScore = 30;
+                
+                // Weather impact scoring
+                switch(info.weather_impact) {
+                    case 'very_high': weatherScore = 35; break;
+                    case 'high': weatherScore = 30; break;
+                    case 'medium': weatherScore = 25; break;
+                    case 'low': weatherScore = 20; break;
+                    default: weatherScore = 25;
+                }
+                
+                totalScore = mufScore + timeScore + weatherScore;
+                
+                return {
+                    band,
+                    info,
+                    mufRatio,
+                    isSelected,
+                    timeOptimal,
+                    mufScore,
+                    timeScore,
+                    weatherScore,
+                    totalScore
+                };
+            }).sort((a, b) => b.totalScore - a.totalScore);
+            
+            // Generate analysis display
+            const analysisRows = analysis.map(band => {
+                const statusClass = band.isSelected ? 'border-green-500 bg-green-900/20' : 'border-gray-600 bg-gray-700/20';
+                const rankClass = band.isSelected ? 'text-green-400 font-bold' : 'text-gray-400';
+                const rank = analysis.findIndex(b => b.band === band.band) + 1;
+                
+                return `
+                    <div class="border-l-4 ${statusClass} bg-gray-700/20 p-3 rounded-r-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="font-semibold text-white">${band.band}</div>
+                            <div class="text-xs ${rankClass}">Rank #${rank}</div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <div class="text-gray-400">MUF Ratio</div>
+                                <div class="font-semibold ${band.mufRatio <= 1.0 ? 'text-green-400' : 'text-red-400'}">
+                                    ${band.mufRatio.toFixed(2)}x
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-gray-400">Total Score</div>
+                                <div class="font-semibold text-white">${band.totalScore}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-2 space-y-1 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">MUF Score:</span>
+                                <span class="text-blue-300">${band.mufScore}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Time Score:</span>
+                                <span class="text-yellow-300">${band.timeScore}</span>
+                                </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Weather Score:</span>
+                                <span class="text-purple-300">${band.weatherScore}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-2 text-xs">
+                            <div class="text-gray-400 mb-1">Strategic Analysis:</div>
+                            <div class="text-gray-300">
+                                ${band.mufRatio <= 1.0 ? 
+                                    `✅ Below MUF - Excellent propagation potential` :
+                                    `⚠️ Above MUF - Limited propagation potential`
+                                }
+                                ${band.timeOptimal ? 
+                                    ` | ✅ Optimal for ${dayNight.toLowerCase()}` :
+                                    ` | ⚠️ Suboptimal for ${dayNight.toLowerCase()}`
+                                }
+                                ${band.isSelected ? 
+                                    ` | 🎯 SELECTED - High strategic value` : ''
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="space-y-4">
+                    <div class="text-center mb-4">
+                        <div class="text-lg font-bold text-white mb-2">Band Scoring Analysis</div>
+                        <div class="text-sm text-gray-300">
+                            Detailed breakdown of how each band was scored and ranked
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        ${analysisRows}
+                    </div>
+                    
+                    <div class="bg-gray-700 p-3 rounded-lg mt-4">
+                        <div class="text-sm text-blue-300 font-semibold mb-2">Scoring Methodology</div>
+                        <div class="text-xs text-gray-300 space-y-1">
+                            <div><span class="font-semibold">MUF Score (0-45):</span> Based on frequency relationship to current MUF</div>
+                            <div><span class="font-semibold">Time Score (0-40):</span> Optimization for current time-of-day</div>
+                            <div><span class="font-semibold">Weather Score (0-35):</span> Impact of current weather conditions</div>
+                            <div><span class="font-semibold">Total Score:</span> Sum of all factors (0-120)</div>
+                            <div class="text-green-400 font-semibold mt-2">Bands with scores ≥ 80 are automatically selected</div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         function createTimeBasedStrategy(dayNight, muf, solarCycle) {
