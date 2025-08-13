@@ -30,9 +30,13 @@ def get_conditions():
         conditions = ham_conditions.generate_report()
         
         if conditions:
+            # Ensure JSON safety by converting NaN values
+            from ham_radio_conditions import safe_json_serialize
+            safe_conditions = safe_json_serialize(conditions)
+            
             # Cache the conditions
-            cache_set('conditions', 'current', conditions, max_age=300)  # 5 minutes
-            return jsonify(conditions)
+            cache_set('conditions', 'current', safe_conditions, max_age=300)  # 5 minutes
+            return jsonify(safe_conditions)
         else:
             return jsonify({'error': 'Failed to generate conditions'}), 500
             

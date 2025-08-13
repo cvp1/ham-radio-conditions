@@ -103,6 +103,23 @@ def register_blueprints(app):
     logger.info("Blueprints registered")
 
 
+def safe_json_serialize(obj):
+    """Safely serialize an object to JSON, handling NaN, inf, and other problematic values."""
+    import math
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return "N/A"  # Use safe string instead of None
+        return obj
+    elif isinstance(obj, dict):
+        return {key: safe_json_serialize(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [safe_json_serialize(item) for item in obj]
+    elif isinstance(obj, (int, str, bool, type(None))):
+        return obj
+    else:
+        # Convert other types to string
+        return str(obj)
+
 def register_routes(app):
     """Register application routes."""
     @app.route('/')
@@ -116,14 +133,20 @@ def register_routes(app):
         # Try to get cached conditions first
         cached_conditions = cache_get('conditions', 'current')
         if cached_conditions:
-            logger.debug("Using cached conditions for main page")
-            return render_template('index.html', data=cached_conditions)
+            print("=== MAIN PAGE: Using cached conditions ===")
+            # Ensure JSON safety for template rendering
+            safe_cached_conditions = safe_json_serialize(cached_conditions)
+            print(f"=== MAIN PAGE: JSON safety check: Original size={len(str(cached_conditions))}, Safe size={len(str(safe_cached_conditions))} ===")
+            return render_template('index.html', data=safe_cached_conditions)
         
         # Generate new conditions if not cached
-        logger.debug("Generating new conditions for main page")
+        print("=== MAIN PAGE: Generating new conditions ===")
         new_conditions = ham_conditions.generate_report()
         if new_conditions:
-            return render_template('index.html', data=new_conditions)
+            # Ensure JSON safety for template rendering
+            safe_new_conditions = safe_json_serialize(new_conditions)
+            print(f"=== MAIN PAGE: JSON safety check: Original size={len(str(new_conditions))}, Safe size={len(str(safe_new_conditions))} ===")
+            return render_template('index.html', data=safe_new_conditions)
         else:
             # Return empty data if generation fails
             return render_template('index.html', data={})

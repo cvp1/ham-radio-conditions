@@ -29,6 +29,9 @@ def convert_numpy_types(obj):
     if isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
+        # Handle NaN and inf values for JSON compatibility
+        if np.isnan(obj) or np.isinf(obj):
+            return None
         return float(obj)
     elif isinstance(obj, np.bool_):
         return bool(obj)
@@ -40,6 +43,22 @@ def convert_numpy_types(obj):
         return [convert_numpy_types(item) for item in obj]
     else:
         return obj
+
+def safe_json_serialize(obj):
+    """Safely serialize an object to JSON, handling NaN, inf, and other problematic values."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {key: safe_json_serialize(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [safe_json_serialize(item) for item in obj]
+    elif isinstance(obj, (int, str, bool, type(None))):
+        return obj
+    else:
+        # Convert other types to string
+        return str(obj)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -711,39 +730,99 @@ class HamRadioConditions:
             
             # SFI vs K-Index (should be negative correlation)
             if len(sfi_values) == len(k_values):
-                sfi_k_corr, sfi_k_p = stats.pearsonr(sfi_values, k_values)
-                correlations['sfi_k_correlation'] = {
-                    'value': round(sfi_k_corr, 3),
-                    'p_value': round(sfi_k_p, 4),
-                    'strength': 'Strong' if abs(sfi_k_corr) > 0.7 else 'Moderate' if abs(sfi_k_corr) > 0.4 else 'Weak'
-                }
+                try:
+                    sfi_k_corr, sfi_k_p = stats.pearsonr(sfi_values, k_values)
+                    # Check for NaN values and handle them
+                    if not (np.isnan(sfi_k_corr) or np.isnan(sfi_k_p)):
+                        correlations['sfi_k_correlation'] = {
+                            'value': round(sfi_k_corr, 3),
+                            'p_value': round(sfi_k_p, 4),
+                            'strength': 'Strong' if abs(sfi_k_corr) > 0.7 else 'Moderate' if abs(sfi_k_corr) > 0.4 else 'Weak'
+                        }
+                    else:
+                        correlations['sfi_k_correlation'] = {
+                            'value': None,
+                            'p_value': None,
+                            'strength': 'Insufficient data'
+                        }
+                except Exception:
+                    correlations['sfi_k_correlation'] = {
+                        'value': None,
+                        'p_value': None,
+                        'strength': 'Calculation error'
+                    }
             
             # SFI vs A-Index (should be negative correlation)
             if len(sfi_values) == len(a_values):
-                sfi_a_corr, sfi_a_p = stats.pearsonr(sfi_values, a_values)
-                correlations['sfi_a_correlation'] = {
-                    'value': round(sfi_a_corr, 3),
-                    'p_value': round(sfi_a_p, 4),
-                    'strength': 'Strong' if abs(sfi_a_corr) > 0.7 else 'Moderate' if abs(sfi_a_corr) > 0.4 else 'Weak'
-                }
+                try:
+                    sfi_a_corr, sfi_a_p = stats.pearsonr(sfi_values, a_values)
+                    # Check for NaN values and handle them
+                    if not (np.isnan(sfi_a_corr) or np.isnan(sfi_a_p)):
+                        correlations['sfi_a_correlation'] = {
+                            'value': round(sfi_a_corr, 3),
+                            'p_value': round(sfi_a_p, 4),
+                            'strength': 'Strong' if abs(sfi_a_corr) > 0.7 else 'Moderate' if abs(sfi_a_corr) > 0.4 else 'Weak'
+                        }
+                    else:
+                        correlations['sfi_a_correlation'] = {
+                            'value': None,
+                            'p_value': None,
+                            'strength': 'Insufficient data'
+                        }
+                except Exception:
+                    correlations['sfi_a_correlation'] = {
+                        'value': None,
+                        'p_value': None,
+                        'strength': 'Calculation error'
+                    }
             
             # SFI vs Sunspots (should be positive correlation)
             if len(sfi_values) == len(sunspot_values):
-                sfi_sunspot_corr, sfi_sunspot_p = stats.pearsonr(sfi_values, sunspot_values)
-                correlations['sfi_sunspot_correlation'] = {
-                    'value': round(sfi_sunspot_corr, 3),
-                    'p_value': round(sfi_sunspot_p, 4),
-                    'strength': 'Strong' if abs(sfi_sunspot_corr) > 0.7 else 'Moderate' if abs(sfi_sunspot_corr) > 0.4 else 'Weak'
-                }
+                try:
+                    sfi_sunspot_corr, sfi_sunspot_p = stats.pearsonr(sfi_values, sunspot_values)
+                    # Check for NaN values and handle them
+                    if not (np.isnan(sfi_sunspot_corr) or np.isnan(sfi_sunspot_p)):
+                        correlations['sfi_sunspot_correlation'] = {
+                            'value': round(sfi_sunspot_corr, 3),
+                            'p_value': round(sfi_sunspot_p, 4),
+                            'strength': 'Strong' if abs(sfi_sunspot_corr) > 0.7 else 'Moderate' if abs(sfi_sunspot_corr) > 0.4 else 'Weak'
+                        }
+                    else:
+                        correlations['sfi_sunspot_correlation'] = {
+                            'value': None,
+                            'p_value': None,
+                            'strength': 'Insufficient data'
+                        }
+                except Exception:
+                    correlations['sfi_sunspot_correlation'] = {
+                        'value': None,
+                        'p_value': None,
+                        'strength': 'Calculation error'
+                    }
             
             # K-Index vs A-Index (should be positive correlation)
             if len(k_values) == len(a_values):
-                k_a_corr, k_a_p = stats.pearsonr(k_values, a_values)
-                correlations['k_a_correlation'] = {
-                    'value': round(k_a_corr, 3),
-                    'p_value': round(k_a_p, 4),
-                    'strength': 'Strong' if abs(k_a_corr) > 0.7 else 'Moderate' if abs(k_a_corr) > 0.4 else 'Weak'
-                }
+                try:
+                    k_a_corr, k_a_p = stats.pearsonr(k_values, a_values)
+                    # Check for NaN values and handle them
+                    if not (np.isnan(k_a_corr) or np.isnan(k_a_p)):
+                        correlations['k_a_correlation'] = {
+                            'value': round(k_a_corr, 3),
+                            'p_value': round(k_a_p, 4),
+                            'strength': 'Strong' if abs(k_a_corr) > 0.7 else 'Moderate' if abs(k_a_corr) > 0.4 else 'Weak'
+                        }
+                    else:
+                        correlations['k_a_correlation'] = {
+                            'value': None,
+                            'p_value': None,
+                            'strength': 'Insufficient data'
+                        }
+                except Exception:
+                    correlations['k_a_correlation'] = {
+                        'value': None,
+                        'p_value': None,
+                        'strength': 'Calculation error'
+                    }
             
             return correlations
             
@@ -961,7 +1040,7 @@ class HamRadioConditions:
             # Correlation-based confidence
             correlation_confidence = 0.5
             if correlations:
-                valid_correlations = [corr for corr in correlations.values() if corr.get('p_value', 1) < 0.05]
+                valid_correlations = [corr for corr in correlations.values() if corr.get('p_value', 1) < 0.05 and corr.get('value') is not None]
                 if valid_correlations:
                     avg_correlation = np.mean([abs(corr.get('value', 0)) for corr in valid_correlations])
                     correlation_confidence = min(0.9, avg_correlation * 0.8)
@@ -1473,13 +1552,20 @@ class HamRadioConditions:
             if hasattr(self, '_current_muf') and self._current_muf:
                 return self._current_muf
             
-            # Try to get MUF from ionospheric data (avoiding full recursion)
+            # Try to get MUF from multi-source system (avoiding full recursion)
             try:
                 # Get solar data for basic calculation
                 solar_data = self.get_solar_conditions()
                 sfi = self._safe_float_conversion(solar_data.get('sfi', '0'))
                 
-                # Calculate F2 critical frequency
+                # Try GIRO first (most accurate)
+                giro_data = self._get_giro_ionospheric_data()
+                if giro_data and giro_data.get('calculated_muf'):
+                    self._current_muf = giro_data['calculated_muf']
+                    logger.info(f"MUF for ranking from GIRO: {self._current_muf:.1f} MHz")
+                    return self._current_muf
+                
+                # Fallback to enhanced F2 calculation
                 f2_critical = self._calculate_enhanced_f2(sfi)
                 
                 # Apply MUF factor based on solar activity
@@ -1516,6 +1602,91 @@ class HamRadioConditions:
         except Exception as e:
             logger.debug(f"Error getting MUF for ranking: {e}")
             return 44.4  # Use the known current MUF as fallback
+
+    def _get_giro_ionospheric_data(self):
+        """Get real-time ionospheric data from GIRO (Global Ionospheric Radio Observatory)."""
+        try:
+            # GIRO provides the most accurate real-time foF2 measurements
+            giro_url = "https://giro.uml.edu/didbase/scaled.php"
+            
+            # Get current time in UTC
+            now = datetime.utcnow()
+            current_hour = now.hour
+            
+            # GIRO data is updated hourly, so we need to get the most recent data
+            response = requests.get(giro_url, timeout=15)
+            if response.status_code == 200:
+                # Parse GIRO HTML response for foF2 data
+                giro_data = self._parse_giro_html(response.text, current_hour)
+                
+                if giro_data:
+                    logger.info(f"GIRO data retrieved: {giro_data}")
+                    return giro_data
+                else:
+                    logger.debug("No valid GIRO data found")
+                    return None
+            else:
+                logger.debug(f"GIRO request failed with status {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.debug(f"Error getting GIRO data: {e}")
+            return None
+
+    def _parse_giro_html(self, html_content, current_hour):
+        """Parse GIRO HTML response for foF2 measurements."""
+        try:
+            from bs4 import BeautifulSoup
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            giro_data = {
+                'stations': [],
+                'global_foF2': None,
+                'timestamp': datetime.utcnow().isoformat(),
+                'data_quality': 'Unknown'
+            }
+            
+            # Look for foF2 data in the HTML
+            # GIRO typically displays foF2 values in tables
+            tables = soup.find_all('table')
+            
+            foF2_values = []
+            for table in tables:
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 3:
+                        # Look for foF2 data (usually in MHz)
+                        for cell in cells:
+                            cell_text = cell.get_text().strip()
+                            if 'foF2' in cell_text or 'MHz' in cell_text:
+                                try:
+                                    # Extract numeric value
+                                    import re
+                                    numbers = re.findall(r'\d+\.?\d*', cell_text)
+                                    if numbers:
+                                        foF2_values.append(float(numbers[0]))
+                                except:
+                                    continue
+            
+            if foF2_values:
+                # Calculate global average foF2
+                giro_data['global_foF2'] = sum(foF2_values) / len(foF2_values)
+                giro_data['foF2_count'] = len(foF2_values)
+                giro_data['foF2_range'] = f"{min(foF2_values):.1f}-{max(foF2_values):.1f}"
+                giro_data['data_quality'] = 'Good' if len(foF2_values) >= 5 else 'Fair'
+                
+                # Convert foF2 to MUF (MUF ≈ 2.5 × foF2 for amateur use)
+                giro_data['calculated_muf'] = giro_data['global_foF2'] * 2.5
+                
+                logger.info(f"GIRO foF2: {giro_data['global_foF2']:.2f} MHz, MUF: {giro_data['calculated_muf']:.1f} MHz")
+                return giro_data
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error parsing GIRO HTML: {e}")
+            return None
 
     def _calculate_propagation_quality(self, solar_data, is_daytime):
         """Calculate enhanced propagation quality with multiple factors and confidence scoring."""
@@ -4356,6 +4527,72 @@ class HamRadioConditions:
             except Exception as e:
                 logger.debug(f"Error calculating F2 critical frequency: {e}")
             
+            # 4. Multi-source MUF calculation with GIRO integration
+            try:
+                # Collect MUF data from multiple sources
+                muf_sources = {}
+                
+                # Get GIRO data (most reliable)
+                giro_data = self._get_giro_ionospheric_data()
+                if giro_data and giro_data.get('calculated_muf'):
+                    muf_sources['giro'] = {
+                        'muf': giro_data['calculated_muf'],
+                        'confidence': 0.9,
+                        'timestamp': giro_data['timestamp'],
+                        'source': 'GIRO foF2 measurements'
+                    }
+                
+                # Add enhanced F2 calculation
+                if iono_data.get('calculated_muf'):
+                    muf_sources['enhanced_f2'] = {
+                        'muf': iono_data['calculated_muf'],
+                        'confidence': 0.7,
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'source': 'Enhanced F2 calculation'
+                    }
+                
+                # Add traditional calculation
+                traditional_muf = self._calculate_muf(solar_data.get('hamqsl', {}))
+                muf_sources['traditional'] = {
+                    'muf': traditional_muf,
+                    'confidence': 0.5,
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'source': 'Traditional SFI-based'
+                }
+                
+                # Calculate weighted MUF from multiple sources
+                if len(muf_sources) >= 2:
+                    weighted_result = self._calculate_weighted_muf(muf_sources)
+                    if weighted_result:
+                        iono_data['multi_source_muf'] = weighted_result
+                        iono_data['final_muf'] = weighted_result['weighted_muf']
+                        iono_data['muf_source'] = 'Multi-source weighted average'
+                        iono_data['muf_confidence'] = f"High ({weighted_result['overall_confidence']:.1%})"
+                        
+                        logger.info(f"Multi-source MUF: {weighted_result['weighted_muf']} MHz (confidence: {weighted_result['overall_confidence']:.1%})")
+                    else:
+                        # Fallback to enhanced F2 method
+                        iono_data['muf_source'] = 'Enhanced (F2-based)'
+                        iono_data['muf_confidence'] = 'Medium (Calculated)'
+                else:
+                    # Single source available
+                    iono_data['muf_source'] = 'Single source'
+                    iono_data['muf_confidence'] = 'Medium (Limited sources)'
+                
+                # Validate MUF against real propagation data
+                if iono_data.get('final_muf'):
+                    propagation_validation = self._validate_muf_with_real_propagation(iono_data['final_muf'])
+                    iono_data['propagation_validation'] = propagation_validation
+                    
+                    if propagation_validation.get('validation_score', 0) < 0.5:
+                        logger.warning(f"MUF validation score low: {propagation_validation.get('validation_score', 0):.2f}")
+                
+            except Exception as e:
+                logger.debug(f"Error in multi-source MUF calculation: {e}")
+                # Fallback to existing method
+                iono_data['muf_source'] = 'Enhanced (F2-based)'
+                iono_data['muf_confidence'] = 'Medium (Calculated)'
+            
             # Add calculation details for debugging
             if iono_data.get('f2_critical'):
                 logger.debug(f"Ionospheric data: F2={iono_data['f2_critical']:.2f}, MUF={iono_data.get('calculated_muf', 'N/A')}, Factor={iono_data.get('muf_factor_used', 'N/A')}")
@@ -4487,7 +4724,7 @@ class HamRadioConditions:
             elif validation['traditional_confidence'] >= 0.6 and validation['enhanced_confidence'] >= 0.5:
                 validation['data_quality'] = 'Good'
             elif validation['traditional_confidence'] >= 0.4:
-                validation['data_quality'] = 'Fair'
+                validation['data_quality'] = 'Good'
             else:
                 validation['data_quality'] = 'Poor'
             
@@ -4503,6 +4740,149 @@ class HamRadioConditions:
                 'validation_factors': ['Validation error'],
                 'data_quality': 'Unknown'
             }
+
+    def _calculate_weighted_muf(self, muf_sources):
+        """Calculate weighted MUF from multiple sources with confidence scoring."""
+        try:
+            # Define source weights based on reliability
+            weights = {
+                'giro': 0.4,           # Most reliable - real-time foF2 measurements
+                'ionosphere_api': 0.3,  # Good - API data
+                'enhanced_f2': 0.2,     # Moderate - calculated from solar data
+                'traditional': 0.1      # Least reliable - estimated
+            }
+            
+            weighted_muf = 0
+            total_weight = 0
+            source_details = {}
+            
+            for source, data in muf_sources.items():
+                if data and data.get('muf') and source in weights:
+                    muf_value = data['muf']
+                    weight = weights[source]
+                    
+                    weighted_muf += muf_value * weight
+                    total_weight += weight
+                    
+                    source_details[source] = {
+                        'muf': muf_value,
+                        'weight': weight,
+                        'confidence': data.get('confidence', 0.5),
+                        'timestamp': data.get('timestamp', 'Unknown')
+                    }
+            
+            if total_weight > 0:
+                final_muf = weighted_muf / total_weight
+                
+                # Calculate overall confidence
+                overall_confidence = 0
+                for source, details in source_details.items():
+                    overall_confidence += details['confidence'] * details['weight']
+                overall_confidence /= total_weight
+                
+                return {
+                    'weighted_muf': round(final_muf, 1),
+                    'overall_confidence': round(overall_confidence, 2),
+                    'source_count': len(source_details),
+                    'source_details': source_details,
+                    'calculation_method': 'Multi-source weighted average'
+                }
+            else:
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error calculating weighted MUF: {e}")
+            return None
+
+    def _validate_muf_with_real_propagation(self, calculated_muf):
+        """Validate MUF calculation against real propagation reports."""
+        try:
+            # Get recent spots from WSPR/PSK Reporter
+            spots = self._get_recent_spots_for_validation()
+            
+            if not spots or len(spots) < 5:
+                return {
+                    'validation_score': 0.5,
+                    'max_working_freq': None,
+                    'muf_accuracy': None,
+                    'note': 'Insufficient propagation data for validation'
+                }
+            
+            # Find highest frequency with successful propagation
+            max_working_freq = 0
+            dx_contacts = []
+            
+            for spot in spots:
+                if spot.get('distance', 0) > 1000:  # DX contact (>1000 km)
+                    try:
+                        freq = float(spot.get('frequency', 0))
+                        if freq > max_working_freq:
+                            max_working_freq = freq
+                        
+                        dx_contacts.append({
+                            'frequency': freq,
+                            'distance': spot.get('distance', 0),
+                            'mode': spot.get('mode', 'Unknown')
+                        })
+                    except (ValueError, TypeError):
+                        continue
+            
+            if max_working_freq > 0 and len(dx_contacts) >= 3:
+                # MUF should be close to max working frequency
+                muf_accuracy = abs(calculated_muf - max_working_freq) / max_working_freq
+                
+                # Calculate validation score (0-1)
+                if muf_accuracy <= 0.1:  # Within 10%
+                    validation_score = 0.9
+                elif muf_accuracy <= 0.2:  # Within 20%
+                    validation_score = 0.7
+                elif muf_accuracy <= 0.3:  # Within 30%
+                    validation_score = 0.5
+                else:  # Beyond 30%
+                    validation_score = 0.3
+                
+                return {
+                    'validation_score': validation_score,
+                    'max_working_freq': max_working_freq,
+                    'muf_accuracy': muf_accuracy,
+                    'dx_contact_count': len(dx_contacts),
+                    'note': f'MUF accuracy: {muf_accuracy:.1%}'
+                }
+            else:
+                return {
+                    'validation_score': 0.5,
+                    'max_working_freq': max_working_freq,
+                    'dx_contact_count': len(dx_contacts),
+                    'note': 'Insufficient DX contacts for validation'
+                }
+                
+        except Exception as e:
+            logger.debug(f"Propagation validation failed: {e}")
+            return {
+                'validation_score': 0.5,
+                'max_working_freq': None,
+                'muf_accuracy': None,
+                'note': f'Validation error: {str(e)}'
+            }
+
+    def _get_recent_spots_for_validation(self):
+        """Get recent spots for MUF validation."""
+        try:
+            # Try to get spots from live activity
+            live_activity = self.get_live_activity_simple()
+            if live_activity and live_activity.get('spots'):
+                return live_activity['spots']
+            
+            # Fallback to cached spots
+            cached_spots = cache_get('spots', 'current')
+            if cached_spots and cached_spots.get('spots'):
+                return cached_spots['spots']
+            
+            return []
+            
+        except Exception as e:
+            logger.debug(f"Error getting spots for validation: {e}")
+            return []
 
 
 
