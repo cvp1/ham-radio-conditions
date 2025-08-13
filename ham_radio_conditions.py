@@ -2030,8 +2030,16 @@ class HamRadioConditions:
                 traditional_muf, iono_data, solar_data.get('hamqsl', {})
             )
             
-            # Use enhanced calculations, fallback to traditional method
-            if iono_data.get('adjusted_muf') and muf_validation['enhanced_confidence'] > 0.6:
+            # Use enhanced calculations, prioritize Phase 3 MUF, fallback to traditional method
+            if iono_data.get('final_muf') and iono_data.get('phase3_enhancements'):
+                muf = iono_data['final_muf']  # Use Phase 3 enhanced MUF (highest priority)
+                muf_source = iono_data.get('muf_source', 'Phase 3 Enhanced')
+                muf_confidence = iono_data.get('muf_confidence', 'Ultra High')
+            elif iono_data.get('final_muf') and iono_data.get('phase2_enhancements'):
+                muf = iono_data['final_muf']  # Use Phase 2 enhanced MUF
+                muf_source = iono_data.get('muf_source', 'Phase 2 Enhanced')
+                muf_confidence = iono_data.get('muf_confidence', 'Very High')
+            elif iono_data.get('adjusted_muf') and muf_validation['enhanced_confidence'] > 0.6:
                 muf = iono_data['adjusted_muf']  # Use time-of-day adjusted MUF
                 muf_source = 'Enhanced (Time-adjusted)'
                 muf_confidence = f"High ({muf_validation['enhanced_confidence']:.1%})"
@@ -2266,12 +2274,19 @@ class HamRadioConditions:
             'sunset': sun_info['sunset'],
             'enhanced_time_analysis': self._calculate_enhanced_time_of_day(sun_info),
             'enhanced_weather_analysis': self._calculate_weather_impact_on_propagation(self.get_weather_conditions()),
-            'phase2_enhancements': {
-                'geographic_modeling': True,
-                'solar_wind_integration': True,
-                'enhancement_level': 'Phase 2',
-                'description': 'Geographic MUF adjustments + Solar wind integration'
-            },
+                            'phase2_enhancements': {
+                    'geographic_modeling': True,
+                    'solar_wind_integration': True,
+                    'enhancement_level': 'Phase 2',
+                    'description': 'Geographic MUF adjustments + Solar wind integration'
+                },
+                'phase3_enhancements': {
+                    'seasonal_patterns': True,
+                    'auroral_modeling': True,
+                    'storm_prediction': True,
+                    'enhancement_level': 'Phase 3',
+                    'description': 'Advanced intelligence + Predictive modeling + Seasonal patterns + Auroral activity + Storm prediction'
+                },
                 'location': {
                     'grid': self.grid_square,
                     'latitude': round(self.lat, 2),
@@ -4605,50 +4620,106 @@ class HamRadioConditions:
                 if len(muf_sources) >= 2:
                     weighted_result = self._calculate_weighted_muf(muf_sources)
                     if weighted_result:
-                        # Phase 2: Apply geographic and solar wind adjustments
-                        base_muf = weighted_result['weighted_muf']
-                        
-                        # Geographic adjustments
-                        geo_adjustments = self._calculate_geographic_muf_adjustments(
-                            base_muf, self.lat, self.lon
-                        )
-                        
-                        # Solar wind adjustments
-                        solar_wind_data = self._get_solar_wind_data()
-                        if solar_wind_data:
-                            solar_wind_impact = solar_wind_data['propagation_impact']
-                            final_muf = geo_adjustments['adjusted_muf'] * solar_wind_impact['muf_adjustment']
+                                                    # Phase 2: Apply geographic and solar wind adjustments
+                            base_muf = weighted_result['weighted_muf']
                             
-                            iono_data['phase2_enhancements'] = {
-                                'geographic_adjustments': geo_adjustments,
-                                'solar_wind_data': solar_wind_data,
-                                'final_adjustment': geo_adjustments['adjustments']['total_adjustment'] * solar_wind_impact['muf_adjustment'],
-                                'confidence': min(geo_adjustments['confidence'], solar_wind_impact['confidence'])
-                            }
+                            # Geographic adjustments
+                            geo_adjustments = self._calculate_geographic_muf_adjustments(
+                                base_muf, self.lat, self.lon
+                            )
                             
-                            logger.info(f"Phase 2 MUF: {base_muf:.1f} → {geo_adjustments['adjusted_muf']:.1f} → {final_muf:.1f} MHz")
-                            logger.info(f"  Geographic: {geo_adjustments['adjustments']['total_adjustment']:.2f}x")
-                            logger.info(f"  Solar Wind: {solar_wind_impact['muf_adjustment']:.2f}x")
+                            # Solar wind adjustments
+                            solar_wind_data = self._get_solar_wind_data()
+                            if solar_wind_data:
+                                solar_wind_impact = solar_wind_data['propagation_impact']
+                                final_muf = geo_adjustments['adjusted_muf'] * solar_wind_impact['muf_adjustment']
+                                
+                                iono_data['phase2_enhancements'] = {
+                                    'geographic_adjustments': geo_adjustments,
+                                    'solar_wind_data': solar_wind_data,
+                                    'final_adjustment': geo_adjustments['adjustments']['total_adjustment'] * solar_wind_impact['muf_adjustment'],
+                                    'confidence': min(geo_adjustments['confidence'], solar_wind_impact['confidence'])
+                                }
+                                
+                                logger.info(f"Phase 2 MUF: {base_muf:.1f} → {geo_adjustments['adjusted_muf']:.1f} → {final_muf:.1f} MHz")
+                                logger.info(f"  Geographic: {geo_adjustments['adjustments']['total_adjustment']:.2f}x")
+                                logger.info(f"  Solar Wind: {solar_wind_impact['muf_adjustment']:.2f}x")
+                                
+                                iono_data['final_muf'] = final_muf
+                                iono_data['muf_source'] = 'Phase 2 Enhanced (Multi-source + Geo + Solar Wind)'
+                                iono_data['muf_confidence'] = f"Very High ({iono_data['phase2_enhancements']['confidence']:.1%})"
+                            else:
+                                # Fallback to geographic adjustments only
+                                final_muf = geo_adjustments['adjusted_muf']
+                                iono_data['phase2_enhancements'] = {
+                                    'geographic_adjustments': geo_adjustments,
+                                    'solar_wind_data': None,
+                                    'final_adjustment': geo_adjustments['adjustments']['total_adjustment'],
+                                    'confidence': geo_adjustments['confidence']
+                                }
+                                
+                                iono_data['final_muf'] = final_muf
+                                iono_data['muf_source'] = 'Phase 2 Enhanced (Multi-source + Geo)'
+                                iono_data['muf_confidence'] = 'High (Geographic only)'
                             
-                            iono_data['final_muf'] = final_muf
-                            iono_data['muf_source'] = 'Phase 2 Enhanced (Multi-source + Geo + Solar Wind)'
-                            iono_data['muf_confidence'] = f"Very High ({iono_data['phase2_enhancements']['confidence']:.1%})"
-                        else:
-                            # Fallback to geographic adjustments only
-                            final_muf = geo_adjustments['adjusted_muf']
-                            iono_data['phase2_enhancements'] = {
-                                'geographic_adjustments': geo_adjustments,
-                                'solar_wind_data': None,
-                                'final_adjustment': geo_adjustments['adjustments']['total_adjustment'],
-                                'confidence': geo_adjustments['confidence']
-                            }
+                            # Phase 3: Apply advanced intelligence and predictive modeling
+                            try:
+                                # Seasonal pattern analysis
+                                seasonal_analysis = self._analyze_seasonal_patterns()
+                                seasonal_muf = final_muf * seasonal_analysis['seasonal_factors'].get('muf_multiplier', 1.0)
+                                
+                                # Auroral activity analysis
+                                auroral_analysis = self._analyze_auroral_activity(
+                                    self._safe_float_conversion(solar_data.get('k_index', '2')),
+                                    self._safe_float_conversion(solar_data.get('a_index', '5')),
+                                    solar_wind_data
+                                )
+                                auroral_muf = seasonal_muf * auroral_analysis['muf_adjustment']
+                                
+                                # Storm impact prediction
+                                storm_prediction = self._predict_storm_impact(solar_data, solar_wind_data)
+                                storm_adjusted_muf = auroral_muf * (1.0 - storm_prediction['muf_degradation'])
+                                
+                                # Final Phase 3 MUF
+                                final_phase3_muf = storm_adjusted_muf
+                                
+                                iono_data['phase3_enhancements'] = {
+                                    'seasonal_analysis': seasonal_analysis,
+                                    'auroral_analysis': auroral_analysis,
+                                    'storm_prediction': storm_prediction,
+                                    'muf_evolution': {
+                                        'phase2_muf': final_muf,
+                                        'seasonal_adjusted': seasonal_muf,
+                                        'auroral_adjusted': auroral_muf,
+                                        'storm_adjusted': storm_adjusted_muf,
+                                        'final_phase3_muf': final_phase3_muf
+                                    },
+                                    'total_adjustment': (seasonal_analysis['seasonal_factors'].get('muf_multiplier', 1.0) * 
+                                                       auroral_analysis['muf_adjustment'] * 
+                                                       (1.0 - storm_prediction['muf_degradation'])),
+                                    'confidence': min(seasonal_analysis['confidence'], 
+                                                    auroral_analysis['confidence'], 
+                                                    storm_prediction['confidence'])
+                                }
+                                
+                                logger.info(f"Phase 3 MUF: {final_muf:.1f} → {seasonal_muf:.1f} → {auroral_muf:.1f} → {storm_adjusted_muf:.1f} MHz")
+                                logger.info(f"  Seasonal: {seasonal_analysis['seasonal_factors'].get('muf_multiplier', 1.0):.2f}x")
+                                logger.info(f"  Auroral: {auroral_analysis['muf_adjustment']:.2f}x")
+                                logger.info(f"  Storm: {1.0 - storm_prediction['muf_degradation']:.2f}x")
+                                
+                                iono_data['final_muf'] = final_phase3_muf
+                                iono_data['muf_source'] = 'Phase 3 Enhanced (Multi-source + Geo + Solar Wind + Seasonal + Auroral + Storm)'
+                                iono_data['muf_confidence'] = f"Ultra High ({iono_data['phase3_enhancements']['confidence']:.1%})"
+                                
+                            except Exception as e:
+                                logger.debug(f"Phase 3 enhancements failed: {e}")
+                                # Fallback to Phase 2 MUF
+                                iono_data['final_muf'] = final_muf
+                                iono_data['muf_source'] = 'Phase 2 Enhanced (Multi-source + Geo + Solar Wind)'
+                                iono_data['muf_confidence'] = f"Very High ({iono_data['phase2_enhancements']['confidence']:.1%})"
                             
-                            iono_data['final_muf'] = final_muf
-                            iono_data['muf_source'] = 'Phase 2 Enhanced (Multi-source + Geo)'
-                            iono_data['muf_confidence'] = 'High (Geographic only)'
-                        
-                        iono_data['multi_source_muf'] = weighted_result
-                        logger.info(f"Phase 2 Enhanced MUF: {final_muf:.1f} MHz (confidence: {iono_data['muf_confidence']})")
+                            iono_data['multi_source_muf'] = weighted_result
+                            logger.info(f"Final Enhanced MUF: {iono_data['final_muf']:.1f} MHz (confidence: {iono_data['muf_confidence']})")
                     else:
                         # Fallback to enhanced F2 method
                         iono_data['muf_source'] = 'Enhanced (F2-based)'
@@ -6379,6 +6450,377 @@ class HamRadioConditions:
                 'muf_adjustment': 1.0,
                 'confidence': 0.5,
                 'factors': []
+            }
+
+    # ===== PHASE 3: ADVANCED INTELLIGENCE & PREDICTIVE MODELING =====
+    
+    def _analyze_seasonal_patterns(self, historical_data=None):
+        """Analyze seasonal patterns in propagation conditions."""
+        try:
+            from datetime import datetime, timedelta
+            import calendar
+            
+            now = datetime.utcnow()
+            current_month = now.month
+            current_day = now.day
+            day_of_year = now.timetuple().tm_yday
+            
+            seasonal_analysis = {
+                'current_season': self._get_current_season(current_month),
+                'seasonal_factors': {},
+                'monthly_patterns': {},
+                'day_of_year_analysis': {},
+                'confidence': 0.8,
+                'notes': []
+            }
+            
+            # Seasonal factors based on month
+            if current_month in [12, 1, 2]:  # Winter
+                seasonal_analysis['seasonal_factors'] = {
+                    'muf_multiplier': 0.85,  # Lower MUF in winter
+                    'propagation_quality': 'reduced',
+                    'auroral_activity': 'increased',
+                    'day_length': 'short',
+                    'ionization': 'lower'
+                }
+                seasonal_analysis['notes'].append("Winter: Reduced ionization, increased auroral activity")
+                
+            elif current_month in [3, 4, 5]:  # Spring
+                seasonal_analysis['seasonal_factors'] = {
+                    'muf_multiplier': 1.05,  # Improving MUF in spring
+                    'propagation_quality': 'improving',
+                    'auroral_activity': 'moderate',
+                    'day_length': 'increasing',
+                    'ionization': 'building'
+                }
+                seasonal_analysis['notes'].append("Spring: Building ionization, improving conditions")
+                
+            elif current_month in [6, 7, 8]:  # Summer
+                seasonal_analysis['seasonal_factors'] = {
+                    'muf_multiplier': 1.15,  # Peak MUF in summer
+                    'propagation_quality': 'optimal',
+                    'auroral_activity': 'low',
+                    'day_length': 'long',
+                    'ionization': 'peak'
+                }
+                seasonal_analysis['notes'].append("Summer: Peak ionization, optimal conditions")
+                
+            elif current_month in [9, 10, 11]:  # Fall
+                seasonal_analysis['seasonal_factors'] = {
+                    'muf_multiplier': 0.95,  # Declining MUF in fall
+                    'propagation_quality': 'declining',
+                    'auroral_activity': 'increasing',
+                    'day_length': 'decreasing',
+                    'ionization': 'declining'
+                }
+                seasonal_analysis['notes'].append("Fall: Declining ionization, increasing auroral activity")
+            
+            # Day of year analysis (equinoxes and solstices)
+            if 79 <= day_of_year <= 81:  # Spring equinox (March 20-22)
+                seasonal_analysis['day_of_year_analysis'] = {
+                    'event': 'Spring Equinox',
+                    'muf_boost': 1.1,
+                    'propagation_enhancement': 'Equinox conditions - enhanced propagation',
+                    'duration': '3-5 days'
+                }
+                seasonal_analysis['notes'].append("Spring Equinox: Enhanced propagation conditions")
+                
+            elif 172 <= day_of_year <= 174:  # Summer solstice (June 20-22)
+                seasonal_analysis['day_of_year_analysis'] = {
+                    'event': 'Summer Solstice',
+                    'muf_boost': 1.15,
+                    'propagation_enhancement': 'Peak summer conditions - optimal propagation',
+                    'duration': '5-7 days'
+                }
+                seasonal_analysis['notes'].append("Summer Solstice: Peak propagation conditions")
+                
+            elif 265 <= day_of_year <= 267:  # Fall equinox (September 22-24)
+                seasonal_analysis['day_of_year_analysis'] = {
+                    'event': 'Fall Equinox',
+                    'muf_boost': 1.05,
+                    'propagation_enhancement': 'Equinox conditions - good propagation',
+                    'duration': '3-5 days'
+                }
+                seasonal_analysis['notes'].append("Fall Equinox: Good propagation conditions")
+                
+            elif 355 <= day_of_year <= 357:  # Winter solstice (December 21-23)
+                seasonal_analysis['day_of_year_analysis'] = {
+                    'event': 'Winter Solstice',
+                    'muf_boost': 0.9,
+                    'propagation_enhancement': 'Peak winter conditions - reduced propagation',
+                    'duration': '5-7 days'
+                }
+                seasonal_analysis['notes'].append("Winter Solstice: Reduced propagation conditions")
+            
+            # Monthly patterns (based on solar cycle position)
+            solar_data = self.get_solar_conditions()
+            sfi = self._safe_float_conversion(solar_data.get('sfi', '100'))
+            
+            if sfi > 150:  # High solar activity
+                seasonal_analysis['monthly_patterns'] = {
+                    'pattern': 'High solar activity',
+                    'muf_variation': '±15%',
+                    'propagation_stability': 'variable',
+                    'auroral_impact': 'significant'
+                }
+            elif sfi > 120:  # Moderate-high activity
+                seasonal_analysis['monthly_patterns'] = {
+                    'pattern': 'Moderate-high activity',
+                    'muf_variation': '±10%',
+                    'propagation_stability': 'stable',
+                    'auroral_impact': 'moderate'
+                }
+            else:  # Low activity
+                seasonal_analysis['monthly_patterns'] = {
+                    'pattern': 'Low solar activity',
+                    'muf_variation': '±5%',
+                    'propagation_stability': 'very_stable',
+                    'auroral_impact': 'minimal'
+                }
+            
+            logger.info(f"Seasonal analysis: {seasonal_analysis['current_season']} - MUF multiplier: {seasonal_analysis['seasonal_factors'].get('muf_multiplier', 1.0):.2f}")
+            
+            return seasonal_analysis
+            
+        except Exception as e:
+            logger.debug(f"Error analyzing seasonal patterns: {e}")
+            return {
+                'current_season': 'unknown',
+                'seasonal_factors': {'muf_multiplier': 1.0},
+                'confidence': 0.5,
+                'notes': ['Seasonal analysis failed']
+            }
+    
+    def _get_current_season(self, month):
+        """Get current season based on month."""
+        if month in [12, 1, 2]:
+            return 'Winter'
+        elif month in [3, 4, 5]:
+            return 'Spring'
+        elif month in [6, 7, 8]:
+            return 'Summer'
+        elif month in [9, 10, 11]:
+            return 'Fall'
+        else:
+            return 'Unknown'
+    
+    def _analyze_auroral_activity(self, k_index, a_index, solar_wind_data=None):
+        """Analyze auroral activity and its impact on propagation."""
+        try:
+            auroral_analysis = {
+                'activity_level': 'quiet',
+                'impact_on_propagation': 'minimal',
+                'muf_adjustment': 1.0,
+                'auroral_zone_effects': 'none',
+                'storm_probability': 'low',
+                'recovery_time': 'immediate',
+                'confidence': 0.8,
+                'notes': []
+            }
+            
+            # Determine auroral activity level
+            if k_index >= 6:  # Severe storm
+                auroral_analysis['activity_level'] = 'severe_storm'
+                auroral_analysis['impact_on_propagation'] = 'severe_degradation'
+                auroral_analysis['muf_adjustment'] = 0.6
+                auroral_analysis['auroral_zone_effects'] = 'complete_blackout'
+                auroral_analysis['storm_probability'] = 'very_high'
+                auroral_analysis['recovery_time'] = '6-12_hours'
+                auroral_analysis['notes'].append("Severe geomagnetic storm - significant propagation degradation")
+                
+            elif k_index >= 5:  # Strong storm
+                auroral_analysis['activity_level'] = 'strong_storm'
+                auroral_analysis['impact_on_propagation'] = 'major_degradation'
+                auroral_analysis['muf_adjustment'] = 0.75
+                auroral_analysis['auroral_zone_effects'] = 'heavy_interference'
+                auroral_analysis['storm_probability'] = 'high'
+                auroral_analysis['recovery_time'] = '3-6_hours'
+                auroral_analysis['notes'].append("Strong geomagnetic storm - major propagation degradation")
+                
+            elif k_index >= 4:  # Minor storm
+                auroral_analysis['activity_level'] = 'minor_storm'
+                auroral_analysis['impact_on_propagation'] = 'moderate_degradation'
+                auroral_analysis['muf_adjustment'] = 0.85
+                auroral_analysis['auroral_zone_effects'] = 'moderate_interference'
+                auroral_analysis['storm_probability'] = 'moderate'
+                auroral_analysis['recovery_time'] = '1-3_hours'
+                auroral_analysis['notes'].append("Minor geomagnetic storm - moderate propagation degradation")
+                
+            elif k_index >= 3:  # Unsettled
+                auroral_analysis['activity_level'] = 'unsettled'
+                auroral_analysis['impact_on_propagation'] = 'minor_degradation'
+                auroral_analysis['muf_adjustment'] = 0.95
+                auroral_analysis['auroral_zone_effects'] = 'light_interference'
+                auroral_analysis['storm_probability'] = 'low'
+                auroral_analysis['recovery_time'] = '30_minutes'
+                auroral_analysis['notes'].append("Unsettled conditions - minor propagation degradation")
+                
+            else:  # Quiet
+                auroral_analysis['activity_level'] = 'quiet'
+                auroral_analysis['impact_on_propagation'] = 'minimal'
+                auroral_analysis['muf_adjustment'] = 1.0
+                auroral_analysis['auroral_zone_effects'] = 'none'
+                auroral_analysis['storm_probability'] = 'very_low'
+                auroral_analysis['recovery_time'] = 'immediate'
+                auroral_analysis['notes'].append("Quiet geomagnetic conditions - optimal propagation")
+            
+            # A-index effects (longer-term geomagnetic activity)
+            if a_index > 30:  # High A-index
+                auroral_analysis['muf_adjustment'] *= 0.9
+                auroral_analysis['notes'].append(f"High A-index ({a_index}) - additional MUF reduction")
+            elif a_index < 5:  # Low A-index
+                auroral_analysis['muf_adjustment'] *= 1.05
+                auroral_analysis['notes'].append(f"Low A-index ({a_index}) - MUF enhancement")
+            
+            # Solar wind effects on auroral activity
+            if solar_wind_data:
+                speed = solar_wind_data.get('speed', 0)
+                bz = solar_wind_data.get('bz_component', 0)
+                
+                if speed > 500 and bz < -5:  # High speed + southward Bz
+                    auroral_analysis['storm_probability'] = 'increasing'
+                    auroral_analysis['notes'].append("High solar wind speed + southward Bz - storm probability increasing")
+                
+                if bz < -10:  # Strong southward Bz
+                    auroral_analysis['muf_adjustment'] *= 0.9
+                    auroral_analysis['notes'].append("Strong southward Bz - additional MUF reduction")
+            
+            # Geographic considerations (auroral zone effects)
+            if hasattr(self, 'lat') and abs(self.lat) > 60:  # High latitude
+                auroral_analysis['auroral_zone_effects'] = 'enhanced'
+                auroral_analysis['muf_adjustment'] *= 0.95
+                auroral_analysis['notes'].append(f"High latitude ({self.lat:.1f}°) - enhanced auroral effects")
+            
+            # Clamp adjustment to reasonable range
+            auroral_analysis['muf_adjustment'] = max(0.5, min(1.2, auroral_analysis['muf_adjustment']))
+            
+            logger.info(f"Auroral analysis: {auroral_analysis['activity_level']} - MUF adjustment: {auroral_analysis['muf_adjustment']:.2f}")
+            
+            return auroral_analysis
+            
+        except Exception as e:
+            logger.debug(f"Error analyzing auroral activity: {e}")
+            return {
+                'activity_level': 'unknown',
+                'muf_adjustment': 1.0,
+                'confidence': 0.5,
+                'notes': ['Auroral analysis failed']
+            }
+    
+    def _predict_storm_impact(self, solar_data, solar_wind_data=None):
+        """Predict solar storm impact on propagation."""
+        try:
+            storm_prediction = {
+                'storm_probability': 'low',
+                'expected_impact': 'minimal',
+                'muf_degradation': 0.0,
+                'recovery_timeline': 'immediate',
+                'affected_bands': [],
+                'confidence': 0.7,
+                'warnings': [],
+                'recommendations': []
+            }
+            
+            # Analyze current solar conditions
+            sfi = self._safe_float_conversion(solar_data.get('sfi', '100'))
+            k_index = self._safe_float_conversion(solar_data.get('k_index', '2'))
+            a_index = self._safe_float_conversion(solar_data.get('a_index', '5'))
+            x_ray_flux = solar_data.get('x_ray_flux', 'A0.0')
+            
+            # X-ray flux analysis (solar flare indicator)
+            if x_ray_flux.startswith('X'):
+                # X-class flare (major)
+                storm_prediction['storm_probability'] = 'very_high'
+                storm_prediction['expected_impact'] = 'severe'
+                storm_prediction['muf_degradation'] = 0.4
+                storm_prediction['recovery_timeline'] = '6-24_hours'
+                storm_prediction['affected_bands'] = ['10m', '12m', '15m', '17m', '20m']
+                storm_prediction['warnings'].append("X-class solar flare detected - severe propagation degradation expected")
+                storm_prediction['recommendations'].append("Avoid high-frequency bands for next 6-24 hours")
+                
+            elif x_ray_flux.startswith('M'):
+                # M-class flare (moderate)
+                storm_prediction['storm_probability'] = 'high'
+                storm_prediction['expected_impact'] = 'moderate'
+                storm_prediction['muf_degradation'] = 0.25
+                storm_prediction['recovery_timeline'] = '2-6_hours'
+                storm_prediction['affected_bands'] = ['10m', '12m', '15m']
+                storm_prediction['warnings'].append("M-class solar flare detected - moderate propagation degradation expected")
+                storm_prediction['recommendations'].append("Monitor high-frequency bands for degradation")
+                
+            elif x_ray_flux.startswith('C'):
+                # C-class flare (minor)
+                storm_prediction['storm_probability'] = 'moderate'
+                storm_prediction['expected_impact'] = 'minor'
+                storm_prediction['muf_degradation'] = 0.1
+                storm_prediction['recovery_timeline'] = '30_minutes'
+                storm_prediction['affected_bands'] = ['10m']
+                storm_prediction['warnings'].append("C-class solar flare detected - minor propagation degradation possible")
+                storm_prediction['recommendations'].append("Monitor 10m band for temporary degradation")
+            
+            # K-index storm analysis
+            if k_index >= 6:
+                storm_prediction['storm_probability'] = 'very_high'
+                storm_prediction['expected_impact'] = 'severe'
+                storm_prediction['muf_degradation'] = max(storm_prediction['muf_degradation'], 0.5)
+                storm_prediction['recovery_timeline'] = '6-12_hours'
+                storm_prediction['affected_bands'].extend(['20m', '30m', '40m'])
+                storm_prediction['warnings'].append(f"Severe geomagnetic storm (K={k_index}) - major propagation degradation")
+                storm_prediction['recommendations'].append("Focus on lower frequency bands (80m, 160m)")
+                
+            elif k_index >= 5:
+                storm_prediction['storm_probability'] = 'high'
+                storm_prediction['expected_impact'] = 'moderate'
+                storm_prediction['muf_degradation'] = max(storm_prediction['muf_degradation'], 0.3)
+                storm_prediction['recovery_timeline'] = '3-6_hours'
+                storm_prediction['affected_bands'].extend(['20m', '30m'])
+                storm_prediction['warnings'].append(f"Strong geomagnetic storm (K={k_index}) - moderate propagation degradation")
+                storm_prediction['recommendations'].append("Monitor mid-frequency bands for degradation")
+            
+            # A-index long-term effects
+            if a_index > 30:
+                storm_prediction['muf_degradation'] += 0.1
+                storm_prediction['warnings'].append(f"High A-index ({a_index}) - extended recovery period expected")
+                storm_prediction['recommendations'].append("Plan for extended recovery period")
+            
+            # Solar wind storm effects
+            if solar_wind_data:
+                speed = solar_wind_data.get('speed', 0)
+                bz = solar_wind_data.get('bz_component', 0)
+                
+                if speed > 600 and bz < -10:
+                    storm_prediction['storm_probability'] = 'very_high'
+                    storm_prediction['expected_impact'] = 'severe'
+                    storm_prediction['muf_degradation'] = max(storm_prediction['muf_degradation'], 0.4)
+                    storm_prediction['warnings'].append("High solar wind speed + strong southward Bz - severe storm conditions")
+                    storm_prediction['recommendations'].append("Prepare for severe propagation degradation")
+                
+                elif speed > 500 and bz < -5:
+                    storm_prediction['storm_probability'] = 'high'
+                    storm_prediction['expected_impact'] = 'moderate'
+                    storm_prediction['muf_degradation'] = max(storm_prediction['muf_degradation'], 0.2)
+                    storm_prediction['warnings'].append("Elevated solar wind conditions - moderate storm probability")
+                    storm_prediction['recommendations'].append("Monitor conditions closely")
+            
+            # Remove duplicate bands and sort
+            storm_prediction['affected_bands'] = sorted(list(set(storm_prediction['affected_bands'])))
+            
+            # Clamp degradation to reasonable range
+            storm_prediction['muf_degradation'] = min(0.8, storm_prediction['muf_degradation'])
+            
+            logger.info(f"Storm prediction: {storm_prediction['storm_probability']} probability, {storm_prediction['expected_impact']} impact")
+            
+            return storm_prediction
+            
+        except Exception as e:
+            logger.debug(f"Error predicting storm impact: {e}")
+            return {
+                'storm_probability': 'unknown',
+                'expected_impact': 'unknown',
+                'muf_degradation': 0.0,
+                'confidence': 0.5,
+                'warnings': ['Storm prediction failed'],
+                'recommendations': ['Monitor conditions manually']
             }
 
 

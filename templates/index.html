@@ -956,6 +956,14 @@
                         </div>
                     </div>
                     
+                    <!-- Phase 3 Advanced Intelligence -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">PHASE 3: ADVANCED INTELLIGENCE</div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            ${createPhase3Intelligence(data)}
+                        </div>
+                    </div>
+                    
                     <!-- Success Metrics -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">SUCCESS METRICS</div>
@@ -1261,6 +1269,135 @@
                     </div>
                 </div>
             `;
+        }
+
+        function createPhase3Intelligence(data) {
+            try {
+                const phase3 = data.phase3_enhancements;
+                if (!phase3) {
+                    return '<div class="text-gray-400 text-sm">Phase 3 data not available</div>';
+                }
+                
+                const seasonal = phase3.seasonal_analysis || {};
+                const auroral = phase3.auroral_analysis || {};
+                const storm = phase3.storm_prediction || {};
+                const mufEvolution = phase3.muf_evolution || {};
+                
+                return `
+                    <div class="space-y-4">
+                        <!-- Seasonal Analysis -->
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="text-sm text-blue-300 font-semibold mb-2">Seasonal Patterns</div>
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <div class="text-gray-400">Current Season</div>
+                                    <div class="font-semibold text-white">${seasonal.current_season || 'Unknown'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">MUF Multiplier</div>
+                                    <div class="font-semibold ${seasonal.seasonal_factors?.muf_multiplier > 1 ? 'text-green-400' : 'text-red-400'}">
+                                        ${seasonal.seasonal_factors?.muf_multiplier?.toFixed(2) || '1.00'}x
+                                    </div>
+                                </div>
+                            </div>
+                            ${seasonal.day_of_year_analysis?.event ? `
+                                <div class="mt-2 p-2 bg-blue-900/20 rounded border-l-2 border-blue-500">
+                                    <div class="text-xs text-blue-300 font-semibold">${seasonal.day_of_year_analysis.event}</div>
+                                    <div class="text-xs text-gray-300">${seasonal.day_of_year_analysis.propagation_enhancement}</div>
+                                    <div class="text-xs text-gray-400">Duration: ${seasonal.day_of_year_analysis.duration}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Auroral Activity -->
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="text-sm text-purple-300 font-semibold mb-2">Auroral Activity</div>
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <div class="text-gray-400">Activity Level</div>
+                                    <div class="font-semibold ${auroral.activity_level === 'quiet' ? 'text-green-400' : 
+                                                           auroral.activity_level === 'unsettled' ? 'text-yellow-400' : 
+                                                           auroral.activity_level === 'minor_storm' ? 'text-orange-400' : 
+                                                           auroral.activity_level === 'strong_storm' ? 'text-red-400' : 'text-white'}">
+                                        ${auroral.activity_level?.replace('_', ' ').toUpperCase() || 'Unknown'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">MUF Adjustment</div>
+                                    <div class="font-semibold ${auroral.muf_adjustment > 1 ? 'text-green-400' : 'text-red-400'}">
+                                        ${auroral.muf_adjustment?.toFixed(2) || '1.00'}x
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-300">
+                                ${auroral.auroral_zone_effects?.replace('_', ' ').toUpperCase() || 'Normal conditions'}
+                            </div>
+                        </div>
+                        
+                        <!-- Storm Prediction -->
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="text-sm text-red-300 font-semibold mb-2">Storm Prediction</div>
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <div class="text-gray-400">Storm Probability</div>
+                                    <div class="font-semibold ${storm.storm_probability === 'very_low' ? 'text-green-400' : 
+                                                           storm.storm_probability === 'low' ? 'text-blue-400' : 
+                                                           storm.storm_probability === 'moderate' ? 'text-yellow-400' : 
+                                                           storm.storm_probability === 'high' ? 'text-orange-400' : 'text-red-400'}">
+                                        ${storm.storm_probability?.replace('_', ' ').toUpperCase() || 'Unknown'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400">Expected Impact</div>
+                                    <div class="font-semibold ${storm.expected_impact === 'minimal' ? 'text-green-400' : 
+                                                           storm.expected_impact === 'minor' ? 'text-yellow-400' : 
+                                                           storm.expected_impact === 'moderate' ? 'text-orange-400' : 'text-red-400'}">
+                                        ${storm.expected_impact?.toUpperCase() || 'Unknown'}
+                                    </div>
+                                </div>
+                            </div>
+                            ${storm.warnings?.length > 0 ? `
+                                <div class="mt-2 p-2 bg-red-900/20 rounded border-l-2 border-red-500">
+                                    <div class="text-xs text-red-300 font-semibold mb-1">Warnings:</div>
+                                    ${storm.warnings.map(warning => `<div class="text-xs text-gray-300">• ${warning}</div>`).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- MUF Evolution -->
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="text-sm text-green-300 font-semibold mb-2">MUF Evolution (Phase 3)</div>
+                            <div class="space-y-2 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Phase 2 MUF:</span>
+                                    <span class="font-semibold text-white">${mufEvolution.phase2_muf?.toFixed(1) || 'N/A'} MHz</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Seasonal Adjusted:</span>
+                                    <span class="font-semibold text-white">${mufEvolution.seasonal_adjusted?.toFixed(1) || 'N/A'} MHz</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Auroral Adjusted:</span>
+                                    <span class="font-semibold text-white">${mufEvolution.auroral_adjusted?.toFixed(1) || 'N/A'} MHz</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Storm Adjusted:</span>
+                                    <span class="font-semibold text-white">${mufEvolution.storm_adjusted?.toFixed(1) || 'N/A'} MHz</span>
+                                </div>
+                                <div class="border-t border-gray-600 pt-2 mt-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-400 font-semibold">Final Phase 3 MUF:</span>
+                                        <span class="font-semibold text-green-400 text-lg">${mufEvolution.final_phase3_muf?.toFixed(1) || 'N/A'} MHz</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Error creating Phase 3 intelligence:', e);
+                return '<div class="text-red-400 text-sm">Error displaying Phase 3 data</div>';
+            }
         }
 
         function createTimeBasedStrategy(dayNight, muf, solarCycle) {
