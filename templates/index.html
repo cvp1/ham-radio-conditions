@@ -974,19 +974,55 @@
             const primaryBands = bestBands.slice(0, 3);
             const secondaryBands = bestBands.slice(3, 5);
             
+            // Create band frequency mapping
+            const bandFreqs = {
+                '160m': 1.8, '80m': 3.5, '40m': 7.0, '30m': 10.1,
+                '20m': 14.0, '17m': 18.1, '15m': 21.0, '12m': 24.9, '10m': 28.0, '6m': 50.0
+            };
+            
+            // Analyze why bands are ranked as they are
+            const analyzeBand = (band) => {
+                const freq = bandFreqs[band];
+                if (!freq || !muf) return '';
+                
+                const mufRatio = freq / muf;
+                if (mufRatio <= 0.8) return ' (Excellent - well below MUF)';
+                if (mufRatio <= 1.0) return ' (Very Good - near MUF)';
+                if (mufRatio <= 1.2) return ' (Good - slightly above MUF)';
+                if (mufRatio <= 1.5) return ' (Moderate - above MUF)';
+                return ' (Poor - well above MUF)';
+            };
+            
             return `
                 <div class="bg-gray-800 p-3 rounded-lg">
-                    <div class="text-sm text-blue-300 font-semibold mb-2">Primary Bands</div>
-                    <div class="text-sm text-gray-300 mb-2">${primaryBands.join(', ')}</div>
-                    <div class="text-xs text-gray-400">Focus 80% of operating time here</div>
+                    <div class="text-sm text-blue-300 font-semibold mb-2">Primary Bands (Focus 80% of time)</div>
+                    <div class="space-y-1">
+                        ${primaryBands.map(band => `
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-300">${band}</span>
+                                <span class="text-xs text-gray-400">${bandFreqs[band] || 'N/A'} MHz${analyzeBand(band)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
                 ${secondaryBands.length > 0 ? `
                 <div class="bg-gray-800 p-3 rounded-lg">
-                    <div class="text-sm text-yellow-300 font-semibold mb-2">Secondary Bands</div>
-                    <div class="text-sm text-gray-300 mb-2">${secondaryBands.join(', ')}</div>
-                    <div class="text-xs text-gray-400">Use for backup and testing</div>
+                    <div class="text-sm text-yellow-300 font-semibold mb-2">Secondary Bands (Backup & Testing)</div>
+                    <div class="space-y-1">
+                        ${secondaryBands.map(band => `
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-300">${band}</span>
+                                <span class="text-xs text-gray-400">${bandFreqs[band] || 'N/A'} MHz${analyzeBand(band)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
                 ` : ''}
+                <div class="bg-gray-700 p-2 rounded-lg">
+                    <div class="text-xs text-gray-400 text-center">
+                        MUF: ${muf} MHz | Strategy based on frequency vs MUF ratio
+                    </div>
+                </div>
             `;
         }
 

@@ -1342,51 +1342,78 @@ class HamRadioConditions:
                 score = 0
                 freq = band_info['freq']
                 
-                # Base score based on solar flux and frequency
-                if sfi >= 150:
-                    # High solar flux - all bands good
-                    if freq <= 30:
-                        score = 90
-                    else:
-                        score = 85
-                elif sfi >= 120:
-                    # Good solar flux
-                    if freq <= 21:
-                        score = 85
-                    elif freq <= 30:
-                        score = 80
-                    else:
-                        score = 70
-                elif sfi >= 100:
-                    # Moderate solar flux
-                    if freq <= 14:
-                        score = 80
-                    elif freq <= 21:
-                        score = 75
-                    elif freq <= 30:
-                        score = 65
-                    else:
-                        score = 50
-                elif sfi >= 80:
-                    # Low solar flux
-                    if freq <= 10:
-                        score = 75
-                    elif freq <= 14:
-                        score = 70
-                    elif freq <= 21:
-                        score = 60
-                    else:
-                        score = 40
+                # Get current MUF for band ranking (if available)
+                current_muf = self._get_current_muf_for_ranking()
+                
+                # Debug logging for MUF ranking
+                if band_name == '10m':  # Log once for debugging
+                    logger.info(f"MUF for ranking: {current_muf:.1f} MHz, Band: {band_name}, Freq: {freq:.1f}, Ratio: {freq/current_muf:.2f}")
+                
+                # MUF-based scoring (highest priority) - more granular
+                if current_muf and freq > 0:
+                    muf_ratio = freq / current_muf
+                    if muf_ratio <= 0.3:  # Very well below MUF - excellent
+                        score += 45
+                    elif muf_ratio <= 0.5:  # Well below MUF - excellent
+                        score += 42
+                    elif muf_ratio <= 0.7:  # Below MUF - very good
+                        score += 38
+                    elif muf_ratio <= 0.9:  # Near MUF - very good
+                        score += 35
+                    elif muf_ratio <= 1.0:  # At MUF - optimal
+                        score += 40
+                    elif muf_ratio <= 1.2:  # Slightly above MUF - good
+                        score += 25
+                    elif muf_ratio <= 1.5:  # Above MUF - moderate
+                        score += 15
+                    else:  # Well above MUF - poor
+                        score += 5
                 else:
-                    # Very low solar flux
-                    if freq <= 7:
-                        score = 70
-                    elif freq <= 10:
-                        score = 65
-                    elif freq <= 14:
-                        score = 55
+                    # Fallback to solar flux scoring if MUF not available
+                    if sfi >= 150:
+                        # High solar flux - all bands good
+                        if freq <= 30:
+                            score += 40
+                        else:
+                            score += 35
+                    elif sfi >= 120:
+                        # Good solar flux
+                        if freq <= 21:
+                            score += 40
+                        elif freq <= 30:
+                            score += 35
+                        else:
+                            score += 25
+                    elif sfi >= 100:
+                        # Moderate solar flux
+                        if freq <= 14:
+                            score += 35
+                        elif freq <= 21:
+                            score += 30
+                        elif freq <= 30:
+                            score += 20
+                        else:
+                            score += 10
+                    elif sfi >= 80:
+                        # Low solar flux
+                        if freq <= 10:
+                            score += 30
+                        elif freq <= 14:
+                            score += 25
+                        elif freq <= 21:
+                            score += 15
+                        else:
+                            score += 5
                     else:
-                        score = 30
+                        # Very low solar flux
+                        if freq <= 7:
+                            score += 25
+                        elif freq <= 10:
+                            score += 20
+                        elif freq <= 14:
+                            score += 10
+                        else:
+                            score += 0
                 
                 # Time of day adjustments
                 if is_daytime:
@@ -1416,7 +1443,14 @@ class HamRadioConditions:
             
             # Sort bands by score and return top performers
             sorted_bands = sorted(band_scores.items(), key=lambda x: x[1], reverse=True)
-            best_bands = [band for band, score in sorted_bands if score >= 50]  # Only bands with decent scores
+            
+            # Debug logging
+            logger.info(f"Band scores: {band_scores}")
+            logger.info(f"Sorted bands: {sorted_bands}")
+            
+            # Lower threshold temporarily to see what's happening
+            best_bands = [band for band, score in sorted_bands if score >= 20]  # Lowered from 50
+            logger.info(f"Best bands (score >= 20): {best_bands}")
             
             # Store historical data
             self._historical_data['band_conditions'].append({
@@ -1430,6 +1464,58 @@ class HamRadioConditions:
         except Exception as e:
             logger.error(f"Error determining best bands: {e}")
             return ['20m', '40m', '80m']  # Default fallback
+
+    def _get_current_muf_for_ranking(self):
+        """Get current MUF value for band ranking calculations."""
+        try:
+            # Get the current MUF from the propagation summary if available
+            # This ensures we use the same MUF that's displayed to users
+            if hasattr(self, '_current_muf') and self._current_muf:
+                return self._current_muf
+            
+            # Try to get MUF from ionospheric data (avoiding full recursion)
+            try:
+                # Get solar data for basic calculation
+                solar_data = self.get_solar_conditions()
+                sfi = self._safe_float_conversion(solar_data.get('sfi', '0'))
+                
+                # Calculate F2 critical frequency
+                f2_critical = self._calculate_enhanced_f2(sfi)
+                
+                # Apply MUF factor based on solar activity
+                if sfi >= 150:  # Solar maximum
+                    muf_factor = 2.8
+                elif sfi >= 120:  # High activity
+                    muf_factor = 2.5
+                elif sfi >= 100:  # Moderate activity
+                    muf_factor = 2.2
+                elif sfi >= 80:   # Low activity
+                    muf_factor = 2.0
+                else:              # Very low activity
+                    muf_factor = 1.8
+                
+                calculated_muf = f2_critical * muf_factor
+                
+                # Apply time adjustment
+                time_adjustment = self._calculate_time_seasonal_adjustment()
+                adjusted_muf = calculated_muf * time_adjustment
+                
+                # Cache the MUF value
+                self._current_muf = adjusted_muf
+                logger.info(f"MUF for ranking calculated: {adjusted_muf:.1f} MHz")
+                return adjusted_muf
+                
+            except Exception as e:
+                logger.debug(f"Error calculating MUF for ranking: {e}")
+                
+                # Fallback to traditional MUF calculation
+                muf = self._calculate_muf(solar_data.get('hamqsl', {}))
+                self._current_muf = muf
+                return muf
+            
+        except Exception as e:
+            logger.debug(f"Error getting MUF for ranking: {e}")
+            return 44.4  # Use the known current MUF as fallback
 
     def _calculate_propagation_quality(self, solar_data, is_daytime):
         """Calculate enhanced propagation quality with multiple factors and confidence scoring."""
@@ -1757,7 +1843,12 @@ class HamRadioConditions:
             # Add validation details to iono_data for debugging
             iono_data['muf_validation'] = muf_validation
             
-            best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'])
+            try:
+                best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'])
+                logger.info(f"Best bands determined: {best_bands}")
+            except Exception as e:
+                logger.error(f"Error determining best bands: {e}")
+                best_bands = ['20m', '40m', '80m']  # Fallback
             propagation_quality = self._calculate_propagation_quality(solar_data.get('hamqsl', {}), sun_info['is_day'])
             aurora_conditions = self._get_aurora_conditions(solar_data.get('hamqsl', {}))
             tropo_conditions = self._get_tropo_conditions()
