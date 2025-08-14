@@ -22,11 +22,9 @@ def get_conditions():
         # Try to get cached conditions first
         cached_conditions = cache_get('conditions', 'current')
         if cached_conditions:
-            logger.debug("Returning cached conditions")
             return jsonify(cached_conditions)
         
         # Generate new conditions
-        logger.debug("Generating new conditions")
         conditions = ham_conditions.generate_report()
         
         if conditions:
@@ -56,11 +54,9 @@ def get_spots():
         # Try to get cached spots first
         cached_spots = cache_get('spots', 'current')
         if cached_spots:
-            logger.debug("Returning cached spots")
             return jsonify(cached_spots)
         
         # Get fresh spots data
-        logger.debug("Getting fresh spots data")
         spots_data = ham_conditions.get_live_activity()
         
         if spots_data:
@@ -86,11 +82,9 @@ def get_weather():
         # Try to get cached weather first
         cached_weather = cache_get('weather', 'current')
         if cached_weather:
-            logger.debug("Returning cached weather")
             return jsonify(cached_weather)
         
         # Get fresh weather data
-        logger.debug("Getting fresh weather data")
         weather_data = ham_conditions.get_weather_conditions()
         
         if weather_data:

@@ -1527,6 +1527,10 @@
             const params = summary.propagation_parameters || {};
             const solarCycle = summary.solar_cycle || {};
             
+            // Get Phase 3 advanced intelligence data
+            const phase3 = summary.enhanced_data_sources?.ionospheric?.phase3_enhancements;
+            const hasPhase3 = phase3 && (phase3.seasonal_analysis || phase3.auroral_analysis || phase3.muf_evolution);
+            
             // Create a coherent executive summary
             const currentTime = summary.current_time || 'Unknown';
             const dayNight = summary.day_night || 'Unknown';
@@ -1568,8 +1572,29 @@
                             <div>• Solar cycle is in ${phase.toLowerCase()} phase</div>
                             <div>• Best operating bands: ${bestBands.slice(0, 3).join(', ') || 'None identified'}</div>
                             <div>• Overall propagation quality: ${quality}</div>
+                            ${hasPhase3 ? `
+                            <div>• Advanced intelligence: Phase 3 analysis active with enhanced accuracy</div>
+                            ` : ''}
                         </div>
                     </div>
+                    
+                    <!-- Advanced Intelligence Summary -->
+                    ${hasPhase3 ? `
+                    <div class="space-y-2">
+                        <div class="text-sm text-gray-400 font-semibold">Advanced Intelligence:</div>
+                        <div class="text-sm text-gray-300 space-y-1">
+                            ${phase3.seasonal_analysis ? `
+                            <div>• Seasonal factor: ${phase3.seasonal_analysis.current_season} (${phase3.seasonal_analysis.seasonal_factors?.muf_multiplier || 1.0}x MUF multiplier)</div>
+                            ` : ''}
+                            ${phase3.auroral_analysis ? `
+                            <div>• Auroral activity: ${phase3.auroral_analysis.activity_level.replace('_', ' ')} (${phase3.auroral_analysis.muf_adjustment}x MUF adjustment)</div>
+                            ` : ''}
+                            ${phase3.muf_evolution ? `
+                            <div>• MUF evolution: ${phase3.muf_evolution.phase2_muf} → ${phase3.muf_evolution.final_phase3_muf} MHz (Phase 3 enhanced)</div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
                     
                     <!-- Outlook -->
                     <div class="space-y-2">

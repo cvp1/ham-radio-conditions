@@ -277,14 +277,12 @@ class HamRadioConditions:
         # Try to get from cache first
         cached_report = cache_get('conditions', 'current')
         if cached_report:
-            logger.debug("Returning cached conditions report")
             # Update the timestamp to current time even for cached data
             cached_report['timestamp'] = datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')
             return cached_report
         
         # Generate new report
         try:
-            logger.debug("Generating new conditions report")
             report = {
                 'timestamp': datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S %Z'),
                 'callsign': self.callsign,  # Add callsign to the report
@@ -1434,9 +1432,7 @@ class HamRadioConditions:
                 # Get current MUF for band ranking (if available)
                 current_muf = self._get_current_muf_for_ranking()
                 
-                # Debug logging for MUF ranking
-                if band_name == '10m':  # Log once for debugging
-                    logger.info(f"MUF for ranking: {current_muf:.1f} MHz, Band: {band_name}, Freq: {freq:.1f}, Ratio: {freq/current_muf:.2f}")
+
                 
                 # MUF-based scoring (highest priority) - more granular
                 if current_muf and freq > 0:
@@ -1515,7 +1511,7 @@ class HamRadioConditions:
                     band_opt = time_factors['band_optimization']
                     if band_name in band_opt.get('optimal', []):
                         score *= 1.4  # 40% bonus for optimal time
-                        logger.info(f"Time optimization bonus for {band_name}: {time_factors['period']}")
+
                     elif band_name in band_opt.get('good', []):
                         score *= 1.2  # 20% bonus for good time
                     elif band_name in band_opt.get('poor', []):
@@ -1527,11 +1523,7 @@ class HamRadioConditions:
                     weather_multiplier = weather_adj / 50.0  # Normalize to 0.5-1.5 range
                     score *= weather_multiplier
                     
-                    # Log significant weather effects
-                    if weather_multiplier > 1.2:
-                        logger.info(f"Weather enhancement for {band_name}: {weather_impact['impact']}")
-                    elif weather_multiplier < 0.8:
-                        logger.info(f"Weather degradation for {band_name}: {weather_impact['impact']}")
+                    # Weather effects applied
                 
                 # Geomagnetic activity penalty
                 if k_index > 4:
@@ -1556,13 +1548,8 @@ class HamRadioConditions:
             # Sort bands by score and return top performers
             sorted_bands = sorted(band_scores.items(), key=lambda x: x[1], reverse=True)
             
-            # Debug logging
-            logger.info(f"Band scores: {band_scores}")
-            logger.info(f"Sorted bands: {sorted_bands}")
-            
             # Use appropriate threshold for band selection with enhanced scoring
             best_bands = [band for band, score in sorted_bands if score >= 3]  # Adjusted for enhanced scoring
-            logger.info(f"Best bands (score >= 3): {best_bands}")
             
             # Store historical data
             self._historical_data['band_conditions'].append({
@@ -1595,7 +1582,6 @@ class HamRadioConditions:
                 giro_data = self._get_giro_ionospheric_data()
                 if giro_data and giro_data.get('calculated_muf'):
                     self._current_muf = giro_data['calculated_muf']
-                    logger.info(f"MUF for ranking from GIRO: {self._current_muf:.1f} MHz")
                     return self._current_muf
                 
                 # Fallback to enhanced F2 calculation
@@ -1621,19 +1607,15 @@ class HamRadioConditions:
                 
                 # Cache the MUF value
                 self._current_muf = adjusted_muf
-                logger.info(f"MUF for ranking calculated: {adjusted_muf:.1f} MHz")
                 return adjusted_muf
                 
             except Exception as e:
-                logger.debug(f"Error calculating MUF for ranking: {e}")
-                
                 # Fallback to traditional MUF calculation
                 muf = self._calculate_muf(solar_data.get('hamqsl', {}))
                 self._current_muf = muf
                 return muf
             
         except Exception as e:
-            logger.debug(f"Error getting MUF for ranking: {e}")
             return 44.4  # Use the known current MUF as fallback
 
     def _get_giro_ionospheric_data(self):
@@ -1653,17 +1635,13 @@ class HamRadioConditions:
                 giro_data = self._parse_giro_html(response.text, current_hour)
                 
                 if giro_data:
-                    logger.info(f"GIRO data retrieved: {giro_data}")
                     return giro_data
                 else:
-                    logger.debug("No valid GIRO data found")
                     return None
             else:
-                logger.debug(f"GIRO request failed with status {response.status_code}")
                 return None
                 
         except Exception as e:
-            logger.debug(f"Error getting GIRO data: {e}")
             return None
 
     def _parse_giro_html(self, html_content, current_hour):
@@ -1712,13 +1690,11 @@ class HamRadioConditions:
                 # Convert foF2 to MUF (MUF ≈ 2.5 × foF2 for amateur use)
                 giro_data['calculated_muf'] = giro_data['global_foF2'] * 2.5
                 
-                logger.info(f"GIRO foF2: {giro_data['global_foF2']:.2f} MHz, MUF: {giro_data['calculated_muf']:.1f} MHz")
                 return giro_data
             
             return None
             
         except Exception as e:
-            logger.debug(f"Error parsing GIRO HTML: {e}")
             return None
 
     def _calculate_propagation_quality(self, solar_data, is_daytime):
@@ -2022,12 +1998,7 @@ class HamRadioConditions:
             # Get enhanced ionospheric data for accurate MUF calculation
             iono_data = self._get_ionospheric_data()
             
-            # Debug: Log what's in iono_data
-            logger.info(f"DEBUG: iono_data keys after _get_ionospheric_data: {list(iono_data.keys())}")
-            if 'phase3_enhancements' in iono_data:
-                logger.info(f"DEBUG: Phase 3 data found: {list(iono_data['phase3_enhancements'].keys())}")
-            else:
-                logger.info("DEBUG: No Phase 3 data found in iono_data")
+
             
             # Store both calculations for comparison
             traditional_muf = self._calculate_muf(solar_data.get('hamqsl', {}))
@@ -2064,7 +2035,6 @@ class HamRadioConditions:
             
             try:
                 best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'], sun_info, self.get_weather_conditions())
-                logger.info(f"Best bands determined: {best_bands}")
             except Exception as e:
                 logger.error(f"Error determining best bands: {e}")
                 best_bands = ['20m', '40m', '80m']  # Fallback
@@ -2387,26 +2357,8 @@ class HamRadioConditions:
                     'ionospheric': iono_data  # Ensure iono_data is preserved even in fallback
                 }
             
-            # Debug: Log what's in iono_data before returning
-            logger.info(f"DEBUG: iono_data keys before return: {list(iono_data.keys())}")
-            if 'phase3_enhancements' in iono_data:
-                logger.info(f"DEBUG: Phase 3 data still present before return: {list(iono_data['phase3_enhancements'].keys())}")
-            else:
-                logger.info("DEBUG: Phase 3 data missing before return")
-            
             # Convert NumPy types to Python native types for JSON serialization
             converted_result = convert_numpy_types(result)
-            
-            # Debug: Check if Phase 3 data survived the conversion
-            if 'enhanced_data_sources' in converted_result and 'ionospheric' in converted_result['enhanced_data_sources']:
-                iono = converted_result['enhanced_data_sources']['ionospheric']
-                logger.info(f"DEBUG: After convert_numpy_types - ionospheric keys: {list(iono.keys())}")
-                if 'phase3_enhancements' in iono:
-                    logger.info(f"DEBUG: After convert_numpy_types - Phase 3 data: {list(iono['phase3_enhancements'].keys())}")
-                else:
-                    logger.info("DEBUG: After convert_numpy_types - No Phase 3 data found")
-            else:
-                logger.info("DEBUG: After convert_numpy_types - No ionospheric section found")
             
             return converted_result
         except Exception as e:

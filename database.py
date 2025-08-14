@@ -86,7 +86,6 @@ class Database:
                     ))
                 
                 conn.commit()
-                logger.debug(f"Stored {len(spots)} spots in database")
                 return True
                 
         except Exception as e:
@@ -188,7 +187,6 @@ class Database:
                 ''', (key, value))
                 
                 conn.commit()
-                logger.debug(f"Stored user preference: {key} = {value}")
                 return True
                 
         except Exception as e:
