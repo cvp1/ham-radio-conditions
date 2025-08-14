@@ -671,6 +671,11 @@
             const summary = data.propagation_summary;
             const params = summary.propagation_parameters || {};
             
+            // Get solar analysis for propagation context
+            const solarConditions = data.solar_conditions || {};
+            const sfi = parseInt(solarConditions.sfi) || 0;
+            const kIndex = parseInt(solarConditions.k_index) || 0;
+            
             safeSetHTML(propagationCurrentDiv, `
                 <div class="space-y-2">
                     <div class="flex justify-between items-center">
@@ -685,6 +690,16 @@
                         <span class="text-gray-400">Day/Night:</span>
                         <span class="font-semibold">${summary.day_night || 'N/A'}</span>
                     </div>
+                    
+                    <!-- Solar Impact on Propagation -->
+                    <div class="mt-2 p-2 bg-blue-900/20 border-l-4 border-blue-500 rounded">
+                        <div class="text-blue-200 text-xs font-semibold mb-1">Solar Impact:</div>
+                        <div class="text-xs text-gray-300 space-y-1">
+                            <div>• SFI ${sfi}: ${sfi >= 120 ? 'Enhances' : sfi >= 100 ? 'Supports' : 'Limits'} HF propagation</div>
+                            <div>• K-Index ${kIndex}: ${kIndex <= 2 ? 'Favorable' : kIndex <= 3 ? 'Moderate' : 'Degrades'} conditions</div>
+                            <div>• MUF Source: ${params.muf_source || 'Traditional'} calculation</div>
+                        </div>
+                    </div>
                 </div>
             `);
         }
@@ -695,6 +710,12 @@
             const summary = data.propagation_summary;
             const params = summary.propagation_parameters || {};
             const bestBands = params.best_bands || [];
+            
+            // Get solar analysis for band selection context
+            const solarConditions = data.solar_conditions || {};
+            const sfi = parseInt(solarConditions.sfi) || 0;
+            const kIndex = parseInt(solarConditions.k_index) || 0;
+            const aurora = parseInt(solarConditions.aurora) || 0;
             
             safeSetHTML(bestBandsCurrentDiv, `
                 <div class="space-y-2">
@@ -710,6 +731,16 @@
                                 <span class="font-mono">${dist}</span>
                             </div>`
                         ).join('')}
+                    </div>
+                    
+                    <!-- Solar Context for Band Selection -->
+                    <div class="mt-3 p-2 bg-yellow-900/20 border-l-4 border-yellow-500 rounded">
+                        <div class="text-yellow-200 text-xs font-semibold mb-1">Solar Context:</div>
+                        <div class="text-xs text-gray-300 space-y-1">
+                            <div>• SFI ${sfi}: ${sfi >= 120 ? 'Favorable' : sfi >= 100 ? 'Moderate' : 'Limited'} for higher bands</div>
+                            <div>• K-Index ${kIndex}: ${kIndex <= 2 ? 'Quiet' : kIndex <= 3 ? 'Unsettled' : 'Active'} geomagnetic conditions</div>
+                            <div>• Aurora ${aurora}: ${aurora <= 2 ? 'Quiet' : aurora <= 4 ? 'Minor' : 'Active'} auroral activity</div>
+                        </div>
                     </div>
                 </div>
             `);
@@ -833,6 +864,10 @@
             const quality = params.quality || 'Unknown';
             const dayNight = summary.day_night || 'Unknown';
             
+            // Set global data for band strategy analysis
+            window.currentPhase3Data = summary.enhanced_data_sources?.ionospheric?.phase3_enhancements;
+            window.currentSolarConditions = data.solar_conditions;
+            
             // Create a strategic operating plan
             const strategy = createOperatingStrategy({
                 muf, quality, bestBands, dayNight, solarCycle, recommendations,
@@ -844,24 +879,39 @@
 
         function createOperatingStrategy(data) {
             const { muf, quality, bestBands, dayNight, solarCycle, recommendations, fullData } = data;
-            // Use the full data structure for Phase 3 intelligence
             
-            // Determine overall strategy based on conditions
+            // Get comprehensive solar analysis data
+            const solarConditions = fullData?.solar_conditions || {};
+            const enhancedData = fullData?.propagation_summary?.enhanced_data_sources || {};
+            const phase3 = fullData?.propagation_summary?.enhanced_data_sources?.ionospheric?.phase3_enhancements;
+            const enhancedAccuracy = fullData?.propagation_summary?.enhanced_accuracy;
+            const mufSource = fullData?.propagation_summary?.propagation_parameters?.muf_source;
+            const mufConfidence = fullData?.propagation_summary?.propagation_parameters?.muf_confidence;
+            
+            // Parse MUF as number for proper comparison
+            const mufValue = parseFloat(muf) || 0;
+            
+            // Determine overall strategy based on conditions and Phase 3 data
             let overallStrategy = '';
             let strategyColor = '';
+            let strategyRationale = '';
             
-            if (quality === 'Excellent' || muf > 25) {
+            if (quality === 'Excellent' && mufValue > 20) {
                 overallStrategy = 'AGGRESSIVE DX OPERATION';
                 strategyColor = 'text-green-400';
-            } else if (quality === 'Good' || muf > 15) {
+                strategyRationale = 'Excellent propagation quality with high MUF enables maximum DX opportunities';
+            } else if (quality === 'Good' && mufValue > 15) {
                 overallStrategy = 'MODERATE DX OPERATION';
                 strategyColor = 'text-blue-400';
-            } else if (quality === 'Fair' || muf > 10) {
+                strategyRationale = 'Good conditions support reliable DX with moderate power requirements';
+            } else if (quality === 'Fair' && mufValue > 10) {
                 overallStrategy = 'CONSERVATIVE DX OPERATION';
                 strategyColor = 'text-yellow-400';
+                strategyRationale = 'Moderate conditions require careful frequency and timing selection';
             } else {
                 overallStrategy = 'LOCAL OPERATION FOCUS';
                 strategyColor = 'text-red-400';
+                strategyRationale = 'Poor conditions limit communication options to local contacts';
             }
             
             return `
@@ -876,11 +926,23 @@
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">MUF Analysis</div>
                                 <div class="text-xs text-gray-300">
-                                    Current MUF of ${muf} MHz indicates ${muf > 20 ? 'excellent' : muf > 15 ? 'good' : muf > 10 ? 'moderate' : 'poor'} ionospheric conditions. 
-                                    ${muf > 20 ? 'This high MUF allows operation on multiple bands with strong signal propagation and minimal absorption losses.' : 
-                                    muf > 15 ? 'This MUF supports reliable continental DX with good signal strength on mid-range bands.' : 
-                                    muf > 10 ? 'This moderate MUF limits DX range but provides stable regional communication.' : 
-                                    'This low MUF severely restricts long-distance communication, requiring focus on local and regional contacts.'}
+                                    <div class="mb-2">
+                                        <span class="text-blue-200">Current MUF:</span> ${muf} MHz (${mufSource || 'Standard calculation'})
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="text-blue-200">Confidence:</span> ${mufConfidence || 'Standard'}
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="text-blue-200">Analysis:</span> ${mufValue > 20 ? 'Excellent ionospheric conditions with high MUF enabling multiple band operation and strong signal propagation.' : 
+                                        mufValue > 15 ? 'Good ionospheric conditions supporting reliable continental DX with good signal strength.' : 
+                                        mufValue > 10 ? 'Moderate ionospheric conditions limiting DX range but providing stable regional communication.' : 
+                                        'Poor ionospheric conditions severely restricting long-distance communication.'}
+                                    </div>
+                                    ${phase3 ? `
+                                    <div class="mt-2 p-2 bg-gray-600 rounded">
+                                        <span class="text-green-200 font-semibold">Phase 3 Enhanced:</span> Advanced MUF calculation with ${mufSource || 'enhanced intelligence'} (${mufConfidence || 'high confidence'})
+                                    </div>
+                                    ` : ''}
                                 </div>
                             </div>
                             
@@ -908,10 +970,70 @@
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">Why This Strategy?</div>
                                 <div class="text-xs text-gray-300">
-                                    ${overallStrategy === 'AGGRESSIVE DX OPERATION' ? 'High MUF and excellent conditions allow maximum exploitation of propagation opportunities. Use full power, directional antennas, and focus on global DX contacts while conditions remain favorable.' :
-                                    overallStrategy === 'MODERATE DX OPERATION' ? 'Good conditions support reliable DX operation with moderate power requirements. Balance between DX achievement and power efficiency, focusing on continental contacts.' :
-                                    overallStrategy === 'CONSERVATIVE DX OPERATION' ? 'Moderate conditions require careful frequency and timing selection. Use lower power and focus on regional contacts with occasional DX opportunities.' :
-                                    'Poor conditions limit communication options. Focus on local contacts, antenna testing, and preparation for when conditions improve. This is not the time for DX attempts.'}
+                                    <div class="mb-2">${strategyRationale}</div>
+                                    ${phase3 ? `
+                                    <div class="mt-2 p-2 bg-gray-600 rounded">
+                                        <span class="text-green-200 font-semibold">Phase 3 Intelligence:</span>
+                                        ${phase3.seasonal_analysis ? `Seasonal factor: ${phase3.seasonal_analysis.current_season || 'N/A'} (${phase3.seasonal_analysis.seasonal_factors?.muf_multiplier || 1.0}x)` : ''}
+                                        ${phase3.auroral_analysis ? ` • Auroral activity: ${phase3.auroral_analysis.activity_level || 'N/A'}` : ''}
+                                        ${phase3.storm_prediction ? ` • Storm impact: ${phase3.storm_prediction.overall_impact || 'N/A'}` : ''}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <!-- Comprehensive Solar Analysis -->
+                            <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="text-sm text-blue-300 font-semibold mb-1">Solar Analysis Integration</div>
+                                <div class="text-xs text-gray-300">
+                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                        <div>
+                                            <span class="text-blue-200">SFI:</span> ${solarConditions.sfi || 'N/A'}
+                                            <br><span class="text-gray-400 text-xs">${solarConditions.sfi ? (parseInt(solarConditions.sfi) >= 150 ? 'Excellent' : parseInt(solarConditions.sfi) >= 120 ? 'Good' : parseInt(solarConditions.sfi) >= 100 ? 'Moderate' : 'Poor') : 'Unknown'} conditions</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-blue-200">K-Index:</span> ${solarConditions.k_index || 'N/A'}
+                                            <br><span class="text-gray-400 text-xs">${solarConditions.k_index ? (parseInt(solarConditions.k_index) >= 6 ? 'Severe storm' : parseInt(solarConditions.k_index) >= 4 ? 'Strong storm' : parseInt(solarConditions.k_index) >= 2 ? 'Minor storm' : 'Quiet') : 'Unknown'}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-blue-200">A-Index:</span> ${solarConditions.a_index || 'N/A'}
+                                            <br><span class="text-gray-400 text-xs">${solarConditions.a_index ? (parseInt(solarConditions.a_index) >= 30 ? 'High activity' : parseInt(solarConditions.a_index) >= 15 ? 'Moderate activity' : 'Low activity') : 'Unknown'}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-blue-200">Aurora:</span> ${solarConditions.aurora || 'N/A'}
+                                            <br><span class="text-gray-400 text-xs">${solarConditions.aurora ? (parseInt(solarConditions.aurora) >= 8 ? 'High activity' : parseInt(solarConditions.aurora) >= 5 ? 'Moderate activity' : parseInt(solarConditions.aurora) >= 3 ? 'Minor activity' : 'Quiet') : 'Unknown'}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <span class="text-blue-200">Sunspots:</span> ${solarConditions.sunspots || 'N/A'}
+                                        <br><span class="text-gray-400 text-xs">${solarConditions.sunspots ? (parseInt(solarConditions.sunspots) >= 100 ? 'High activity' : parseInt(solarConditions.sunspots) >= 50 ? 'Moderate activity' : 'Low activity') : 'Unknown'}</span>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <span class="text-blue-200">X-Ray:</span> ${solarConditions.xray || 'N/A'}
+                                        <br><span class="text-gray-400 text-xs">${solarConditions.xray ? (solarConditions.xray.startsWith('M') ? 'Major flare' : solarConditions.xray.startsWith('X') ? 'Extreme flare' : solarConditions.xray.startsWith('C') ? 'Common flare' : 'Quiet') : 'Unknown'}</span>
+                                    </div>
+                                    
+                                    ${solarConditions.storm_level ? `
+                                    <div class="mb-2">
+                                        <span class="text-blue-200">Storm Level:</span> ${solarConditions.storm_level}
+                                        <br><span class="text-gray-400 text-xs">${solarConditions.storm_probability ? `Probability: ${Math.round(parseFloat(solarConditions.storm_probability) * 100)}%` : ''}</span>
+                                    </div>
+                                    ` : ''}
+                                    
+                                    <div class="mt-2 p-2 bg-yellow-900/20 border-l-4 border-yellow-500 rounded">
+                                        <span class="text-yellow-200 font-semibold">Solar Impact on Strategy:</span>
+                                        <div class="text-xs text-gray-300 mt-1">
+                                            ${solarConditions.sfi ? (parseInt(solarConditions.sfi) >= 150 ? 'High SFI enables aggressive DX operation on all bands' : 
+                                            parseInt(solarConditions.sfi) >= 120 ? 'Good SFI supports reliable DX with moderate power' : 
+                                            parseInt(solarConditions.sfi) >= 100 ? 'Moderate SFI requires careful band selection' : 
+                                            'Low SFI limits DX opportunities, focus on local contacts') : 'Unknown solar impact'}
+                                            ${solarConditions.k_index ? (parseInt(solarConditions.k_index) >= 4 ? ' • High geomagnetic activity may degrade higher bands' : 
+                                            parseInt(solarConditions.k_index) >= 2 ? ' • Moderate geomagnetic activity affects band selection' : 
+                                            ' • Quiet geomagnetic conditions are favorable') : ''}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -930,6 +1052,62 @@
                         <div class="text-sm text-gray-400 font-semibold">BAND STRATEGY</div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             ${createBandStrategy(bestBands, muf, dayNight)}
+                        </div>
+                    </div>
+                    
+                    <!-- Enhanced Data Sources Integration -->
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-400 font-semibold">ENHANCED DATA SOURCES</div>
+                        <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-green-500">
+                            <div class="space-y-3">
+                                <div class="text-sm text-green-300 font-semibold mb-2">Multi-Source Data Integration</div>
+                                
+                                <!-- Phase 3 Enhanced Intelligence -->
+                                ${phase3 ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-sm text-purple-200 font-semibold mb-1">Phase 3 Advanced Intelligence</div>
+                                    <div class="text-xs text-gray-300">
+                                        ${phase3.seasonal_analysis ? `<div>• Seasonal Patterns: ${phase3.seasonal_analysis.current_season || 'N/A'} (${phase3.seasonal_analysis.seasonal_factors?.muf_multiplier || 1.0}x MUF enhancement)</div>` : ''}
+                                        ${phase3.auroral_analysis ? `<div>• Auroral Modeling: ${phase3.auroral_analysis.activity_level || 'N/A'} (${phase3.auroral_analysis.muf_adjustment || 1.0}x MUF adjustment)</div>` : ''}
+                                        ${phase3.storm_prediction ? `<div>• Storm Prediction: ${phase3.storm_prediction.overall_impact || 'N/A'} (${phase3.storm_prediction.recovery_time || 'N/A'} recovery)</div>` : ''}
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- Enhanced Validation -->
+                                ${enhancedData.enhanced_validation ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-sm text-green-200 font-semibold mb-1">Enhanced Validation</div>
+                                    <div class="text-xs text-gray-300">
+                                        <div>• Data Quality: ${enhancedData.enhanced_validation.data_quality || 'N/A'}</div>
+                                        <div>• Confidence: ${enhancedData.enhanced_validation.confidence || 'N/A'}</div>
+                                        <div>• Validation Method: ${enhancedData.enhanced_validation.method || 'N/A'}</div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- Geomagnetic Coordinates -->
+                                ${enhancedData.geomagnetic_coordinates ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-sm text-green-200 font-semibold mb-1">Geomagnetic Coordinates</div>
+                                    <div class="text-xs text-gray-300">
+                                        <div>• Latitude: ${enhancedData.geomagnetic_coordinates.lat || 'N/A'}°</div>
+                                        <div>• Longitude: ${enhancedData.geomagnetic_coordinates.lon || 'N/A'}°</div>
+                                        <div>• Impact: ${enhancedData.geomagnetic_coordinates.impact || 'N/A'}</div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- Additional Sources -->
+                                ${enhancedData.additional_sources ? `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="text-sm text-green-200 font-semibold mb-1">Additional Sources</div>
+                                    <div class="text-xs text-gray-300">
+                                        ${Object.keys(enhancedData.additional_sources).map(source => `<div>• ${source}: ${enhancedData.additional_sources[source] ? 'Active' : 'Inactive'}</div>`).join('')}
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                     
@@ -1108,6 +1286,10 @@
         }
 
         function createBandStrategyAnalysis(bestBands, muf, dayNight) {
+            // Get comprehensive data for enhanced analysis
+            const phase3 = window.currentPhase3Data; // We'll set this globally
+            const solarConditions = window.currentSolarConditions; // We'll set this globally
+            
             // Define band characteristics and scoring factors
             const bandInfo = {
                 '160m': { freq: 1.8, day_optimal: false, night_optimal: true, weather_impact: 'low' },
@@ -1177,6 +1359,41 @@
             }).sort((a, b) => b.totalScore - a.totalScore);
             
             // Generate analysis display
+            let phase3Explanation = '';
+            let solarExplanation = '';
+            
+            if (phase3) {
+                phase3Explanation = `
+                    <div class="mb-4 p-3 bg-purple-900/20 border-l-4 border-purple-500 rounded">
+                        <div class="text-sm text-purple-200 font-semibold mb-2">Phase 3 Enhanced Selection Logic</div>
+                        <div class="text-xs text-gray-300 space-y-1">
+                            ${phase3.seasonal_analysis ? `<div>• Seasonal factor: ${phase3.seasonal_analysis.current_season || 'N/A'} provides ${phase3.seasonal_analysis.seasonal_factors?.muf_multiplier || 1.0}x MUF enhancement</div>` : ''}
+                            ${phase3.auroral_analysis ? `<div>• Auroral activity: ${phase3.auroral_analysis.activity_level || 'N/A'} with ${phase3.auroral_analysis.muf_adjustment || 1.0}x MUF adjustment</div>` : ''}
+                            ${phase3.storm_prediction ? `<div>• Storm conditions: ${phase3.storm_prediction.overall_impact || 'N/A'} with ${phase3.storm_prediction.recovery_time || 'N/A'} recovery</div>` : ''}
+                            <div>• Enhanced MUF calculation: Available</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (solarConditions) {
+                const sfi = parseInt(solarConditions.sfi) || 0;
+                const kIndex = parseInt(solarConditions.k_index) || 0;
+                const aurora = parseInt(solarConditions.aurora) || 0;
+                
+                solarExplanation = `
+                    <div class="mb-4 p-3 bg-yellow-900/20 border-l-4 border-yellow-500 rounded">
+                        <div class="text-sm text-yellow-200 font-semibold mb-2">Solar Analysis Integration</div>
+                        <div class="text-xs text-gray-300 space-y-1">
+                            <div>• SFI ${sfi}: ${sfi >= 150 ? 'Excellent' : sfi >= 120 ? 'Good' : sfi >= 100 ? 'Moderate' : 'Poor'} conditions for HF propagation</div>
+                            <div>• K-Index ${kIndex}: ${kIndex >= 6 ? 'Severe storm' : kIndex >= 4 ? 'Strong storm' : kIndex >= 2 ? 'Minor storm' : 'Quiet'} geomagnetic activity</div>
+                            <div>• Aurora ${aurora}: ${aurora >= 8 ? 'High' : aurora >= 5 ? 'Moderate' : aurora >= 3 ? 'Minor' : 'Quiet'} auroral activity</div>
+                            <div>• Impact: ${sfi >= 120 && kIndex <= 2 ? 'Favorable for all bands' : sfi >= 100 && kIndex <= 3 ? 'Good for mid-range bands' : 'Limited to lower bands'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
             const analysisRows = analysis.map(band => {
                 const statusClass = band.isSelected ? 'border-green-500 bg-green-900/20' : 'border-gray-600 bg-gray-700/20';
                 const rankClass = band.isSelected ? 'text-green-400 font-bold' : 'text-gray-400';
@@ -1239,6 +1456,8 @@
             
             return `
                 <div class="space-y-4">
+                    ${phase3Explanation}
+                    ${solarExplanation}
                     <div class="text-center mb-4">
                         <div class="text-lg font-bold text-white mb-2">Band Scoring Analysis</div>
                         <div class="text-sm text-gray-300">
@@ -1258,6 +1477,17 @@
                             <div><span class="font-semibold">Weather Score (0-35):</span> Impact of current weather conditions</div>
                             <div><span class="font-semibold">Total Score:</span> Sum of all factors (0-120)</div>
                             <div class="text-green-400 font-semibold mt-2">Bands with scores ≥ 80 are automatically selected</div>
+                            
+                            ${solarConditions ? `
+                            <div class="mt-3 p-2 bg-yellow-900/20 border-l-4 border-yellow-500 rounded">
+                                <div class="text-yellow-200 font-semibold mb-1">Solar Factors Integration</div>
+                                <div class="space-y-1">
+                                    <div>• SFI ${parseInt(solarConditions.sfi) || 0}: ${parseInt(solarConditions.sfi) >= 120 ? 'Boosts higher bands' : parseInt(solarConditions.sfi) >= 100 ? 'Supports mid-range bands' : 'Limits to lower bands'}</div>
+                                    <div>• K-Index ${parseInt(solarConditions.k_index) || 0}: ${parseInt(solarConditions.k_index) >= 4 ? 'Penalizes higher bands' : parseInt(solarConditions.k_index) >= 2 ? 'Moderate penalty' : 'No penalty'}</div>
+                                    <div>• Aurora ${parseInt(solarConditions.aurora) || 0}: ${parseInt(solarConditions.aurora) >= 5 ? 'Affects auroral zone propagation' : 'Minimal impact'}</div>
+                                </div>
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
@@ -1529,7 +1759,7 @@
             
             // Get Phase 3 advanced intelligence data
             const phase3 = summary.enhanced_data_sources?.ionospheric?.phase3_enhancements;
-            const hasPhase3 = phase3 && (phase3.seasonal_analysis || phase3.auroral_analysis || phase3.muf_evolution);
+            const hasPhase3 = phase3 && (phase3.seasonal_analysis || phase3.auroral_analysis || phase3.storm_prediction);
             
             // Create a coherent executive summary
             const currentTime = summary.current_time || 'Unknown';
@@ -1584,13 +1814,13 @@
                         <div class="text-sm text-gray-400 font-semibold">Advanced Intelligence:</div>
                         <div class="text-sm text-gray-300 space-y-1">
                             ${phase3.seasonal_analysis ? `
-                            <div>• Seasonal factor: ${phase3.seasonal_analysis.current_season} (${phase3.seasonal_analysis.seasonal_factors?.muf_multiplier || 1.0}x MUF multiplier)</div>
+                            <div>• Seasonal factor: ${phase3.seasonal_analysis.current_season || 'N/A'} (${phase3.seasonal_analysis.seasonal_factors?.muf_multiplier || 1.0}x MUF multiplier)</div>
                             ` : ''}
                             ${phase3.auroral_analysis ? `
-                            <div>• Auroral activity: ${phase3.auroral_analysis.activity_level.replace('_', ' ')} (${phase3.auroral_analysis.muf_adjustment}x MUF adjustment)</div>
+                            <div>• Auroral activity: ${phase3.auroral_analysis.activity_level || 'N/A'} (${phase3.auroral_analysis.muf_adjustment || 1.0}x MUF adjustment)</div>
                             ` : ''}
-                            ${phase3.muf_evolution ? `
-                            <div>• MUF evolution: ${phase3.muf_evolution.phase2_muf} → ${phase3.muf_evolution.final_phase3_muf} MHz (Phase 3 enhanced)</div>
+                            ${phase3.storm_prediction ? `
+                            <div>• Storm impact: ${phase3.storm_prediction.overall_impact || 'N/A'} (${phase3.storm_prediction.recovery_time || 'N/A'} recovery)</div>
                             ` : ''}
                         </div>
                     </div>
@@ -1705,7 +1935,7 @@
             }
             
             // Check solar flux
-            const sfi = solarCycle.sfi_value || 0;
+            const sfi = parseInt(data.solar_conditions?.sfi) || 0;
             if (sfi < 60) {
                 risks.push({
                     level: 'HIGH',
@@ -1716,12 +1946,35 @@
             }
             
             // Check aurora conditions
-            if (aurora.activity === 'Strong' || aurora.activity === 'Moderate') {
+            const auroraValue = parseInt(data.solar_conditions?.aurora) || 0;
+            if (auroraValue >= 5) {
                 warnings.push({
                     level: 'MODERATE',
                     message: 'Auroral activity detected',
                     impact: 'HF propagation may be affected at high latitudes',
                     recommendation: 'Monitor conditions, expect unusual propagation'
+                });
+            }
+            
+            // Check X-ray flares
+            const xray = data.solar_conditions?.xray || '';
+            if (xray.startsWith('M') || xray.startsWith('X')) {
+                risks.push({
+                    level: 'HIGH',
+                    message: 'Major solar flare detected',
+                    impact: 'HF propagation may be disrupted',
+                    recommendation: 'Monitor for blackout conditions, avoid critical communications'
+                });
+            }
+            
+            // Check sunspot activity
+            const sunspots = parseInt(data.solar_conditions?.sunspots) || 0;
+            if (sunspots < 20) {
+                warnings.push({
+                    level: 'MODERATE',
+                    message: 'Low sunspot activity',
+                    impact: 'Reduced HF propagation on higher bands',
+                    recommendation: 'Focus on lower bands (40m, 80m) for reliable contacts'
                 });
             }
             
@@ -1736,6 +1989,18 @@
                             </div>
                             <div class="text-sm text-green-300">
                                 Current propagation conditions present minimal risks for HF operation.
+                            </div>
+                        </div>
+                        
+                        <!-- Solar Analysis Summary -->
+                        <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg">
+                            <div class="text-sm text-blue-300 font-semibold mb-2">Solar Analysis Summary</div>
+                            <div class="text-xs text-gray-300 space-y-1">
+                                <div>• SFI ${sfi}: ${sfi >= 120 ? 'Favorable' : sfi >= 100 ? 'Moderate' : 'Limited'} HF conditions</div>
+                                <div>• K-Index ${kIndex}: ${kIndex <= 2 ? 'Quiet' : kIndex <= 3 ? 'Unsettled' : 'Active'} geomagnetic conditions</div>
+                                <div>• Aurora ${auroraValue}: ${auroraValue <= 2 ? 'Quiet' : auroraValue <= 4 ? 'Minor' : 'Active'} auroral activity</div>
+                                <div>• Sunspots ${sunspots}: ${sunspots >= 50 ? 'Good' : sunspots >= 20 ? 'Moderate' : 'Low'} solar activity</div>
+                                <div>• X-Ray: ${xray.startsWith('M') || xray.startsWith('X') ? 'Major flare' : xray.startsWith('C') ? 'Common flare' : 'Quiet'} conditions</div>
                             </div>
                         </div>
                     </div>
@@ -1765,6 +2030,21 @@
                 `;
             }
             
+            // Add comprehensive solar analysis to risk display
+            const solarAnalysis = `
+                <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg mt-4">
+                    <div class="text-sm text-blue-300 font-semibold mb-2">Comprehensive Solar Analysis</div>
+                    <div class="text-xs text-gray-300 space-y-1">
+                        <div>• SFI ${sfi}: ${sfi >= 150 ? 'Excellent' : sfi >= 120 ? 'Good' : sfi >= 100 ? 'Moderate' : 'Poor'} HF conditions</div>
+                        <div>• K-Index ${kIndex}: ${kIndex >= 6 ? 'Severe storm' : kIndex >= 4 ? 'Strong storm' : kIndex >= 2 ? 'Minor storm' : 'Quiet'} geomagnetic activity</div>
+                        <div>• A-Index ${data.solar_conditions?.a_index || 'N/A'}: ${parseInt(data.solar_conditions?.a_index) >= 30 ? 'High' : parseInt(data.solar_conditions?.a_index) >= 15 ? 'Moderate' : 'Low'} activity</div>
+                        <div>• Aurora ${auroraValue}: ${auroraValue >= 8 ? 'High' : auroraValue >= 5 ? 'Moderate' : auroraValue >= 3 ? 'Minor' : 'Quiet'} auroral activity</div>
+                        <div>• Sunspots ${sunspots}: ${sunspots >= 100 ? 'High' : sunspots >= 50 ? 'Moderate' : 'Low'} solar activity</div>
+                        <div>• X-Ray: ${xray.startsWith('M') || xray.startsWith('X') ? 'Major flare' : xray.startsWith('C') ? 'Common flare' : 'Quiet'} conditions</div>
+                    </div>
+                </div>
+            `;
+            
             if (warnings.length > 0) {
                 riskHtml += `
                     <div class="space-y-3">
@@ -1784,7 +2064,9 @@
                 `;
             }
             
-            safeSetHTML(riskAssessmentDiv, riskHtml);
+            // Combine risks, warnings, and solar analysis
+            const finalHtml = riskHtml + solarAnalysis;
+            safeSetHTML(riskAssessmentDiv, finalHtml);
         }
 
         // Main update function

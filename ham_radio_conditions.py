@@ -1033,21 +1033,39 @@ class HamRadioConditions:
             
             # Base confidence factors
             solar_confidence = solar_trends.get('confidence', 0.5)
-            data_quality = 1.0 - (anomalies.get('anomaly_rate', 0.2) * 2)  # Reduce confidence for poor data quality
+            if solar_confidence is None:
+                solar_confidence = 0.5
+                
+            anomaly_rate = anomalies.get('anomaly_rate', 0.2)
+            if anomaly_rate is None:
+                anomaly_rate = 0.2
+            data_quality = 1.0 - (anomaly_rate * 2)  # Reduce confidence for poor data quality
             
             # Correlation-based confidence
             correlation_confidence = 0.5
             if correlations:
-                valid_correlations = [corr for corr in correlations.values() if corr.get('p_value', 1) < 0.05 and corr.get('value') is not None]
+                valid_correlations = [corr for corr in correlations.values() 
+                                    if corr.get('p_value') is not None and 
+                                    corr.get('p_value', 1) < 0.05 and 
+                                    corr.get('value') is not None]
                 if valid_correlations:
                     avg_correlation = np.mean([abs(corr.get('value', 0)) for corr in valid_correlations])
                     correlation_confidence = min(0.9, avg_correlation * 0.8)
             
             # Historical accuracy confidence
             historical_confidence = self._prediction_confidence.get('overall', 0.5)
+            if historical_confidence is None:
+                historical_confidence = 0.5
             
             # Data completeness confidence
             data_completeness = min(1.0, len(self._historical_data['solar_conditions']) / 168)  # 7 days = 168 hours
+            
+            # Ensure all confidence values are valid numbers
+            solar_confidence = float(solar_confidence) if solar_confidence is not None else 0.5
+            data_quality = float(data_quality) if data_quality is not None else 0.5
+            correlation_confidence = float(correlation_confidence) if correlation_confidence is not None else 0.5
+            historical_confidence = float(historical_confidence) if historical_confidence is not None else 0.5
+            data_completeness = float(data_completeness) if data_completeness is not None else 0.5
             
             # Calculate weighted overall confidence
             overall_confidence = (
@@ -1057,6 +1075,10 @@ class HamRadioConditions:
                 historical_confidence * 0.2 +
                 data_completeness * 0.15
             )
+            
+            # Ensure overall confidence is valid
+            if not isinstance(overall_confidence, (int, float)) or np.isnan(overall_confidence):
+                overall_confidence = 0.5
             
             # Update prediction confidence
             self._prediction_confidence['overall'] = overall_confidence
@@ -1402,6 +1424,11 @@ class HamRadioConditions:
             time_factors = {}
             if sun_info:
                 time_factors = self._calculate_enhanced_time_of_day(sun_info)
+                logger.info(f"Time factors calculated: {time_factors.get('period', 'unknown')} - {time_factors.get('description', 'no description')}")
+                if 'band_optimization' in time_factors:
+                    logger.info(f"Band optimization: Optimal={time_factors['band_optimization'].get('optimal', [])}, Good={time_factors['band_optimization'].get('good', [])}, Poor={time_factors['band_optimization'].get('poor', [])}")
+            else:
+                logger.warning("No sun_info provided for time-of-day analysis")
             
             # Enhanced weather impact analysis
             weather_impact = {}
@@ -1434,25 +1461,25 @@ class HamRadioConditions:
                 
 
                 
-                # MUF-based scoring (highest priority) - more granular
+                # MUF-based scoring (reduced priority) - more granular
                 if current_muf and freq > 0:
                     muf_ratio = freq / current_muf
                     if muf_ratio <= 0.3:  # Very well below MUF - excellent
-                        score += 45
+                        score += 25  # Reduced from 45
                     elif muf_ratio <= 0.5:  # Well below MUF - excellent
-                        score += 42
+                        score += 23  # Reduced from 42
                     elif muf_ratio <= 0.7:  # Below MUF - very good
-                        score += 38
+                        score += 20  # Reduced from 38
                     elif muf_ratio <= 0.9:  # Near MUF - very good
-                        score += 35
+                        score += 18  # Reduced from 35
                     elif muf_ratio <= 1.0:  # At MUF - optimal
-                        score += 40
+                        score += 22  # Reduced from 40
                     elif muf_ratio <= 1.2:  # Slightly above MUF - good
-                        score += 25
+                        score += 15  # Reduced from 25
                     elif muf_ratio <= 1.5:  # Above MUF - moderate
-                        score += 15
+                        score += 10  # Reduced from 15
                     else:  # Well above MUF - poor
-                        score += 5
+                        score += 3   # Reduced from 5
                 else:
                     # Fallback to solar flux scoring if MUF not available
                     if sfi >= 150:
@@ -1506,16 +1533,38 @@ class HamRadioConditions:
                 else:
                     score *= (1 + band_info['night_bonus'])
                 
-                # Time-of-day optimization bonus (NEW!)
+                # Time-of-day optimization bonus (DOMINANT!)
                 if time_factors and 'band_optimization' in time_factors:
                     band_opt = time_factors['band_optimization']
                     if band_name in band_opt.get('optimal', []):
-                        score *= 1.4  # 40% bonus for optimal time
-
+                        score *= 3.0  # 200% bonus for optimal time
+                        logger.info(f"Time-of-day bonus: {band_name} is optimal for current time (3.0x)")
                     elif band_name in band_opt.get('good', []):
-                        score *= 1.2  # 20% bonus for good time
+                        score *= 2.0  # 100% bonus for good time
+                        logger.info(f"Time-of-day bonus: {band_name} is good for current time (2.0x)")
                     elif band_name in band_opt.get('poor', []):
-                        score *= 0.8  # 20% penalty for poor time
+                        score *= 0.3  # 70% penalty for poor time
+                        logger.info(f"Time-of-day penalty: {band_name} is poor for current time (0.3x)")
+                else:
+                    # Fallback time-of-day logic if time_factors not available
+                    current_hour = datetime.now().hour
+                    if is_daytime:
+                        if current_hour < 10:  # Early morning - 40m shines!
+                            if band_name == '40m':
+                                score *= 2.5  # 150% bonus for 40m in early morning
+                            elif band_name in ['30m', '20m']:
+                                score *= 2.0  # 100% bonus
+                        elif current_hour < 14:  # Mid-morning to early afternoon
+                            if band_name in ['20m', '15m', '17m']:
+                                score *= 2.5  # 150% bonus for optimal bands
+                        elif current_hour < 18:  # Late afternoon
+                            if band_name in ['15m', '12m', '10m']:
+                                score *= 2.5  # 150% bonus for optimal bands
+                    else:  # Night time
+                        if band_name in ['80m', '40m', '160m']:
+                            score *= 2.0  # 100% bonus for night bands
+                        elif band_name in ['30m', '20m']:
+                            score *= 1.5  # 50% bonus
                 
                 # Weather impact adjustments (NEW!)
                 if weather_impact and 'band_adjustments' in weather_impact:
@@ -1545,11 +1594,31 @@ class HamRadioConditions:
                 
                 band_scores[band_name] = score
             
+            # Apply final time-of-day priority adjustment
+            if time_factors and 'band_optimization' in time_factors:
+                band_opt = time_factors['band_optimization']
+                # Give a final boost to optimal bands to ensure they rank highest
+                for band_name in band_scores:
+                    if band_name in band_opt.get('optimal', []):
+                        band_scores[band_name] += 50  # Significant boost for optimal time
+                        logger.info(f"Final priority boost: {band_name} gets +50 for optimal time")
+                    elif band_name in band_opt.get('good', []):
+                        band_scores[band_name] += 25  # Moderate boost for good time
+                        logger.info(f"Final priority boost: {band_name} gets +25 for good time")
+            
             # Sort bands by score and return top performers
             sorted_bands = sorted(band_scores.items(), key=lambda x: x[1], reverse=True)
             
+            # Log the top band scores for debugging
+            logger.info(f"Top 5 band scores: {sorted_bands[:5]}")
+            
             # Use appropriate threshold for band selection with enhanced scoring
             best_bands = [band for band, score in sorted_bands if score >= 3]  # Adjusted for enhanced scoring
+            
+            # Log why these bands were selected
+            for band in best_bands[:3]:
+                if band in band_scores:
+                    logger.info(f"Band {band} selected with score {band_scores[band]:.1f}")
             
             # Store historical data
             self._historical_data['band_conditions'].append({
@@ -1986,6 +2055,10 @@ class HamRadioConditions:
             
             # Get sunrise/sunset information
             sun_info = self._calculate_sunrise_sunset()
+            # Ensure sun_info has the required fields for time-of-day analysis
+            if 'sunrise' not in sun_info or 'sunset' not in sun_info:
+                sun_info['sunrise'] = '06:00 AM'
+                sun_info['sunset'] = '06:00 PM'
             
             # Get enhanced solar conditions from multiple sources
             solar_data = self._get_enhanced_solar_data()
