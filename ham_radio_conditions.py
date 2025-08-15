@@ -6181,43 +6181,63 @@ class HamRadioConditions:
             if is_day:
                 logger.info(f"Time analysis: current_hour={current_hour}, sunrise_hour+2={sunrise_hour + 2}, sunrise_hour+4={sunrise_hour + 4}, sunset_hour-2={sunset_hour - 2}")
                 
-                if current_hour < sunrise_hour + 2:  # Early morning (dawn)
+                if current_hour < sunrise_hour + 2:  # Dawn (05:00-07:00)
                     logger.info("Selected period: DAWN")
                     time_factors['period'] = 'dawn'
-                    time_factors['description'] = 'Dawn - D layer forming, E layer optimal'
+                    time_factors['description'] = 'Dawn - D layer forming, E layer optimal, 40m excels'
                     time_factors['band_optimization'] = {
-                        'optimal': ['40m', '30m', '20m'],  # 40m shines here!
-                        'good': ['80m', '17m', '15m'],
-                        'poor': ['160m', '10m', '6m']
+                        'optimal': ['40m', '80m', '160m'],  # Lower bands work best at dawn
+                        'good': ['30m', '20m', '17m'],
+                        'poor': ['15m', '12m', '10m', '6m']  # High bands need stronger F2
                     }
-                    time_factors['weather_impact'] = 'morning_inversion'
-                elif current_hour < sunrise_hour + 4:  # Morning
-                    logger.info("Selected period: MORNING")
-                    time_factors['period'] = 'morning'
-                    time_factors['description'] = 'Morning - F2 layer building, excellent HF conditions'
+                    time_factors['weather_impact'] = 'dawn_enhancement'
+                elif current_hour < sunrise_hour + 4:  # Early Morning (07:00-09:00)
+                    logger.info("Selected period: EARLY_MORNING")
+                    time_factors['period'] = 'early_morning'
+                    time_factors['description'] = 'Early Morning - F2 layer building, 40m still excellent'
                     time_factors['band_optimization'] = {
-                        'optimal': ['20m', '15m', '17m'],
-                        'good': ['40m', '30m', '12m', '10m'],
-                        'poor': ['160m', '80m', '6m']
+                        'optimal': ['40m', '30m', '20m'],  # 40m still optimal, 30m starting to work
+                        'good': ['80m', '17m', '15m'],
+                        'poor': ['160m', '12m', '10m', '6m']
+                    }
+                    time_factors['weather_impact'] = 'morning_building'
+                elif current_hour < sunrise_hour + 6:  # Mid Morning (09:00-11:00)
+                    logger.info("Selected period: MID_MORNING")
+                    time_factors['period'] = 'mid_morning'
+                    time_factors['description'] = 'Mid Morning - F2 layer strong, all bands opening'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['30m', '20m', '17m'],  # 30m now optimal, 40m still good
+                        'good': ['40m', '15m', '12m'],
+                        'poor': ['160m', '80m', '10m', '6m']
                     }
                     time_factors['weather_impact'] = 'morning_optimal'
-                elif current_hour < sunset_hour - 2:  # Afternoon
-                    logger.info("Selected period: AFTERNOON")
-                    time_factors['period'] = 'afternoon'
-                    time_factors['description'] = 'Afternoon - Peak F2 layer, best HF conditions'
+                elif current_hour < sunset_hour - 4:  # Midday (11:00-15:00)
+                    logger.info("Selected period: MIDDAY")
+                    time_factors['period'] = 'midday'
+                    time_factors['description'] = 'Midday - Peak F2 layer, highest bands optimal'
                     time_factors['band_optimization'] = {
-                        'optimal': ['15m', '12m', '10m', '6m'],
-                        'good': ['20m', '17m', '30m'],
-                        'poor': ['40m', '80m', '160m']
+                        'optimal': ['20m', '15m', '17m'],  # High bands at peak
+                        'good': ['30m', '12m', '10m'],
+                        'poor': ['40m', '80m', '160m', '6m']
                     }
-                    time_factors['weather_impact'] = 'afternoon_peak'
-                else:  # Dusk
+                    time_factors['weather_impact'] = 'midday_peak'
+                elif current_hour < sunset_hour - 2:  # Late Afternoon (15:00-17:00)
+                    logger.info("Selected period: LATE_AFTERNOON")
+                    time_factors['period'] = 'late_afternoon'
+                    time_factors['description'] = 'Late Afternoon - F2 layer declining, mid bands optimal'
+                    time_factors['band_optimization'] = {
+                        'optimal': ['15m', '12m', '10m'],  # Still high bands
+                        'good': ['20m', '17m', '30m'],
+                        'poor': ['40m', '80m', '160m', '6m']
+                    }
+                    time_factors['weather_impact'] = 'afternoon_decline'
+                else:  # Dusk (17:00-19:00)
                     logger.info("Selected period: DUSK")
                     time_factors['period'] = 'dusk'
-                    time_factors['description'] = 'Dusk - F2 layer declining, D layer forming'
+                    time_factors['description'] = 'Dusk - F2 layer fading, lower bands returning'
                     time_factors['band_optimization'] = {
-                        'optimal': ['17m', '20m', '15m'],
-                        'good': ['30m', '40m', '12m'],
+                        'optimal': ['17m', '20m', '30m'],  # Mid bands still working
+                        'good': ['40m', '15m', '12m'],
                         'poor': ['10m', '6m', '80m', '160m']
                     }
                     time_factors['weather_impact'] = 'dusk_transition'
