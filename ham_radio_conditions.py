@@ -1412,6 +1412,7 @@ class HamRadioConditions:
 
     def _determine_best_bands(self, solar_data, is_daytime, sun_info=None, weather_data=None):
         """Enhanced band determination with time-of-day and weather integration."""
+        logger.info(f"_determine_best_bands called: is_daytime={is_daytime}, sun_info={sun_info}")
         try:
             sfi = self._safe_float_conversion(solar_data.get('sfi', '0'))
             k_index = self._safe_float_conversion(solar_data.get('k_index', '0'))
@@ -2107,9 +2108,21 @@ class HamRadioConditions:
             iono_data['muf_validation'] = muf_validation
             
             try:
+                logger.info(f"Calling _determine_best_bands with: is_daytime={sun_info['is_day']}, sun_info={sun_info}")
                 best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'], sun_info, self.get_weather_conditions())
+                logger.info(f"Best bands determined: {best_bands}")
+                
+                # TEMPORARY OVERRIDE: Force the enhanced function to be used
+                if not best_bands or len(best_bands) == 0:
+                    logger.warning("Enhanced function returned empty bands, forcing recalculation")
+                    best_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'], sun_info, self.get_weather_conditions())
+                    logger.info(f"Forced recalculation result: {best_bands}")
+                
             except Exception as e:
                 logger.error(f"Error determining best bands: {e}")
+                logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 best_bands = ['20m', '40m', '80m']  # Fallback
             propagation_quality = self._calculate_propagation_quality(solar_data.get('hamqsl', {}), sun_info['is_day'])
             aurora_conditions = self._get_aurora_conditions(solar_data.get('hamqsl', {}))
@@ -2320,10 +2333,9 @@ class HamRadioConditions:
             try:
                 result = {
                 'current_time': current_time,
-                            'day_night': 'Day' if sun_info['is_day'] else 'Night',
-            'sunrise': sun_info['sunrise'],
-            'sunset': sun_info['sunset'],
-            'enhanced_time_analysis': self._calculate_enhanced_time_of_day(sun_info),
+                'day_night': 'Day' if sun_info['is_day'] else 'Night',
+                'sunrise_sunset': sun_info,  # Add the complete sunrise/sunset data
+                'enhanced_time_analysis': self._calculate_enhanced_time_of_day(sun_info),
             'enhanced_weather_analysis': self._calculate_weather_impact_on_propagation(self.get_weather_conditions()),
                             'phase2_enhancements': {
                     'geographic_modeling': True,
@@ -2420,6 +2432,7 @@ class HamRadioConditions:
                 result = {
                     'current_time': current_time,
                     'day_night': 'Day' if sun_info['is_day'] else 'Night',
+                    'sunrise_sunset': sun_info,  # Add the sunrise/sunset data
                     'location': {
                         'grid': self.grid_square,
                         'latitude': round(self.lat, 2),
@@ -2429,6 +2442,24 @@ class HamRadioConditions:
                     },
                     'ionospheric': iono_data  # Ensure iono_data is preserved even in fallback
                 }
+            
+            # DIRECT INJECTION: Force enhanced band selection
+            try:
+                logger.info("DIRECT INJECTION: Forcing enhanced band selection")
+                enhanced_bands = self._determine_best_bands(solar_data.get('hamqsl', {}), sun_info['is_day'], sun_info, self.get_weather_conditions())
+                logger.info(f"DIRECT INJECTION result: {enhanced_bands}")
+                
+                # Override the best bands in the result
+                if enhanced_bands and len(enhanced_bands) > 0:
+                    result['propagation_parameters']['best_bands'] = enhanced_bands
+                    logger.info(f"DIRECT INJECTION: Overrode best bands to: {enhanced_bands}")
+                else:
+                    logger.warning("DIRECT INJECTION: Enhanced function returned empty bands")
+                    
+            except Exception as e:
+                logger.error(f"DIRECT INJECTION failed: {e}")
+                import traceback
+                logger.error(f"DIRECT INJECTION traceback: {traceback.format_exc()}")
             
             # Convert NumPy types to Python native types for JSON serialization
             converted_result = convert_numpy_types(result)
@@ -2497,10 +2528,14 @@ class HamRadioConditions:
     def _calculate_sunrise_sunset(self):
         """Calculate sunrise and sunset times for the current location"""
         try:
+            logger.info(f"_calculate_sunrise_sunset called with lat={self.lat}, timezone={self.timezone}")
+            
             # Simple sunrise/sunset calculation based on latitude and time of year
             # This is a simplified version - for more accuracy, use a proper astronomical library
             now_local = datetime.now(self.timezone)
             today = now_local.date()
+            
+            logger.info(f"Current time: {now_local}, today: {today}")
             
             # Approximate sunrise/sunset times based on latitude
             # These are rough estimates - in production, use a proper astronomical library
@@ -2517,24 +2552,33 @@ class HamRadioConditions:
                 sunrise_hour = 8
                 sunset_hour = 16
             
+            logger.info(f"Latitude {self.lat} -> sunrise_hour={sunrise_hour}, sunset_hour={sunset_hour}")
+            
             # Adjust for seasonal variations (simplified)
             day_of_year = today.timetuple().tm_yday
             if 80 <= day_of_year <= 265:  # Spring/Summer in Northern Hemisphere
                 sunrise_hour -= 1
                 sunset_hour += 1
+                logger.info(f"Spring/Summer adjustment: sunrise_hour={sunrise_hour}, sunset_hour={sunset_hour}")
             
             sunrise_time = now_local.replace(hour=sunrise_hour, minute=0, second=0, microsecond=0)
             sunset_time = now_local.replace(hour=sunset_hour, minute=0, second=0, microsecond=0)
             
             is_day = sunrise_time <= now_local <= sunset_time
             
-            return {
+            result = {
                 'sunrise': sunrise_time.strftime('%I:%M %p'),
                 'sunset': sunset_time.strftime('%I:%M %p'),
                 'is_day': is_day
             }
+            
+            logger.info(f"_calculate_sunrise_sunset returning: {result}")
+            return result
         except Exception as e:
             logger.error(f"Error calculating sunrise/sunset: {e}")
+            logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 'sunrise': 'N/A',
                 'sunset': 'N/A',
@@ -4385,26 +4429,47 @@ class HamRadioConditions:
     def _get_enhanced_propagation_validation(self):
         """Get enhanced propagation validation from multiple sources."""
         try:
+            logger.info("_get_enhanced_propagation_validation called")
             validation_data = {}
             
             # Get RBN data
             rbn_data = self._get_rbn_propagation_data()
             if rbn_data:
                 validation_data['rbn'] = rbn_data
+                logger.info(f"RBN data added: {len(rbn_data)} items")
+            else:
+                logger.info("No RBN data available")
             
             # Get WSPRNet data
             wspr_data = self._get_wsprnet_data()
             if wspr_data:
                 validation_data['wsprnet'] = wspr_data
+                logger.info(f"WSPRNet data added: {len(wspr_data)} items")
+            else:
+                logger.info("No WSPRNet data available")
             
             # Combine and analyze validation data
             if validation_data:
                 validation_data['combined_analysis'] = self._analyze_combined_validation(validation_data)
+                logger.info("Combined analysis added")
             
-            return validation_data
+            # Format for frontend display
+            frontend_validation = {
+                'data_quality': validation_data.get('combined_analysis', {}).get('data_quality', 'N/A'),
+                'confidence': validation_data.get('combined_analysis', {}).get('validation_score', 'N/A'),
+                'method': f"Multi-source ({', '.join(validation_data.keys())})",
+                'total_spots': validation_data.get('combined_analysis', {}).get('total_spots', 0),
+                'data_sources': validation_data.get('combined_analysis', {}).get('data_sources', [])
+            }
+            
+            logger.info(f"Enhanced validation returning: {validation_data}")
+            logger.info(f"Frontend validation format: {frontend_validation}")
+            return frontend_validation
             
         except Exception as e:
             logger.error(f"Error getting enhanced propagation validation: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {}
 
     def get_api_status(self):
@@ -5244,6 +5309,7 @@ class HamRadioConditions:
     def _get_geomagnetic_coordinates(self):
         """Calculate geomagnetic coordinates for more accurate predictions."""
         try:
+            logger.info("_get_geomagnetic_coordinates called")
             # Enhanced geomagnetic coordinate calculation
             # Using more accurate dipole model with current pole positions
             
@@ -5287,7 +5353,7 @@ class HamRadioConditions:
                 # At or very near the pole, use geographic longitude
                 geomag_lon = self.lon
             
-            return {
+            result = {
                 'geomagnetic_latitude': round(geomag_lat, 2),
                 'geomagnetic_longitude': round(geomag_lon, 2),
                 'magnetic_declination': self._calculate_magnetic_declination(),
@@ -5302,14 +5368,45 @@ class HamRadioConditions:
                 }
             }
             
+            # Format for frontend display
+            frontend_geomag = {
+                'lat': round(geomag_lat, 2),
+                'lon': round(geomag_lon, 2),
+                'impact': self._calculate_geomagnetic_impact(geomag_lat, geomag_lon),
+                'magnetic_declination': self._calculate_magnetic_declination(),
+                'calculation_method': 'Enhanced Dipole Model (2024)',
+                'pole_coordinates': f"{mag_pole_lat}°N, {mag_pole_lon}°W"
+            }
+            
+            logger.info(f"Geomagnetic coordinates returning: {result}")
+            logger.info(f"Frontend geomag format: {frontend_geomag}")
+            return frontend_geomag
+            
         except Exception as e:
             logger.error(f"Error calculating geomagnetic coordinates: {e}")
             return {
-                'geomagnetic_latitude': self.lat,
-                'geomagnetic_longitude': self.lon,
+                'lat': self.lat,
+                'lon': self.lon,
+                'impact': 'Unknown',
                 'magnetic_declination': 0.0,
                 'calculation_method': 'Fallback (Geographic)'
             }
+
+    def _calculate_geomagnetic_impact(self, geomag_lat, geomag_lon):
+        """Calculate the impact of geomagnetic coordinates on propagation."""
+        try:
+            # Determine impact based on geomagnetic latitude
+            if abs(geomag_lat) >= 60:
+                return "High - Auroral zone effects"
+            elif abs(geomag_lat) >= 45:
+                return "Moderate - Mid-latitude variations"
+            elif abs(geomag_lat) >= 30:
+                return "Low - Stable propagation"
+            else:
+                return "Minimal - Equatorial stability"
+        except Exception as e:
+            logger.error(f"Error calculating geomagnetic impact: {e}")
+            return "Unknown"
 
     def _calculate_magnetic_declination(self):
         """Calculate magnetic declination for the current location."""
@@ -6045,9 +6142,12 @@ class HamRadioConditions:
         try:
             from datetime import datetime, timedelta
             
-            now = datetime.now()
+            # Use timezone-aware current time instead of datetime.now()
+            now = datetime.now(self.timezone)
             sunrise_str = sun_info.get('sunrise', '05:00 AM')
             sunset_str = sun_info.get('sunset', '07:00 PM')
+            
+            logger.info(f"_calculate_enhanced_time_of_day: current_hour={now.hour}, sunrise_str={sunrise_str}, sunset_str={sunset_str}")
             
             # Parse sunrise/sunset times
             try:
@@ -6067,6 +6167,8 @@ class HamRadioConditions:
             current_hour = now.hour
             is_day = sun_info.get('is_day', True)
             
+            logger.info(f"_calculate_enhanced_time_of_day: current_hour={current_hour}, sunrise_hour={sunrise_hour}, sunset_hour={sunset_hour}, is_day={is_day}")
+            
             # Enhanced time-of-day analysis
             time_factors = {
                 'period': 'unknown',
@@ -6077,7 +6179,10 @@ class HamRadioConditions:
             }
             
             if is_day:
+                logger.info(f"Time analysis: current_hour={current_hour}, sunrise_hour+2={sunrise_hour + 2}, sunrise_hour+4={sunrise_hour + 4}, sunset_hour-2={sunset_hour - 2}")
+                
                 if current_hour < sunrise_hour + 2:  # Early morning (dawn)
+                    logger.info("Selected period: DAWN")
                     time_factors['period'] = 'dawn'
                     time_factors['description'] = 'Dawn - D layer forming, E layer optimal'
                     time_factors['band_optimization'] = {
@@ -6087,6 +6192,7 @@ class HamRadioConditions:
                     }
                     time_factors['weather_impact'] = 'morning_inversion'
                 elif current_hour < sunrise_hour + 4:  # Morning
+                    logger.info("Selected period: MORNING")
                     time_factors['period'] = 'morning'
                     time_factors['description'] = 'Morning - F2 layer building, excellent HF conditions'
                     time_factors['band_optimization'] = {
@@ -6096,6 +6202,7 @@ class HamRadioConditions:
                     }
                     time_factors['weather_impact'] = 'morning_optimal'
                 elif current_hour < sunset_hour - 2:  # Afternoon
+                    logger.info("Selected period: AFTERNOON")
                     time_factors['period'] = 'afternoon'
                     time_factors['description'] = 'Afternoon - Peak F2 layer, best HF conditions'
                     time_factors['band_optimization'] = {
@@ -6105,6 +6212,7 @@ class HamRadioConditions:
                     }
                     time_factors['weather_impact'] = 'afternoon_peak'
                 else:  # Dusk
+                    logger.info("Selected period: DUSK")
                     time_factors['period'] = 'dusk'
                     time_factors['description'] = 'Dusk - F2 layer declining, D layer forming'
                     time_factors['band_optimization'] = {

@@ -880,10 +880,15 @@
         function createOperatingStrategy(data) {
             const { muf, quality, bestBands, dayNight, solarCycle, recommendations, fullData } = data;
             
+            console.log('createOperatingStrategy called with data:', data);
+            console.log('fullData structure:', fullData);
+            
             // Get comprehensive solar analysis data
             const solarConditions = fullData?.solar_conditions || {};
             const enhancedData = fullData?.propagation_summary?.enhanced_data_sources || {};
             const phase3 = fullData?.propagation_summary?.enhanced_data_sources?.ionospheric?.phase3_enhancements;
+            
+            console.log('Phase3 data in createOperatingStrategy:', phase3);
             const enhancedAccuracy = fullData?.propagation_summary?.enhanced_accuracy;
             const mufSource = fullData?.propagation_summary?.propagation_parameters?.muf_source;
             const mufConfidence = fullData?.propagation_summary?.propagation_parameters?.muf_confidence;
@@ -1131,7 +1136,7 @@
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">PHASE 3: ADVANCED INTELLIGENCE</div>
                         <div class="bg-gray-800 p-4 rounded-lg">
-                            ${createPhase3Intelligence(fullData)}
+                            ${fullData && fullData.propagation_summary ? createPhase3Intelligence(fullData) : '<div class="text-gray-400 text-sm">Loading Phase 3 data...</div>'}
                         </div>
                     </div>
                     
@@ -1499,11 +1504,13 @@
                 // Debug: Log what data we're receiving
                 console.log('createPhase3Intelligence called with data:', data);
                 console.log('Data keys:', Object.keys(data || {}));
+                console.log('Data structure:', JSON.stringify(data, null, 2));
                 
                 // Look for Phase 3 data in the correct location: enhanced_data_sources.ionospheric.phase3_enhancements
                 const phase3 = data.propagation_summary?.enhanced_data_sources?.ionospheric?.phase3_enhancements;
                 
                 console.log('Phase3 data found:', phase3);
+                console.log('Phase3 data structure:', JSON.stringify(phase3, null, 2));
                 
                 if (!phase3) {
                     console.log('No Phase 3 data found in any location');
