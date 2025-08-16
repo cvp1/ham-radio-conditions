@@ -389,7 +389,7 @@
             <h2 class="text-2xl font-heading mb-4 flex items-center">
                 <i class="fas fa-satellite-dish mr-3 section-icon icon-propagation text-2xl"></i>
                 <span class="text-white">Current Conditions</span>
-            </h2>
+                </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <!-- Solar Conditions -->
@@ -399,7 +399,7 @@
                         <span>Solar</span>
                     </h3>
                     <div id="solar-conditions" class="space-y-2 text-sm"></div>
-                </div>
+            </div>
 
                 <!-- MUF & Propagation -->
                 <div class="card current-conditions rounded-lg p-4">
@@ -408,7 +408,7 @@
                         <span>Propagation</span>
                     </h3>
                     <div id="propagation-current" class="space-y-2 text-sm"></div>
-                </div>
+                    </div>
 
                 <!-- Best Bands -->
                 <div class="card current-conditions rounded-lg p-4">
@@ -417,7 +417,7 @@
                         <span>Best Bands</span>
                     </h3>
                     <div id="best-bands-current" class="space-y-2 text-sm"></div>
-                </div>
+            </div>
 
                 <!-- Weather -->
                 <div class="card current-conditions rounded-lg p-4">
@@ -428,14 +428,14 @@
                     <div id="weather-conditions" class="space-y-2 text-sm"></div>
                 </div>
             </div>
-        </div>
+            </div>
 
         <!-- Future Predictions & Analysis Section -->
         <div class="mb-8">
             <h2 class="text-2xl font-heading mb-4 flex items-center">
                 <i class="fas fa-chart-line mr-3 section-icon icon-propagation text-2xl"></i>
                 <span class="text-white">Propagation Analysis & Forecast</span>
-            </h2>
+                </h2>
             
             <div class="space-y-6">
                 <!-- Executive Summary -->
@@ -447,8 +447,8 @@
                     <div id="executive-summary" class="space-y-3">
                         <div class="text-gray-300 text-sm">Loading summary...</div>
                     </div>
-                </div>
-                
+                        </div>
+
                 <!-- Solar Cycle Analysis -->
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
@@ -465,11 +465,11 @@
                         <span>Operating Strategy & Recommendations</span>
                     </h3>
                     <div id="recommendations" class="space-y-3"></div>
-                </div>
-                
+                        </div>
 
-            </div>
-        </div>
+
+                            </div>
+                        </div>
 
         <!-- Detailed Band Conditions -->
         <div class="mb-8">
@@ -480,17 +480,17 @@
             
             <div class="card rounded-lg p-6">
                 <div id="band-conditions-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+                </div>
             </div>
-        </div>
 
         <!-- Live Activity -->
         <div class="mb-8">
             <h2 class="text-2xl font-heading mb-4 flex items-center">
-                <i class="fas fa-broadcast-tower mr-3 section-icon icon-spots text-2xl"></i>
+                    <i class="fas fa-broadcast-tower mr-3 section-icon icon-spots text-2xl"></i>
                 <span class="text-white">Live Activity</span>
                 <span id="spots-loading" class="loading-spinner ml-3" style="display: none;"></span>
                 <span id="spots-status" class="ml-2 text-sm text-gray-400">Ready</span>
-            </h2>
+                </h2>
             
             <div class="card rounded-lg p-6">
                 <div id="live-activity">
@@ -833,18 +833,18 @@
                 const w = data.weather_conditions;
                 safeSetHTML(weatherDiv, `
                     <div class="space-y-2">
-                        <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center">
                             <span class="text-gray-400">Location:</span>
                             <span class="font-semibold">${w.city && w.state ? `${w.city}, ${w.state}` : 'N/A'}</span>
-                        </div>
-                        ${Object.entries(w)
-                            .filter(([key]) => !['source', 'city', 'state'].includes(key))
-                            .map(([key, value]) => `
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                                    <span class="font-semibold">${value}</span>
-                                </div>
-                            `).join('')}
+                    </div>
+                    ${Object.entries(w)
+                        .filter(([key]) => !['source', 'city', 'state'].includes(key))
+                        .map(([key, value]) => `
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
+                                <span class="font-semibold">${value}</span>
+                            </div>
+                        `).join('')}
                     </div>
                 `);
             } else {
@@ -880,15 +880,11 @@
         function createOperatingStrategy(data) {
             const { muf, quality, bestBands, dayNight, solarCycle, recommendations, fullData } = data;
             
-            console.log('createOperatingStrategy called with data:', data);
-            console.log('fullData structure:', fullData);
-            
             // Get comprehensive solar analysis data
             const solarConditions = fullData?.solar_conditions || {};
             const enhancedData = fullData?.propagation_summary?.enhanced_data_sources || {};
             const phase3 = fullData?.propagation_summary?.enhanced_data_sources?.ionospheric?.phase3_enhancements;
             
-            console.log('Phase3 data in createOperatingStrategy:', phase3);
             const enhancedAccuracy = fullData?.propagation_summary?.enhanced_accuracy;
             const mufSource = fullData?.propagation_summary?.propagation_parameters?.muf_source;
             const mufConfidence = fullData?.propagation_summary?.propagation_parameters?.muf_confidence;
@@ -1059,7 +1055,7 @@
                             ${createBandStrategy(bestBands, muf, dayNight)}
                         </div>
                     </div>
-                    
+
                     <!-- Enhanced Data Sources Integration -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">ENHANCED DATA SOURCES</div>
@@ -1076,9 +1072,9 @@
                                         ${phase3.auroral_analysis ? `<div>• Auroral Modeling: ${phase3.auroral_analysis.activity_level || 'N/A'} (${phase3.auroral_analysis.muf_adjustment || 1.0}x MUF adjustment)</div>` : ''}
                                         ${phase3.storm_prediction ? `<div>• Storm Prediction: ${phase3.storm_prediction.overall_impact || 'N/A'} (${phase3.storm_prediction.recovery_time || 'N/A'} recovery)</div>` : ''}
                                     </div>
-                                </div>
-                                ` : ''}
-                                
+                            </div>
+                        ` : ''}
+                        
                                 <!-- Enhanced Validation -->
                                 ${enhancedData.enhanced_validation ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
@@ -1087,10 +1083,10 @@
                                         <div>• Data Quality: ${enhancedData.enhanced_validation.data_quality || 'N/A'}</div>
                                         <div>• Confidence: ${enhancedData.enhanced_validation.confidence || 'N/A'}</div>
                                         <div>• Validation Method: ${enhancedData.enhanced_validation.method || 'N/A'}</div>
-                                    </div>
                                 </div>
-                                ` : ''}
-                                
+                            </div>
+                        ` : ''}
+                        
                                 <!-- Geomagnetic Coordinates -->
                                 ${enhancedData.geomagnetic_coordinates ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
@@ -1100,29 +1096,29 @@
                                         <div>• Longitude: ${enhancedData.geomagnetic_coordinates.lon || 'N/A'}°</div>
                                         <div>• Impact: ${enhancedData.geomagnetic_coordinates.impact || 'N/A'}</div>
                                     </div>
-                                </div>
-                                ` : ''}
-                                
+                            </div>
+                        ` : ''}
+                        
                                 <!-- Additional Sources -->
                                 ${enhancedData.additional_sources ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
                                     <div class="text-sm text-green-200 font-semibold mb-1">Additional Sources</div>
                                     <div class="text-xs text-gray-300">
                                         ${Object.keys(enhancedData.additional_sources).map(source => `<div>• ${source}: ${enhancedData.additional_sources[source] ? 'Active' : 'Inactive'}</div>`).join('')}
-                                    </div>
                                 </div>
-                                ` : ''}
-                            </div>
+                                </div>
+                            ` : ''}
+                                </div>
                         </div>
-                    </div>
-                    
+                        </div>
+                        
                     <!-- Operating Tactics -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">OPERATING TACTICS</div>
                         <div class="space-y-2">
                             ${createOperatingTactics(muf, quality, dayNight, solarCycle)}
-                        </div>
-                    </div>
+                                </div>
+                            </div>
                     
                     <!-- Time-Based Strategy -->
                     <div class="space-y-3">
@@ -1131,14 +1127,14 @@
                             ${createTimeBasedStrategy(dayNight, muf, solarCycle)}
                         </div>
                     </div>
-                    
+
                     <!-- Phase 3 Advanced Intelligence -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">PHASE 3: ADVANCED INTELLIGENCE</div>
                         <div class="bg-gray-800 p-4 rounded-lg">
                             ${fullData && fullData.propagation_summary ? createPhase3Intelligence(fullData) : '<div class="text-gray-400 text-sm">Loading Phase 3 data...</div>'}
-                        </div>
-                    </div>
+                                    </div>
+                                </div>
                     
                     <!-- Success Metrics -->
                     <div class="space-y-3">
@@ -1150,7 +1146,7 @@
                             </div>
                             <div class="bg-gray-800 p-3 rounded-lg">
                                 <div class="text-gray-400">Expected Range</div>
-                        <div class="font-semibold">${muf > 20 ? 'Global DX' : muf > 15 ? 'Continental' : muf > 10 ? 'Regional' : 'Local'}</div>
+                                <div class="font-semibold">${muf > 20 ? 'Global DX' : muf > 15 ? 'Continental' : muf > 10 ? 'Regional' : 'Local'}</div>
                             </div>
                         </div>
                     </div>
@@ -1193,10 +1189,10 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-300">${band}</span>
                                 <span class="text-xs text-gray-400">${bandFreqs[band] || 'N/A'} MHz${analyzeBand(band)}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
                 ${secondaryBands.length > 0 ? `
                 <div class="bg-gray-800 p-3 rounded-lg">
                     <div class="text-sm text-yellow-300 font-semibold mb-2">Secondary Bands (Backup & Testing)</div>
@@ -1205,16 +1201,16 @@
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-300">${band}</span>
                                 <span class="text-xs text-gray-400">${bandFreqs[band] || 'N/A'} MHz${analyzeBand(band)}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                ` : ''}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
                 <div class="bg-gray-700 p-2 rounded-lg">
                     <div class="text-xs text-gray-400 text-center">
                         MUF: ${muf} MHz | Strategy based on frequency vs MUF ratio
-                    </div>
-                </div>
+                                        </div>
+                                            </div>
             `;
         }
 
@@ -1286,6 +1282,59 @@
                         <span class="font-semibold text-sm">${tactic.tactic}</span>
                     </div>
                     <div class="text-xs text-gray-300">${tactic.description}</div>
+                </div>
+            `).join('');
+        }
+
+        function createTimeBasedStrategy(dayNight, muf, solarCycle) {
+            const timeStrategy = [];
+            
+            if (dayNight === 'Day') {
+                timeStrategy.push({
+                    period: 'Daytime (F2 Layer Active)',
+                    strategy: 'Focus on higher frequency bands (20m, 15m, 10m) for DX',
+                    bands: '20m, 15m, 10m, 12m',
+                    power: '100-200W for DX, 50W for regional',
+                    notes: 'F2 layer provides excellent long-distance propagation'
+                });
+            } else {
+                timeStrategy.push({
+                    period: 'Nighttime (F2 Layer Reduced)',
+                    strategy: 'Focus on lower frequency bands for regional communication',
+                    bands: '80m, 40m, 30m',
+                    power: '100-200W for regional, 50W for local',
+                    notes: 'No D layer absorption, but reduced F2 ionization'
+                });
+            }
+            
+            // Add MUF-based time adjustments
+            if (muf > 20) {
+                timeStrategy.push({
+                    period: 'High MUF Conditions',
+                    strategy: 'Extended daytime-like conditions on higher bands',
+                    bands: 'All bands above 20m',
+                    power: 'Full power operation',
+                    notes: 'MUF supports extended high-frequency operation'
+                });
+            } else if (muf < 10) {
+                timeStrategy.push({
+                    period: 'Low MUF Conditions',
+                    strategy: 'Focus on lower bands regardless of time',
+                    bands: '80m, 40m, 30m',
+                    power: 'Higher power for regional contacts',
+                    notes: 'Limited high-frequency propagation'
+                });
+            }
+            
+            return timeStrategy.map(strategy => `
+                <div class="bg-gray-700 p-3 rounded-lg">
+                    <div class="text-sm text-blue-300 font-semibold mb-1">${strategy.period}</div>
+                    <div class="text-xs text-gray-300 space-y-1">
+                        <div><span class="text-blue-200">Strategy:</span> ${strategy.strategy}</div>
+                        <div><span class="text-blue-200">Bands:</span> ${strategy.bands}</div>
+                        <div><span class="text-blue-200">Power:</span> ${strategy.power}</div>
+                        <div><span class="text-blue-200">Notes:</span> ${strategy.notes}</div>
+                    </div>
                 </div>
             `).join('');
         }
@@ -1376,8 +1425,8 @@
                             ${phase3.auroral_analysis ? `<div>• Auroral activity: ${phase3.auroral_analysis.activity_level || 'N/A'} with ${phase3.auroral_analysis.muf_adjustment || 1.0}x MUF adjustment</div>` : ''}
                             ${phase3.storm_prediction ? `<div>• Storm conditions: ${phase3.storm_prediction.overall_impact || 'N/A'} with ${phase3.storm_prediction.recovery_time || 'N/A'} recovery</div>` : ''}
                             <div>• Enhanced MUF calculation: Available</div>
-                        </div>
-                    </div>
+                                        </div>
+                                            </div>
                 `;
             }
             
@@ -1394,8 +1443,8 @@
                             <div>• K-Index ${kIndex}: ${kIndex >= 6 ? 'Severe storm' : kIndex >= 4 ? 'Strong storm' : kIndex >= 2 ? 'Minor storm' : 'Quiet'} geomagnetic activity</div>
                             <div>• Aurora ${aurora}: ${aurora >= 8 ? 'High' : aurora >= 5 ? 'Moderate' : aurora >= 3 ? 'Minor' : 'Quiet'} auroral activity</div>
                             <div>• Impact: ${sfi >= 120 && kIndex <= 2 ? 'Favorable for all bands' : sfi >= 100 && kIndex <= 3 ? 'Good for mid-range bands' : 'Limited to lower bands'}</div>
-                        </div>
-                    </div>
+                                        </div>
+                                    </div>
                 `;
             }
             
@@ -1409,26 +1458,26 @@
                         <div class="flex justify-between items-center mb-2">
                             <div class="font-semibold text-white">${band.band}</div>
                             <div class="text-xs ${rankClass}">Rank #${rank}</div>
-                        </div>
+                                </div>
                         
                         <div class="grid grid-cols-2 gap-2 text-xs">
                             <div>
                                 <div class="text-gray-400">MUF Ratio</div>
                                 <div class="font-semibold ${band.mufRatio <= 1.0 ? 'text-green-400' : 'text-red-400'}">
                                     ${band.mufRatio.toFixed(2)}x
+                                    </div>
                                 </div>
-                            </div>
                             <div>
                                 <div class="text-gray-400">Total Score</div>
                                 <div class="font-semibold text-white">${band.totalScore}</div>
-                            </div>
-                        </div>
+                                    </div>
+                                </div>
                         
                         <div class="mt-2 space-y-1 text-xs">
                             <div class="flex justify-between">
                                 <span class="text-gray-400">MUF Score:</span>
                                 <span class="text-blue-300">${band.mufScore}</span>
-                            </div>
+                                    </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-400">Time Score:</span>
                                 <span class="text-yellow-300">${band.timeScore}</span>
@@ -1453,8 +1502,8 @@
                                 ${band.isSelected ? 
                                     ` | 🎯 SELECTED - High strategic value` : ''
                                 }
-                            </div>
-                        </div>
+                                        </div>
+                                    </div>
                     </div>
                 `;
             }).join('');
@@ -1467,12 +1516,12 @@
                         <div class="text-lg font-bold text-white mb-2">Band Scoring Analysis</div>
                         <div class="text-sm text-gray-300">
                             Detailed breakdown of how each band was scored and ranked
-                        </div>
-                    </div>
+                                        </div>
+                                    </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         ${analysisRows}
-                    </div>
+                                        </div>
                     
                     <div class="bg-gray-700 p-3 rounded-lg mt-4">
                         <div class="text-sm text-blue-300 font-semibold mb-2">Scoring Methodology</div>
@@ -1490,11 +1539,11 @@
                                     <div>• SFI ${parseInt(solarConditions.sfi) || 0}: ${parseInt(solarConditions.sfi) >= 120 ? 'Boosts higher bands' : parseInt(solarConditions.sfi) >= 100 ? 'Supports mid-range bands' : 'Limits to lower bands'}</div>
                                     <div>• K-Index ${parseInt(solarConditions.k_index) || 0}: ${parseInt(solarConditions.k_index) >= 4 ? 'Penalizes higher bands' : parseInt(solarConditions.k_index) >= 2 ? 'Moderate penalty' : 'No penalty'}</div>
                                     <div>• Aurora ${parseInt(solarConditions.aurora) || 0}: ${parseInt(solarConditions.aurora) >= 5 ? 'Affects auroral zone propagation' : 'Minimal impact'}</div>
-                                </div>
-                            </div>
-                            ` : ''}
-                        </div>
-                    </div>
+                                        </div>
+                                    </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
                 </div>
             `;
         }
@@ -1528,7 +1577,7 @@
                                 <div class="text-lg font-semibold text-green-400 mb-2">Phase 3 Active</div>
                                 <div class="text-sm text-gray-300 mb-4">
                                     Advanced intelligence and predictive modeling is running in the background
-                                </div>
+                                        </div>
                                 <div class="grid grid-cols-2 gap-4 text-xs">
                                     <div class="bg-gray-800 p-3 rounded-lg">
                                         <div class="text-gray-400">Seasonal Patterns</div>
@@ -1537,16 +1586,16 @@
                                     <div class="bg-gray-800 p-3 rounded-lg">
                                         <div class="text-gray-400">Auroral Modeling</div>
                                         <div class="text-green-400 font-semibold">✅ Active</div>
-                                    </div>
+                            </div>
                                     <div class="bg-gray-800 p-3 rounded-lg">
                                         <div class="text-gray-400">Storm Prediction</div>
                                         <div class="text-green-400 font-semibold">✅ Active</div>
-                                    </div>
+                        </div>
                                     <div class="bg-gray-800 p-3 rounded-lg">
                                         <div class="text-gray-400">Enhancement Level</div>
                                         <div class="text-blue-400 font-semibold">` + (phase3.enhancement_level || 'Phase 3') + `</div>
                                     </div>
-                                </div>
+                                    </div>
                                 <div class="mt-4 text-xs text-gray-400">
                                     <div class="text-blue-300 font-semibold mb-1">What Phase 3 Provides:</div>
                                     <div class="text-gray-300">` + (phase3.description || 'Advanced intelligence + Predictive modeling') + `</div>
@@ -1555,8 +1604,8 @@
                                     <div class="text-yellow-300">Note: Phase 3 is actively calculating MUF with advanced intelligence.</div>
                                     <div class="text-gray-300">Current Phase 3 MUF: <span class="text-green-400 font-semibold">18.7 MHz</span></div>
                                     <div class="text-gray-300">Detailed analysis data will be available in future updates.</div>
+                                    </div>
                                 </div>
-                            </div>
                         </div>
                     `;
                 }
@@ -1583,31 +1632,31 @@
                 return `
                     <div class="space-y-4">
                         <!-- Seasonal Analysis -->
-                        <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-blue-300 font-semibold mb-2">Seasonal Patterns</div>
                             <div class="grid grid-cols-2 gap-3 text-xs">
                                 <div>
                                     <div class="text-gray-400">Current Season</div>
                                     <div class="font-semibold text-white">` + currentSeason + `</div>
-                                </div>
+                                    </div>
                                 <div>
                                     <div class="text-gray-400">MUF Multiplier</div>
                                     <div class="font-semibold ${seasonal.seasonal_factors?.muf_multiplier > 1 ? 'text-green-400' : 'text-red-400'}">
                                         ` + mufMultiplier + `x
-                                    </div>
                                 </div>
-                            </div>
+                                        </div>
+                                    </div>
                             ` + (seasonal.day_of_year_analysis?.event ? `
                                 <div class="mt-2 p-2 bg-blue-900/20 rounded border-l-2 border-blue-500">
                                     <div class="text-xs text-blue-300 font-semibold">` + (seasonal.day_of_year_analysis.event || 'N/A') + `</div>
                                     <div class="text-xs text-gray-300">` + (seasonal.day_of_year_analysis.propagation_enhancement || 'N/A') + `</div>
                                     <div class="text-xs text-gray-400">Duration: ` + (seasonal.day_of_year_analysis.duration || 'N/A') + `</div>
-                                </div>
+                            </div>
                             ` : '') + `
                         </div>
                         
                         <!-- Auroral Activity -->
-                        <div class="bg-gray-700 p-3 rounded-lg">
+                                <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-purple-300 font-semibold mb-2">Auroral Activity</div>
                             <div class="grid grid-cols-2 gap-3 text-xs">
                                 <div>
@@ -1618,21 +1667,21 @@
                                                                activityLevel === 'STRONG STORM' ? 'text-red-400' : 'text-white') + `">
                                         ` + activityLevel + `
                                     </div>
-                                </div>
+                                    </div>
                                 <div>
                                     <div class="text-gray-400">MUF Adjustment</div>
                                     <div class="font-semibold ` + (parseFloat(mufAdjustment) > 1 ? 'text-green-400' : 'text-red-400') + `">
                                         ` + mufAdjustment + `x
+                                </div>
                                     </div>
                                 </div>
-                            </div>
                             <div class="mt-2 text-xs text-gray-300">
                                 ` + (auroral.auroral_zone_effects?.replace('_', ' ').toUpperCase() || 'Normal conditions') + `
-                            </div>
-                        </div>
-                        
+                                        </div>
+                                    </div>
+                                
                         <!-- Storm Prediction -->
-                        <div class="bg-gray-700 p-3 rounded-lg">
+                                    <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-red-300 font-semibold mb-2">Storm Prediction</div>
                             <div class="grid grid-cols-2 gap-3 text-xs">
                                 <div>
@@ -1642,24 +1691,24 @@
                                                                stormProbability === 'MODERATE' ? 'text-yellow-400' : 
                                                                stormProbability === 'HIGH' ? 'text-orange-400' : 'text-red-400') + `">
                                         ` + stormProbability + `
+                                        </div>
                                     </div>
-                                </div>
                                 <div>
                                     <div class="text-gray-400">Expected Impact</div>
                                     <div class="font-semibold ` + (expectedImpact === 'MINIMAL' ? 'text-green-400' : 
                                                                expectedImpact === 'MINOR' ? 'text-yellow-400' : 
                                                                expectedImpact === 'MODERATE' ? 'text-orange-400' : 'text-red-400') + `">
                                         ` + expectedImpact + `
+                                        </div>
                                     </div>
-                                </div>
                             </div>
                             ` + (storm.warnings?.length > 0 ? `
                                 <div class="mt-2 p-2 bg-red-900/20 rounded border-l-2 border-red-500">
                                     <div class="text-xs text-red-300 font-semibold mb-1">Warnings:</div>
                                     ` + storm.warnings.map(warning => `<div class="text-xs text-gray-300">• ` + warning + `</div>`).join('') + `
-                                </div>
-                            ` : '') + `
                         </div>
+                            ` : '') + `
+                </div>
                         
                         <!-- MUF Evolution -->
                         <div class="bg-gray-700 p-3 rounded-lg">
@@ -1682,78 +1731,19 @@
                                     <span class="font-semibold text-white">` + stormAdjusted + ` MHz</span>
                                 </div>
                                 <div class="border-t border-gray-600 pt-2 mt-2">
-                                    <div class="flex justify-between">
+                                <div class="flex justify-between">
                                         <span class="text-gray-400 font-semibold">Final Phase 3 MUF:</span>
                                         <span class="font-semibold text-green-400 text-lg">` + finalPhase3Muf + ` MHz</span>
-                                    </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                                        </div>
                 `;
             } catch (e) {
                 console.error('Error creating Phase 3 intelligence:', e);
                 return '<div class="text-red-400 text-sm">Error displaying Phase 3 data</div>';
             }
-        }
-
-        function createTimeBasedStrategy(dayNight, muf, solarCycle) {
-            const isDay = dayNight === 'Day';
-            const highMuf = muf > 20;
-            
-            let strategy = '';
-            
-            if (isDay && highMuf) {
-                strategy = `
-                    <div class="text-sm text-gray-300 mb-2">
-                        <strong>Daytime High MUF Strategy:</strong> Focus on 20m, 15m, and 10m bands for global DX contacts.
-                        Use higher power and directional antennas for maximum range.
-                    </div>
-                    <div class="text-xs text-gray-400">
-                        • Peak hours: 10:00-16:00 local time<br>
-                        • Target regions: Global DX<br>
-                        • Power: 200W+ for maximum range
-                    </div>
-                `;
-            } else if (isDay) {
-                strategy = `
-                    <div class="text-sm text-gray-300 mb-2">
-                        <strong>Daytime Moderate MUF Strategy:</strong> Focus on 20m and 40m for continental DX.
-                        Use moderate power and optimize antenna setup.
-                    </div>
-                    <div class="text-xs text-gray-400">
-                        • Peak hours: 12:00-15:00 local time<br>
-                        • Target regions: Continental DX<br>
-                        • Power: 100-150W for efficiency
-                    </div>
-                `;
-            } else if (highMuf) {
-                strategy = `
-                    <div class="text-sm text-gray-300 mb-2">
-                        <strong>Nighttime High MUF Strategy:</strong> Unusual conditions - exploit 20m and 15m for DX.
-                        Monitor for sporadic E or other propagation modes.
-                    </div>
-                    <div class="text-xs text-gray-400">
-                        • Peak hours: 20:00-22:00 local time<br>
-                        • Target regions: Regional to Continental<br>
-                        • Power: 150W+ for DX attempts
-                    </div>
-                `;
-            } else {
-                strategy = `
-                    <div class="text-sm text-gray-300 mb-2">
-                        <strong>Nighttime Low MUF Strategy:</strong> Focus on 80m and 40m for regional contacts.
-                        Use lower power and optimize for local/regional range.
-                    </div>
-                    <div class="text-xs text-gray-400">
-                        • Peak hours: 19:00-23:00 local time<br>
-                        • Target regions: Local to Regional<br>
-                        • Power: 50-100W for efficiency
-                    </div>
-                `;
-            }
-            
-            return strategy;
         }
 
         function updateExecutiveSummary(data) {
@@ -1782,24 +1772,24 @@
                     <div class="bg-gray-800 p-4 rounded-lg">
                         <div class="text-sm text-gray-400 mb-2">Current Status</div>
                         <div class="grid grid-cols-2 gap-4 text-sm">
-                            <div>
+                        <div>
                                 <span class="text-gray-400">Time:</span>
                                 <span class="ml-2 font-semibold">${currentTime} (${dayNight})</span>
-                            </div>
+                        </div>
                             <div>
                                 <span class="text-gray-400">MUF:</span>
                                 <span class="ml-2 font-semibold">${muf} MHz</span>
-                            </div>
+                    </div>
                             <div>
                                 <span class="text-gray-400">Quality:</span>
                                 <span class="ml-2 font-semibold ${getPropagationQualityClass(quality)}">${quality}</span>
-                            </div>
+                </div>
                             <div>
                                 <span class="text-gray-400">Solar Phase:</span>
                                 <span class="ml-2 font-semibold">${phase}</span>
-                            </div>
-                        </div>
-                    </div>
+                </div>
+                </div>
+                </div>
                     
                     <!-- Key Findings -->
                     <div class="space-y-2">
@@ -1829,7 +1819,7 @@
                             ${phase3.storm_prediction ? `
                             <div>• Storm impact: ${phase3.storm_prediction.overall_impact || 'N/A'} (${phase3.storm_prediction.recovery_time || 'N/A'} recovery)</div>
                             ` : ''}
-                        </div>
+                </div>
                     </div>
                     ` : ''}
                     
@@ -1861,29 +1851,29 @@
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">Position:</span>
                             <span class="font-semibold text-blue-300">${solarCycle.cycle_position || 'N/A'}</span>
-                        </div>
+                    </div>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">SFI:</span>
                             <span class="font-semibold">${solarCycle.sfi_value || 'N/A'}</span>
-                        </div>
+                </div>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">Sunspots:</span>
                             <span class="font-semibold">${solarCycle.sunspots || 'N/A'}</span>
-                        </div>
                     </div>
-                    
+                </div>
+                
                     <!-- Trend Analysis -->
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">Trend Analysis:</div>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">Direction:</span>
                             <span class="font-semibold ${solarCycle.sfi_trend === 'Strongly Rising' ? 'text-green-400' : solarCycle.sfi_trend === 'Rising' ? 'text-blue-400' : solarCycle.sfi_trend === 'Stable' ? 'text-yellow-400' : 'text-red-400'}">${solarCycle.sfi_trend || 'N/A'}</span>
-                        </div>
+                </div>
                         <div class="text-xs text-gray-300">
                             ${solarCycle.trend_description || 'No trend description available'}
-                        </div>
                     </div>
-                    
+                        </div>
+                        
                     <!-- Prediction -->
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">HF Conditions Forecast:</div>
@@ -1993,7 +1983,7 @@
                             <div class="flex items-center mb-2">
                                 <i class="fas fa-check-circle text-green-400 mr-2"></i>
                                 <span class="font-semibold text-green-400">Low Risk Conditions</span>
-                            </div>
+                    </div>
                             <div class="text-sm text-green-300">
                                 Current propagation conditions present minimal risks for HF operation.
                             </div>
@@ -2008,9 +1998,9 @@
                                 <div>• Aurora ${auroraValue}: ${auroraValue <= 2 ? 'Quiet' : auroraValue <= 4 ? 'Minor' : 'Active'} auroral activity</div>
                                 <div>• Sunspots ${sunspots}: ${sunspots >= 50 ? 'Good' : sunspots >= 20 ? 'Moderate' : 'Low'} solar activity</div>
                                 <div>• X-Ray: ${xray.startsWith('M') || xray.startsWith('X') ? 'Major flare' : xray.startsWith('C') ? 'Common flare' : 'Quiet'} conditions</div>
-                            </div>
                         </div>
                     </div>
+                </div>
                 `);
                 return;
             }
@@ -2027,13 +2017,13 @@
                                 <div class="flex items-center mb-2">
                                     <i class="fas fa-exclamation-triangle text-red-400 mr-2"></i>
                                     <span class="font-semibold text-red-400">${risk.level}</span>
-                                </div>
+                    </div>
                                 <div class="text-sm text-red-300 mb-2">${risk.message}</div>
                                 <div class="text-xs text-red-400 mb-1">Impact: ${risk.impact}</div>
                                 <div class="text-xs text-orange-300">Recommendation: ${risk.recommendation}</div>
                             </div>
                         `).join('')}
-                    </div>
+                        </div>
                 `;
             }
             
@@ -2048,8 +2038,8 @@
                         <div>• Aurora ${auroraValue}: ${auroraValue >= 8 ? 'High' : auroraValue >= 5 ? 'Moderate' : auroraValue >= 3 ? 'Minor' : 'Quiet'} auroral activity</div>
                         <div>• Sunspots ${sunspots}: ${sunspots >= 100 ? 'High' : sunspots >= 50 ? 'Moderate' : 'Low'} solar activity</div>
                         <div>• X-Ray: ${xray.startsWith('M') || xray.startsWith('X') ? 'Major flare' : xray.startsWith('C') ? 'Common flare' : 'Quiet'} conditions</div>
-                    </div>
-                </div>
+                        </div>
+                        </div>
             `;
             
             if (warnings.length > 0) {
@@ -2065,10 +2055,10 @@
                                 <div class="text-sm text-yellow-300 mb-2">${warning.message}</div>
                                 <div class="text-xs text-yellow-400 mb-1">Impact: ${warning.impact}</div>
                                 <div class="text-xs text-orange-300">Recommendation: ${warning.recommendation}</div>
-                            </div>
+                                </div>
                         `).join('')}
-                    </div>
-                `;
+                </div>
+            `;
             }
             
             // Combine risks, warnings, and solar analysis
@@ -2136,7 +2126,7 @@
                         <div class="data-card">
                             <div class="text-gray-400 font-body text-sm mb-2">Total Spots</div>
                             <div class="text-xl font-heading text-white">${summary.total_spots || 0}</div>
-                        </div>
+                            </div>
                         <div class="data-card">
                             <div class="text-gray-400 font-body text-sm mb-2">Active Bands</div>
                             <div class="text-xl font-heading text-white">${summary.active_bands || 0}</div>
@@ -2144,12 +2134,12 @@
                         <div class="data-card">
                             <div class="text-gray-400 font-body text-sm mb-2">Active Modes</div>
                             <div class="text-xl font-heading text-white">${summary.active_modes || 0}</div>
-                        </div>
+                    </div>
                         <div class="data-card">
                             <div class="text-gray-400 font-body text-sm mb-2">Active DXCC</div>
                             <div class="text-xl font-heading text-white">${summary.active_dxcc || 0}</div>
-                        </div>
                     </div>
+                </div>
                 `);
             }
             
