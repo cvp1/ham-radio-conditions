@@ -5220,12 +5220,21 @@ class HamRadioConditions:
                 # Get GIRO data (most reliable)
                 giro_data = self._get_giro_ionospheric_data()
                 if giro_data and giro_data.get('calculated_muf'):
-                    muf_sources['giro'] = {
-                        'muf': giro_data['calculated_muf'],
-                        'confidence': 0.9,
-                        'timestamp': giro_data['timestamp'],
-                        'source': 'GIRO foF2 measurements'
-                    }
+                    giro_muf = giro_data['calculated_muf']
+                    # Validate GIRO MUF - should be reasonable for current SFI
+                    sfi = self._safe_float_conversion(solar_data.get('sfi', '100'))
+                    expected_min_muf = sfi * 0.1  # Minimum reasonable MUF
+                    expected_max_muf = sfi * 0.3  # Maximum reasonable MUF
+                    
+                    if expected_min_muf <= giro_muf <= expected_max_muf:
+                        muf_sources['giro'] = {
+                            'muf': giro_muf,
+                            'confidence': 0.9,
+                            'timestamp': giro_data['timestamp'],
+                            'source': 'GIRO foF2 measurements'
+                        }
+                    else:
+                        logger.warning(f"GIRO MUF {giro_muf} outside expected range {expected_min_muf}-{expected_max_muf} for SFI {sfi}, excluding from weighted calculation")
                 
                 # Add enhanced F2 calculation
                 if iono_data.get('calculated_muf'):
@@ -5525,11 +5534,12 @@ class HamRadioConditions:
         """Calculate weighted MUF from multiple sources with confidence scoring."""
         try:
             # Define source weights based on reliability
+            # Adjusted weights to favor more reliable sources
             weights = {
-                'giro': 0.4,           # Most reliable - real-time foF2 measurements
-                'ionosphere_api': 0.3,  # Good - API data
-                'enhanced_f2': 0.2,     # Moderate - calculated from solar data
-                'traditional': 0.1      # Least reliable - estimated
+                'giro': 0.2,           # Reduced weight - may return unrealistic values
+                'ionosphere_api': 0.2,  # Reduced weight - may be unreliable
+                'enhanced_f2': 0.4,     # Increased weight - more reliable calculation
+                'traditional': 0.2      # Increased weight - proven method
             }
             
             weighted_muf = 0
@@ -6041,6 +6051,15 @@ class HamRadioConditions:
             # 1. Existing HamQSL data
             hamqsl_data = self.get_solar_conditions()
             enhanced_data['hamqsl'] = hamqsl_data
+            
+            # Extract key solar parameters to top level for compatibility
+            enhanced_data['sfi'] = hamqsl_data.get('sfi', '0 SFI')
+            enhanced_data['k_index'] = hamqsl_data.get('k_index', '0')
+            enhanced_data['a_index'] = hamqsl_data.get('a_index', '0')
+            enhanced_data['aurora'] = hamqsl_data.get('aurora', '0')
+            enhanced_data['sunspots'] = hamqsl_data.get('sunspots', '0')
+            enhanced_data['xray'] = hamqsl_data.get('xray', '0')
+            enhanced_data['timestamp'] = hamqsl_data.get('timestamp', '')
             
             # 2. NOAA SWPC data
             noaa_data = self._get_noaa_swpc_data()
@@ -7427,13 +7446,13 @@ class HamRadioConditions:
                 
             elif current_month in [9, 10, 11]:  # Fall
                 seasonal_analysis['seasonal_factors'] = {
-                    'muf_multiplier': 0.95,  # Declining MUF in fall
-                    'propagation_quality': 'declining',
-                    'auroral_activity': 'increasing',
+                    'muf_multiplier': 1.0,  # Neutral MUF in fall (was too aggressive)
+                    'propagation_quality': 'good',
+                    'auroral_activity': 'moderate',
                     'day_length': 'decreasing',
-                    'ionization': 'declining'
+                    'ionization': 'stable'
                 }
-                seasonal_analysis['notes'].append("Fall: Declining ionization, increasing auroral activity")
+                seasonal_analysis['notes'].append("Fall: Stable ionization, moderate auroral activity")
             
             # Day of year analysis (equinoxes and solstices)
             if 79 <= day_of_year <= 81:  # Spring equinox (March 20-22)
@@ -7564,7 +7583,7 @@ class HamRadioConditions:
                 if aurora_value and aurora_value >= 5:
                     auroral_analysis['notes'].append(f"Aurora value ({aurora_value}) indicates moderate activity")
                 
-            elif k_index >= 2 or (aurora_value and aurora_value >= 3):
+            elif k_index >= 3 or (aurora_value and aurora_value >= 3):
                 # Minor storm
                 auroral_analysis['activity_level'] = 'minor_storm'
                 auroral_analysis['impact_on_propagation'] = 'minor_degradation'
