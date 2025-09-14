@@ -5,11 +5,7 @@ from dotenv import load_dotenv
 import time
 import xml.etree.ElementTree as ET
 import math
-from dxcc_data import (
-    get_dxcc_by_grid,
-    get_nearby_dxcc,
-    grid_to_latlon
-)
+from dxcc_data import get_dxcc_by_grid, get_nearby_dxcc, grid_to_latlon
 from typing import Dict, List, Optional
 import pytz
 import logging
@@ -917,37 +913,6 @@ class HamRadioConditions:
             logger.error(f"Error detecting anomalies: {e}")
             return {}
 
-    def _calculate_uncertainty_intervals(self, prediction, confidence):
-        """Calculate uncertainty intervals for predictions."""
-        try:
-            # Base uncertainty based on confidence level
-            if confidence >= 0.8:
-                uncertainty_factor = 0.1  # 10% uncertainty
-            elif confidence >= 0.6:
-                uncertainty_factor = 0.2  # 20% uncertainty
-            else:
-                uncertainty_factor = 0.3  # 30% uncertainty
-            
-            # Additional uncertainty based on data quality
-            if len(self._historical_data['solar_conditions']) < 24:
-                uncertainty_factor += 0.1  # More uncertainty with less data
-            
-            # Calculate confidence intervals
-            lower_bound = max(0, prediction * (1 - uncertainty_factor))
-            upper_bound = prediction * (1 + uncertainty_factor)
-            
-            return {
-                'prediction': prediction,
-                'confidence': confidence,
-                'uncertainty_factor': round(uncertainty_factor, 3),
-                'lower_bound': round(lower_bound, 2),
-                'upper_bound': round(upper_bound, 2),
-                'range': round(upper_bound - lower_bound, 2)
-            }
-            
-        except Exception as e:
-            logger.error(f"Error calculating uncertainty intervals: {e}")
-            return {'prediction': prediction, 'confidence': confidence, 'error': str(e)}
 
     def _multi_timeframe_forecast(self, solar_data, is_daytime):
         """Generate multi-timeframe forecasts (1h, 6h, 12h, 24h)."""
@@ -7790,30 +7755,6 @@ class HamRadioConditions:
                 'recommendations': ['Monitor conditions manually']
             }
 
-    def _generate_predictive_analytics(self):
-        """Generate advanced predictive analytics."""
-        try:
-            # Short-term predictions (1-6 hours)
-            short_term = self._predict_short_term_conditions()
-            
-            # Medium-term predictions (6-24 hours)
-            medium_term = self._predict_medium_term_conditions()
-            
-            # Long-term predictions (1-7 days)
-            long_term = self._predict_long_term_conditions()
-            
-            # Confidence intervals for each prediction
-            confidence_intervals = self._calculate_prediction_confidence()
-            
-            return {
-                'short_term': short_term,
-                'medium_term': medium_term,
-                'long_term': long_term,
-                'confidence': confidence_intervals
-            }
-        except Exception as e:
-            logger.error(f"Error generating predictive analytics: {e}")
-            return {}
 
     def _predict_short_term_conditions(self):
         """Predict conditions for the next 1-6 hours."""
@@ -8054,35 +7995,6 @@ class HamRadioConditions:
                 'overall': 0.4
             }
 
-    def _integrate_user_feedback(self, prediction, actual_result, user_rating):
-        """Integrate user feedback to improve predictions."""
-        try:
-            # Store prediction vs actual results
-            feedback_data = {
-                'timestamp': datetime.now().isoformat(),
-                'prediction': prediction,
-                'actual': actual_result,
-                'user_rating': user_rating,
-                'accuracy': self._calculate_prediction_accuracy(prediction, actual_result)
-            }
-            
-            # Store in historical data
-            if 'user_feedback' not in self._historical_data:
-                self._historical_data['user_feedback'] = []
-            
-            self._historical_data['user_feedback'].append(feedback_data)
-            
-            # Keep only last 100 feedback entries
-            if len(self._historical_data['user_feedback']) > 100:
-                self._historical_data['user_feedback'] = self._historical_data['user_feedback'][-100:]
-            
-            # Update prediction models based on feedback
-            self._update_models_with_feedback(feedback_data)
-            
-            logger.info(f"User feedback integrated: accuracy={feedback_data['accuracy']:.2f}")
-            
-        except Exception as e:
-            logger.error(f"Error integrating user feedback: {e}")
 
     def _calculate_prediction_accuracy(self, prediction, actual):
         """Calculate accuracy of a prediction vs actual result."""
@@ -8135,109 +8047,6 @@ class HamRadioConditions:
                 
         except Exception as e:
             logger.error(f"Error updating models with feedback: {e}")
-
-
-def main():
-    """Main function for standalone testing"""
-    print("🚀 Starting Ham Radio Conditions with Async Spots")
-    
-    reporter = HamRadioConditions()
-    
-    def update_report():
-        report = reporter.generate_report()
-        reporter.print_report(report)
-        
-        # Show spots status
-        status = reporter.get_spots_status()
-        print(f"\n📊 Spots Status:")
-        print(f"   Loading: {status['loading']}")
-        print(f"   Cached: {status['cached']}")
-        print(f"   Source: {status['source']}")
-        if status['cache_age']:
-            print(f"   Cache Age: {status['cache_age']:.1f} seconds")
-
-    # Generate initial report (won't hang on spots)
-    print("📋 Generating initial report...")
-    update_report()
-
-    print("\n⏰ Running continuous updates. Press Ctrl+C to exit.")
-    try:
-        last_update = time.time()
-        while True:
-            current_time = time.time()
-            # Update every hour
-            if current_time - last_update >= 3600:  # 1 hour
-                update_report()
-                last_update = current_time
-            time.sleep(60)  # Check every minute
-    except KeyboardInterrupt:
-        print("\n👋 Shutting down...")
-
-
-def main():
-    """Main function for command-line usage."""
-    print("🔧 Ham Radio Conditions - Enhanced Prediction System")
-    print("=" * 60)
-    
-    # Get location from user
-    zip_code = input("Enter your ZIP code (or press Enter for default): ").strip()
-    if not zip_code:
-        zip_code = "85630"  # Default to St. David, AZ
-    
-    print(f"📍 Location: {zip_code}")
-    print("🔄 Initializing system...")
-    
-    # Create conditions instance
-    hrc = HamRadioConditions(zip_code=zip_code)
-    
-    def update_report():
-        """Update and display the report."""
-        try:
-            print(f"\n⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            print("-" * 60)
-            
-            # Generate report
-            report = hrc.generate_report()
-            
-            if report:
-                # Print summary
-                print("📊 Current Conditions Summary:")
-                if 'solar_conditions' in report:
-                    solar = report['solar_conditions']
-                    print(f"   Solar Flux: {solar.get('sfi', 'N/A')}")
-                    print(f"   K-Index: {solar.get('k_index', 'N/A')}")
-                    print(f"   A-Index: {solar.get('a_index', 'N/A')}")
-                
-                if 'muf' in report:
-                    print(f"   MUF: {report['muf']:.1f} MHz")
-                
-                if 'best_bands' in report:
-                    print(f"   Best Bands: {', '.join(report['best_bands'][:3])}")
-                
-                # Print detailed report
-                hrc.print_report(report)
-            else:
-                print("❌ Failed to generate report")
-                
-        except Exception as e:
-            print(f"❌ Error updating report: {e}")
-    
-    # Generate initial report (won't hang on spots)
-    print("📋 Generating initial report...")
-    update_report()
-
-    print("\n⏰ Running continuous updates. Press Ctrl+C to exit.")
-    try:
-        last_update = time.time()
-        while True:
-            current_time = time.time()
-            # Update every hour
-            if current_time - last_update >= 3600:  # 1 hour
-                update_report()
-                last_update = current_time
-            time.sleep(60)  # Check every minute
-    except KeyboardInterrupt:
-        print("\n👋 Shutting down...")
 
 
 def main():
