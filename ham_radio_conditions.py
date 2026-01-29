@@ -183,6 +183,9 @@ class HamRadioConditions:
             muf_value = muf_data.get('muf', 15.0)
             muf_confidence = muf_data.get('confidence', 0.5)
 
+            # Get solar cycle info
+            solar_cycle_info = self._get_solar_cycle_info(solar_data)
+
             return {
                 'current_time': datetime.now().strftime('%I:%M %p %Z'),
                 'propagation_parameters': {
@@ -193,6 +196,7 @@ class HamRadioConditions:
                     'best_bands': propagation_data.get('best_bands', ['20m', '40m']),
                     'skip_distances': {}
                 },
+                'solar_cycle': solar_cycle_info,
                 'geomagnetic_data': geomagnetic_data,
                 'confidence': self._calculate_overall_confidence(muf_data, propagation_data)
             }
@@ -210,6 +214,80 @@ class HamRadioConditions:
         muf_conf = muf_data.get('confidence', 0.5)
         prop_conf = propagation_data.get('confidence', 0.5)
         return (muf_conf + prop_conf) / 2
+
+    def _get_solar_cycle_info(self, solar_data: Dict) -> Dict:
+        """Get solar cycle information derived from SFI."""
+        try:
+            # Extract SFI value
+            sfi_str = str(solar_data.get('sfi', '100')).replace(' SFI', '').strip()
+            sfi = float(sfi_str)
+            sunspots = solar_data.get('sunspots', 'N/A')
+
+            # Determine solar cycle phase based on SFI
+            if sfi >= 150:
+                phase = "Solar Maximum"
+                prediction = "Excellent HF conditions expected across all bands"
+                phase_description = "Peak solar activity with maximum ionization"
+                cycle_position = "Peak (100%)"
+            elif sfi >= 120:
+                phase = "Rising Solar Maximum"
+                prediction = "Very good HF conditions, optimal for 20m, 15m, 10m DX"
+                phase_description = "Strong solar activity, F2 layer well developed"
+                cycle_position = "Near Peak (85-95%)"
+            elif sfi >= 100:
+                phase = "Rising Phase"
+                prediction = "Good HF conditions, favorable for 20m, 40m DX"
+                phase_description = "Good solar activity, F2 layer active"
+                cycle_position = "Rising (70-85%)"
+            elif sfi >= 80:
+                phase = "Early Rising Phase"
+                prediction = "Fair conditions improving, focus on 40m, 80m"
+                phase_description = "Moderate solar activity, F2 layer developing"
+                cycle_position = "Early Rise (50-70%)"
+            elif sfi >= 60:
+                phase = "Solar Minimum"
+                prediction = "Poor HF conditions, focus on lower bands (80m, 40m)"
+                phase_description = "Low solar activity, limited F2 layer ionization"
+                cycle_position = "Near Minimum (20-50%)"
+            else:
+                phase = "Deep Solar Minimum"
+                prediction = "Very poor HF conditions, local contacts only"
+                phase_description = "Minimal solar activity, F2 layer weak"
+                cycle_position = "Minimum (0-20%)"
+
+            # Determine SFI trend
+            if sfi > 120:
+                sfi_trend = "Strongly Rising"
+                trend_description = "SFI > 120 indicates excellent solar activity"
+            elif sfi > 100:
+                sfi_trend = "Rising"
+                trend_description = "SFI 100-120 shows very good conditions"
+            elif sfi > 80:
+                sfi_trend = "Stable"
+                trend_description = "SFI 80-100 indicates stable conditions"
+            else:
+                sfi_trend = "Low"
+                trend_description = "SFI < 80 shows reduced solar activity"
+
+            return {
+                'phase': phase,
+                'prediction': prediction,
+                'phase_description': phase_description,
+                'cycle_position': cycle_position,
+                'sfi_value': f"{sfi:.0f}",
+                'sunspots': sunspots,
+                'sfi_trend': sfi_trend,
+                'trend_description': trend_description,
+                'calculation_method': 'SFI-based solar cycle analysis'
+            }
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error calculating solar cycle info: {e}")
+            return {
+                'phase': 'Unknown',
+                'prediction': 'Unable to determine',
+                'sfi_trend': 'Unknown'
+            }
     
     def _get_fallback_band_conditions(self) -> Dict:
         """Get fallback band conditions when calculation fails."""
@@ -234,6 +312,11 @@ class HamRadioConditions:
                 'quality': 'Unknown',
                 'best_bands': ['20m', '40m'],
                 'skip_distances': {}
+            },
+            'solar_cycle': {
+                'phase': 'Unknown',
+                'prediction': 'Data unavailable',
+                'sfi_trend': 'Unknown'
             },
             'confidence': 0.3,
             'source': 'Fallback'
