@@ -84,25 +84,54 @@ class BandOptimizer:
         return bands
     
     def _calculate_band_quality(self, band: str, freq: float, sfi: float, k_index: float, is_daytime: bool) -> str:
-        """Calculate quality for a specific band."""
-        # Base quality on frequency vs SFI relationship
-        if freq <= sfi * 0.2:  # Low frequency bands
+        """Calculate quality for a specific band.
+
+        Uses SFI to estimate MUF and determine which bands are usable.
+        Lower K-index = more stable ionosphere = better propagation.
+        """
+        # Estimate MUF from SFI (simplified - matches legacy approach)
+        if sfi >= 150:
+            estimated_muf = 40
+        elif sfi >= 120:
+            estimated_muf = 32
+        elif sfi >= 100:
+            estimated_muf = 26
+        elif sfi >= 80:
+            estimated_muf = 21
+        elif sfi >= 60:
+            estimated_muf = 16
+        else:
+            estimated_muf = 12
+
+        # Apply K-index degradation
+        if k_index >= 5:
+            estimated_muf *= 0.7
+        elif k_index >= 4:
+            estimated_muf *= 0.85
+        elif k_index >= 3:
+            estimated_muf *= 0.92
+
+        # Determine quality based on frequency vs estimated MUF
+        freq_ratio = freq / estimated_muf if estimated_muf > 0 else 1.0
+
+        if freq_ratio <= 0.5:  # Well below MUF - excellent propagation
             if is_daytime:
-                return "Poor" if k_index >= 4 else "Fair"
+                return "Excellent" if k_index <= 2 else "Very Good"
             else:
+                # Lower bands better at night
+                return "Very Good" if freq <= 7 else "Good"
+        elif freq_ratio <= 0.75:  # Below MUF - very good propagation
+            if is_daytime:
+                return "Very Good" if k_index <= 3 else "Good"
+            else:
+                return "Good" if k_index <= 4 else "Fair"
+        elif freq_ratio <= 1.0:  # At or near MUF - good but less reliable
+            if is_daytime:
                 return "Good" if k_index <= 3 else "Fair"
-        elif freq <= sfi * 0.3:  # Mid frequency bands
-            if is_daytime:
-                return "Good" if k_index <= 3 else "Fair"
             else:
-                return "Very Good" if k_index <= 2 else "Good"
-        elif freq <= sfi * 0.4:  # High frequency bands
-            if is_daytime:
-                return "Very Good" if k_index <= 2 else "Good"
-            else:
-                return "Excellent" if k_index <= 1 else "Very Good"
-        else:  # Very high frequency bands
-            return "Poor" if k_index >= 3 else "Fair"
+                return "Fair"
+        else:  # Above MUF - marginal or no propagation
+            return "Poor"
     
     def _calculate_band_score(self, quality: str) -> float:
         """Calculate numerical score for band quality."""

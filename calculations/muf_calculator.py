@@ -60,37 +60,75 @@ class MUFCalculator:
             return 100.0  # Default fallback
     
     def _calculate_traditional_muf(self, sfi: float) -> float:
-        """Calculate traditional MUF using solar flux index."""
-        # Traditional MUF calculation: MUF ≈ 0.85 * foF2
-        # foF2 ≈ 0.4 * sqrt(SFI) for mid-latitudes
-        foF2 = 0.4 * math.sqrt(sfi)
-        muf = 0.85 * foF2
-        return round(muf, 2)
+        """Calculate traditional MUF using solar flux index lookup table.
+
+        Uses empirically-derived values based on real-world amateur radio
+        propagation observations rather than theoretical ionospheric formulas.
+        """
+        # Lookup table based on SFI ranges - empirically derived for amateur radio
+        if sfi >= 150:
+            base_muf = 40  # Very high solar activity
+        elif sfi >= 120:
+            base_muf = 32  # High solar activity
+        elif sfi >= 100:
+            base_muf = 26  # Good solar activity
+        elif sfi >= 80:
+            base_muf = 21  # Moderate solar activity
+        elif sfi >= 60:
+            base_muf = 16  # Low solar activity
+        else:
+            base_muf = 12  # Very low solar activity
+
+        return float(base_muf)
     
     def _calculate_enhanced_muf(self, solar_data: Dict, location_data: Dict) -> float:
-        """Calculate enhanced MUF with additional factors."""
+        """Calculate enhanced MUF with geomagnetic adjustments.
+
+        Starts with the SFI-based lookup table and applies corrections
+        for K-index (geomagnetic storm activity) and A-index (daily average).
+        """
         try:
             sfi = self._extract_sfi(solar_data)
             k_index = self._extract_k_index(solar_data)
             a_index = self._extract_a_index(solar_data)
-            
-            # Base foF2 calculation
-            foF2 = 0.4 * math.sqrt(sfi)
-            
-            # Apply K-index adjustment
-            k_adjustment = 1.0 - (k_index * 0.05)  # 5% reduction per K-index point
-            
-            # Apply A-index adjustment
-            a_adjustment = 1.0 - (a_index * 0.01)  # 1% reduction per A-index point
-            
-            # Calculate enhanced foF2
-            enhanced_foF2 = foF2 * k_adjustment * a_adjustment
-            
-            # Calculate MUF
-            muf = 0.85 * enhanced_foF2
-            
-            return round(muf, 2)
-            
+
+            # Get base MUF from lookup table
+            base_muf = self._calculate_traditional_muf(sfi)
+
+            # Adjust for K-index (geomagnetic activity)
+            # Higher K = more disturbed ionosphere = lower MUF
+            if k_index > 6:  # Severe storm
+                k_factor = 0.5
+            elif k_index > 5:  # Strong storm
+                k_factor = 0.7
+            elif k_index > 4:  # Minor storm
+                k_factor = 0.85
+            elif k_index > 3:  # Unsettled
+                k_factor = 0.92
+            elif k_index > 2:  # Active
+                k_factor = 0.96
+            elif k_index > 1:  # Quiet
+                k_factor = 0.98
+            else:  # Very quiet
+                k_factor = 1.0
+
+            # Adjust for A-index (daily geomagnetic average)
+            if a_index > 50:  # Severe storm
+                a_factor = 0.6
+            elif a_index > 30:  # Minor storm
+                a_factor = 0.8
+            elif a_index > 20:  # Unsettled
+                a_factor = 0.9
+            elif a_index > 10:  # Active
+                a_factor = 0.95
+            else:  # Quiet
+                a_factor = 1.0
+
+            # Calculate final MUF
+            muf = base_muf * k_factor * a_factor
+
+            return round(muf, 1)
+
         except Exception as e:
             logger.error(f"Error in enhanced MUF calculation: {e}")
             return self._calculate_traditional_muf(self._extract_sfi(solar_data))
@@ -98,51 +136,61 @@ class MUFCalculator:
     def _extract_k_index(self, solar_data: Dict) -> float:
         """Extract K-index from solar data."""
         try:
-            k_str = solar_data.get('k_index', '2')
+            k_str = str(solar_data.get('k_index', '2')).strip()
             return float(k_str)
         except (ValueError, TypeError):
             return 2.0  # Default fallback
-    
+
     def _extract_a_index(self, solar_data: Dict) -> float:
         """Extract A-index from solar data."""
         try:
-            a_str = solar_data.get('a_index', '5')
+            a_str = str(solar_data.get('a_index', '5')).strip()
             return float(a_str)
         except (ValueError, TypeError):
             return 5.0  # Default fallback
     
     def _validate_and_select_muf(self, traditional_muf: float, enhanced_muf: float, sfi: float) -> float:
-        """Validate MUF values and select the best one."""
-        # Define reasonable MUF ranges based on SFI
-        min_muf = sfi * 0.05  # 5% of SFI
-        max_muf = sfi * 0.4   # 40% of SFI
-        
-        # Check if enhanced MUF is within reasonable range
+        """Validate MUF values and select the best one.
+
+        Enhanced MUF is preferred as it includes geomagnetic corrections.
+        Traditional MUF is used as fallback if enhanced calculation fails.
+        """
+        # Define reasonable MUF ranges (10-50 MHz for amateur radio)
+        min_muf = 10.0
+        max_muf = 50.0
+
+        # Prefer enhanced MUF if it's within reasonable range
         if min_muf <= enhanced_muf <= max_muf:
             return enhanced_muf
         elif min_muf <= traditional_muf <= max_muf:
             return traditional_muf
+        elif enhanced_muf > 0:
+            # Clamp to reasonable range
+            return max(min_muf, min(max_muf, enhanced_muf))
         else:
-            # Both are out of range, use the one closer to expected range
-            expected_muf = sfi * 0.2  # 20% of SFI as expected
-            if abs(enhanced_muf - expected_muf) < abs(traditional_muf - expected_muf):
-                return enhanced_muf
-            else:
-                return traditional_muf
-    
+            return max(min_muf, min(max_muf, traditional_muf))
+
     def _calculate_muf_confidence(self, muf: float, sfi: float) -> float:
-        """Calculate confidence in MUF calculation."""
-        # Base confidence on how close MUF is to expected range
-        expected_muf = sfi * 0.2
-        if expected_muf > 0:
-            ratio = muf / expected_muf
-            if 0.5 <= ratio <= 2.0:  # Within 50% to 200% of expected
-                return 0.9
-            elif 0.3 <= ratio <= 3.0:  # Within 30% to 300% of expected
-                return 0.7
-            else:
-                return 0.5
-        return 0.5
+        """Calculate confidence in MUF calculation.
+
+        Higher confidence when we have good solar data and
+        MUF is within expected ranges for the SFI level.
+        """
+        # Base confidence
+        confidence = 0.8
+
+        # Adjust based on SFI validity
+        if sfi > 0:
+            confidence += 0.1
+
+        # Adjust based on MUF being in realistic range
+        if 15 <= muf <= 40:  # Sweet spot for HF propagation
+            confidence += 0.05
+        elif muf < 12 or muf > 45:  # Edge cases
+            confidence -= 0.1
+
+        # Clamp to valid range
+        return max(0.5, min(0.95, confidence))
     
     def _get_fallback_muf(self) -> Dict:
         """Get fallback MUF data when calculation fails."""

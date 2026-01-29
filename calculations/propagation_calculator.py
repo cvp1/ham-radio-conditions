@@ -82,24 +82,37 @@ class PropagationCalculator:
     def _calculate_best_bands(self, muf: float, sfi: float, k_index: float) -> List[str]:
         """Calculate best bands based on MUF and conditions."""
         bands = []
-        
-        # Add bands based on MUF
+
+        # Add bands based on MUF - all bands below MUF are potentially usable
         if muf >= 28.0:
             bands.extend(['10m', '12m', '15m', '17m', '20m'])
+        elif muf >= 24.0:
+            bands.extend(['12m', '15m', '17m', '20m', '30m'])
         elif muf >= 21.0:
-            bands.extend(['15m', '17m', '20m', '30m'])
+            bands.extend(['15m', '17m', '20m', '30m', '40m'])
+        elif muf >= 18.0:
+            bands.extend(['17m', '20m', '30m', '40m'])
         elif muf >= 14.0:
-            bands.extend(['20m', '30m', '40m'])
+            bands.extend(['20m', '30m', '40m', '80m'])
+        elif muf >= 10.0:
+            bands.extend(['30m', '40m', '80m'])
         elif muf >= 7.0:
-            bands.extend(['40m', '80m'])
+            bands.extend(['40m', '80m', '160m'])
         else:
             bands.extend(['80m', '160m'])
-        
-        # Adjust based on K-index
-        if k_index >= 4:
-            # High K-index - remove higher bands
+
+        # Adjust based on K-index - higher K reduces reliability of higher bands
+        # but doesn't eliminate them if MUF supports them
+        if k_index >= 6:  # Severe storm - stick to low bands only
             bands = [b for b in bands if b in ['40m', '80m', '160m']]
-        
+        elif k_index >= 5:  # Strong storm - limit to lower/mid bands
+            bands = [b for b in bands if b in ['20m', '30m', '40m', '80m', '160m']]
+        # For K <= 4, use MUF-based band selection without filtering
+
+        # Ensure we always have some bands
+        if not bands:
+            bands = ['40m', '80m']
+
         return bands[:5]  # Return top 5 bands
     
     def _calculate_confidence(self, muf: float, sfi: float, k_index: float) -> float:
