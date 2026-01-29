@@ -10,7 +10,7 @@ Handles fetching and processing solar data from various sources:
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import Dict, Optional, List, Any, Union
+from typing import Dict, Optional, Any
 import logging
 from utils.cache_manager import cache_get, cache_set
 

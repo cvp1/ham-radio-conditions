@@ -7,7 +7,7 @@ Handles fetching and processing weather data for propagation analysis.
 import os
 import requests
 from datetime import datetime
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Any
 import logging
 from utils.cache_manager import cache_get, cache_set
 
