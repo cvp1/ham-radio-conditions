@@ -29,8 +29,8 @@ def get_conditions():
         
         if conditions:
             # Ensure JSON safety by converting NaN values
-            from ham_radio_conditions import safe_json_serialize
-            safe_conditions = safe_json_serialize(conditions)
+            from ham_radio_conditions import HamRadioConditions
+            safe_conditions = HamRadioConditions.safe_json_serialize(conditions)
             
             # Cache the conditions
             cache_set('conditions', 'current', safe_conditions, max_age=300)  # 5 minutes

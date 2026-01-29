@@ -126,3 +126,40 @@ class SolarDataProvider:
             'source': 'Fallback',
             'confidence': 0.3
         }
+
+    def check_status(self) -> Dict[str, Any]:
+        """Check status of solar data sources."""
+        status = {
+            'status': 'online',
+            'sources': {}
+        }
+        
+        # Check HamQSL
+        try:
+            response = requests.get(self.hamqsl_url, timeout=5)
+            status['sources']['hamqsl'] = {
+                'status': 'online' if response.status_code == 200 else 'error',
+                'status_code': response.status_code,
+                'response_time': response.elapsed.total_seconds()
+            }
+        except Exception as e:
+            status['sources']['hamqsl'] = {
+                'status': 'offline',
+                'error': str(e)
+            }
+            
+        # Check NOAA
+        try:
+            response = requests.get(self.noaa_url, timeout=5)
+            status['sources']['noaa'] = {
+                'status': 'online' if response.status_code == 200 else 'error',
+                'status_code': response.status_code,
+                'response_time': response.elapsed.total_seconds()
+            }
+        except Exception as e:
+            status['sources']['noaa'] = {
+                'status': 'offline',
+                'error': str(e)
+            }
+            
+        return status
