@@ -167,28 +167,36 @@ class HamRadioConditions:
                 'lon': self.lon,
                 'grid_square': self.grid_square
             }
-            
+
             # Calculate MUF
             muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
-            
+
             # Calculate propagation
             propagation_data = self.propagation_calculator.calculate_propagation(
                 solar_data, weather_data, muf_data
             )
-            
+
             # Get geomagnetic data
             geomagnetic_data = self.geomagnetic_provider.get_geomagnetic_coordinates()
-            
+
+            # Format MUF as string for frontend compatibility
+            muf_value = muf_data.get('muf', 15.0)
+            muf_confidence = muf_data.get('confidence', 0.5)
+
             return {
                 'current_time': datetime.now().strftime('%I:%M %p %Z'),
-                'muf': muf_data['muf'],
-                'muf_confidence': muf_data['confidence'],
-                'propagation_quality': propagation_data.get('quality', 'Fair'),
-                'best_bands': propagation_data.get('best_bands', ['20m', '40m']),
+                'propagation_parameters': {
+                    'muf': f"{muf_value:.1f}",
+                    'muf_source': muf_data.get('method', 'Traditional'),
+                    'muf_confidence': f"{muf_confidence:.0%}" if muf_confidence >= 0.7 else 'Low (Estimated)',
+                    'quality': propagation_data.get('quality', 'Fair'),
+                    'best_bands': propagation_data.get('best_bands', ['20m', '40m']),
+                    'skip_distances': {}
+                },
                 'geomagnetic_data': geomagnetic_data,
                 'confidence': self._calculate_overall_confidence(muf_data, propagation_data)
             }
-            
+
         except Exception as e:
             logger.error(f"Error generating propagation summary: {e}")
             return self._get_fallback_propagation_summary()
@@ -219,10 +227,14 @@ class HamRadioConditions:
         """Get fallback propagation summary when calculation fails."""
         return {
             'current_time': datetime.now().strftime('%I:%M %p %Z'),
-            'muf': 15.0,
-            'muf_confidence': 0.3,
-            'propagation_quality': 'Unknown',
-            'best_bands': ['20m', '40m'],
+            'propagation_parameters': {
+                'muf': '15.0',
+                'muf_source': 'Fallback',
+                'muf_confidence': 'Low (Estimated)',
+                'quality': 'Unknown',
+                'best_bands': ['20m', '40m'],
+                'skip_distances': {}
+            },
             'confidence': 0.3,
             'source': 'Fallback'
         }
