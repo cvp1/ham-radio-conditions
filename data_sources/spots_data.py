@@ -255,15 +255,33 @@ class SpotsDataProvider:
             mode = spot.get('mode', 'Unknown')
             mode_counts[mode] = mode_counts.get(mode, 0) + 1
 
+        # Count unique DXCC entities
+        dxcc_set = set()
+        for spot in all_spots:
+            dxcc = spot.get('dxcc', '')
+            if dxcc:
+                dxcc_set.add(dxcc)
+
+        # Count active bands (bands with spots)
+        active_bands = sum(1 for band_data in band_activity.values() if band_data.get('count', 0) > 0)
+
+        # Create summary for frontend
+        summary = {
+            'total_spots': len(all_spots),
+            'active_bands': active_bands,
+            'active_modes': len(mode_counts),
+            'active_dxcc': len(dxcc_set)
+        }
+
         combined = {
             'timestamp': datetime.now().isoformat(),
             'sources': list(results.keys()),
             'source_counts': {name: data.get('count', 0) for name, data in results.items()},
             'total_spots': len(all_spots),
-            'spots': sorted(all_spots, key=lambda x: x.get('frequency', 0), reverse=True)[:100],  # Top 100 by freq
+            'summary': summary,
+            'spots': sorted(all_spots, key=lambda x: x.get('frequency', 0), reverse=True)[:100],
             'band_activity': band_activity,
             'mode_breakdown': mode_counts,
-            'data': results,
             'confidence': 0.8 if len(results) >= 2 else 0.6
         }
         return combined
@@ -306,7 +324,15 @@ class SpotsDataProvider:
             'timestamp': datetime.now().isoformat(),
             'sources': ['fallback'],
             'total_spots': 0,
-            'data': {'fallback': {'spots': [], 'count': 0}},
+            'summary': {
+                'total_spots': 0,
+                'active_bands': 0,
+                'active_modes': 0,
+                'active_dxcc': 0
+            },
+            'spots': [],
+            'band_activity': {},
+            'mode_breakdown': {},
             'confidence': 0.3
         }
 

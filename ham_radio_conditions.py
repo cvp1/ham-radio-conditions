@@ -179,6 +179,9 @@ class HamRadioConditions:
             # Get geomagnetic data
             geomagnetic_data = self.geomagnetic_provider.get_geomagnetic_coordinates()
 
+            # Get time data for day/night status
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone)
+
             # Format MUF as string for frontend compatibility
             muf_value = muf_data.get('muf', 15.0)
             muf_confidence = muf_data.get('confidence', 0.5)
@@ -188,6 +191,7 @@ class HamRadioConditions:
 
             return {
                 'current_time': datetime.now().strftime('%I:%M %p %Z'),
+                'day_night': 'Day' if time_data.get('is_day', True) else 'Night',
                 'propagation_parameters': {
                     'muf': f"{muf_value:.1f}",
                     'muf_source': muf_data.get('method', 'Traditional'),
@@ -305,6 +309,7 @@ class HamRadioConditions:
         """Get fallback propagation summary when calculation fails."""
         return {
             'current_time': datetime.now().strftime('%I:%M %p %Z'),
+            'day_night': 'Day',
             'propagation_parameters': {
                 'muf': '15.0',
                 'muf_source': 'Fallback',
