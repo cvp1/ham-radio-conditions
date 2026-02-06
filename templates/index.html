@@ -378,9 +378,40 @@
                 <h1 class="text-4xl font-display text-white">Ham Radio Conditions</h1>
                 <div></div>
             </div>
-            <div class="space-y-2">
+            <div class="space-y-3">
                 <p class="text-gray-300 font-body" id="timestamp"></p>
-                <p class="text-gray-400 font-body" id="location"></p>
+                <!-- Location Display and ZIP Input -->
+                <div class="flex items-center justify-center gap-4 flex-wrap">
+                    <div id="location-display" class="text-gray-400 font-body">
+                        <span id="location-city">Loading...</span>
+                        <span class="text-gray-500 mx-2">|</span>
+                        <span id="location-grid" class="text-blue-400"></span>
+                    </div>
+                    <button id="change-location-btn" class="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1 transition-colors">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Change Location</span>
+                    </button>
+                </div>
+                <!-- ZIP Code Input (hidden by default) -->
+                <div id="zip-input-container" class="hidden mt-4">
+                    <div class="flex items-center justify-center gap-2 max-w-xs mx-auto">
+                        <input type="text"
+                               id="zip-input"
+                               placeholder="Enter ZIP code"
+                               maxlength="5"
+                               pattern="[0-9]{5}"
+                               class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white text-center w-32 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                        <button id="zip-submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-check"></i>
+                            <span>Update</span>
+                        </button>
+                        <button id="zip-cancel-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p id="zip-error" class="text-red-400 text-sm mt-2 hidden"></p>
+                    <p id="zip-preview" class="text-gray-500 text-sm mt-2 hidden"></p>
+                </div>
             </div>
         </header>
 
@@ -635,12 +666,142 @@
             return 'priority-low';
         }
 
+        // Location input elements
+        const changeLocationBtn = document.getElementById('change-location-btn');
+        const zipInputContainer = document.getElementById('zip-input-container');
+        const zipInput = document.getElementById('zip-input');
+        const zipSubmitBtn = document.getElementById('zip-submit-btn');
+        const zipCancelBtn = document.getElementById('zip-cancel-btn');
+        const zipError = document.getElementById('zip-error');
+        const zipPreview = document.getElementById('zip-preview');
+        const locationCity = document.getElementById('location-city');
+        const locationGrid = document.getElementById('location-grid');
+
+        // Toggle ZIP input visibility
+        if (changeLocationBtn) {
+            changeLocationBtn.addEventListener('click', () => {
+                zipInputContainer.classList.toggle('hidden');
+                if (!zipInputContainer.classList.contains('hidden')) {
+                    zipInput.focus();
+                }
+            });
+        }
+
+        // Cancel ZIP input
+        if (zipCancelBtn) {
+            zipCancelBtn.addEventListener('click', () => {
+                zipInputContainer.classList.add('hidden');
+                zipInput.value = '';
+                zipError.classList.add('hidden');
+                zipPreview.classList.add('hidden');
+            });
+        }
+
+        // Preview ZIP on input
+        if (zipInput) {
+            let previewTimeout;
+            zipInput.addEventListener('input', (e) => {
+                const zip = e.target.value.replace(/\D/g, '').slice(0, 5);
+                e.target.value = zip;
+                zipError.classList.add('hidden');
+
+                clearTimeout(previewTimeout);
+                if (zip.length === 5) {
+                    previewTimeout = setTimeout(() => lookupZip(zip), 300);
+                } else {
+                    zipPreview.classList.add('hidden');
+                }
+            });
+
+            zipInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && zipInput.value.length === 5) {
+                    updateLocation(zipInput.value);
+                }
+            });
+        }
+
+        // Submit ZIP
+        if (zipSubmitBtn) {
+            zipSubmitBtn.addEventListener('click', () => {
+                if (zipInput.value.length === 5) {
+                    updateLocation(zipInput.value);
+                } else {
+                    showZipError('Please enter a 5-digit ZIP code');
+                }
+            });
+        }
+
+        // Lookup ZIP for preview
+        async function lookupZip(zip) {
+            try {
+                const response = await fetch(`/api/location/lookup?zip=${zip}`);
+                const data = await response.json();
+                if (response.ok) {
+                    zipPreview.textContent = `${data.city}, ${data.state} (${data.grid_square})`;
+                    zipPreview.classList.remove('hidden');
+                } else {
+                    zipPreview.classList.add('hidden');
+                }
+            } catch (e) {
+                zipPreview.classList.add('hidden');
+            }
+        }
+
+        // Update location
+        async function updateLocation(zip) {
+            try {
+                zipSubmitBtn.disabled = true;
+                zipSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                const response = await fetch('/api/location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ zip_code: zip })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Update display
+                    locationCity.textContent = `${data.city}, ${data.state}`;
+                    locationGrid.textContent = data.grid_square;
+
+                    // Hide input
+                    zipInputContainer.classList.add('hidden');
+                    zipInput.value = '';
+                    zipPreview.classList.add('hidden');
+
+                    // Refresh conditions data
+                    fetchConditions();
+                } else {
+                    showZipError(data.error || 'Failed to update location');
+                }
+            } catch (e) {
+                showZipError('Network error. Please try again.');
+            } finally {
+                zipSubmitBtn.disabled = false;
+                zipSubmitBtn.innerHTML = '<i class="fas fa-check"></i><span>Update</span>';
+            }
+        }
+
+        function showZipError(message) {
+            zipError.textContent = message;
+            zipError.classList.remove('hidden');
+        }
+
         // UI update functions
         function updateTimestampAndLocation(data) {
             if (timestampEl) timestampEl.textContent = `Last Updated: ${data.timestamp}`;
-            if (locationEl) {
-                const locationName = data.propagation_summary?.location?.location_name || data.location;
-                locationEl.textContent = `Location: ${locationName}`;
+
+            // Update location display
+            if (data.location) {
+                const loc = data.location;
+                if (locationCity) {
+                    locationCity.textContent = `${loc.city || 'Unknown'}, ${loc.state || 'XX'}`;
+                }
+                if (locationGrid) {
+                    locationGrid.textContent = loc.grid_square || '';
+                }
             }
         }
 

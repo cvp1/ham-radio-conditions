@@ -15,8 +15,9 @@ from dotenv import load_dotenv
 # Import our refactored modules
 from data_sources import SolarDataProvider, WeatherDataProvider, SpotsDataProvider, GeomagneticDataProvider
 from calculations import MUFCalculator, PropagationCalculator, BandOptimizer, TimeAnalyzer
-from utils.cache_manager import cache_get, cache_set
-from dxcc_data import get_dxcc_by_grid, grid_to_latlon
+from utils.cache_manager import cache_get, cache_set, cache_clear
+from utils.geocoding import zip_to_coordinates, latlon_to_grid
+from dxcc_data import get_dxcc_by_grid, grid_to_latlon as dxcc_grid_to_latlon
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -75,13 +76,56 @@ class HamRadioConditions:
         """Setup location data from ZIP code."""
         if not zip_code:
             zip_code = "85630"  # Default to St. David, AZ
-        
-        # Convert ZIP to coordinates (simplified)
-        self.zip_code = zip_code
-        self.lat = 31.8973  # Would be calculated from ZIP
-        self.lon = -110.2154  # Would be calculated from ZIP
-        self.grid_square = "DM41vv"  # Would be calculated from coordinates
-        self.timezone = "America/Los_Angeles"  # Would be determined from location
+
+        # Convert ZIP to coordinates using geocoding
+        location = zip_to_coordinates(zip_code)
+
+        if location:
+            self.zip_code = location['zip_code']
+            self.lat = location['lat']
+            self.lon = location['lon']
+            self.grid_square = location['grid_square']
+            self.timezone = location['timezone']
+            self.city = location.get('city', 'Unknown')
+            self.state = location.get('state', 'XX')
+            self.location_source = location.get('source', 'unknown')
+            logger.info(f"Location set to {self.city}, {self.state} ({self.grid_square})")
+        else:
+            # Fallback to defaults
+            self.zip_code = zip_code
+            self.lat = 31.8973
+            self.lon = -110.2154
+            self.grid_square = "DM41vv"
+            self.timezone = "America/Phoenix"
+            self.city = "St. David"
+            self.state = "AZ"
+            self.location_source = "fallback"
+            logger.warning(f"Could not geocode ZIP {zip_code}, using defaults")
+
+    def update_location(self, zip_code: str) -> Dict:
+        """Update location from a new ZIP code."""
+        old_zip = self.zip_code
+        self._setup_location(zip_code)
+
+        # Clear cached data since location changed
+        cache_clear('conditions')
+        cache_clear('weather')
+        cache_clear('spots')
+
+        # Reinitialize providers with new location
+        self._initialize_data_providers()
+
+        return {
+            'success': True,
+            'old_zip': old_zip,
+            'new_zip': self.zip_code,
+            'city': self.city,
+            'state': self.state,
+            'lat': self.lat,
+            'lon': self.lon,
+            'grid_square': self.grid_square,
+            'timezone': self.timezone
+        }
     
     def _initialize_data_providers(self):
         """Initialize data source providers."""
@@ -119,6 +163,15 @@ class HamRadioConditions:
             report = {
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z'),
                 'callsign': self.callsign,
+                'location': {
+                    'zip_code': self.zip_code,
+                    'city': getattr(self, 'city', 'Unknown'),
+                    'state': getattr(self, 'state', 'XX'),
+                    'lat': self.lat,
+                    'lon': self.lon,
+                    'grid_square': self.grid_square,
+                    'timezone': self.timezone
+                },
                 'solar_conditions': self.get_solar_conditions(),
                 'weather_conditions': self.get_weather_conditions(),
                 'band_conditions': self.get_band_conditions(),

@@ -29,8 +29,8 @@ def get_conditions():
         
         if conditions:
             # Ensure JSON safety by converting NaN values
-            from ham_radio_conditions import HamRadioConditions
-            safe_conditions = HamRadioConditions.safe_json_serialize(conditions)
+            from ham_radio_conditions import safe_json_serialize
+            safe_conditions = safe_json_serialize(conditions)
             
             # Cache the conditions
             cache_set('conditions', 'current', safe_conditions, max_age=300)  # 5 minutes
@@ -271,17 +271,90 @@ def clear_cache():
     try:
         from flask import request
         from utils.cache_manager import cache_clear
-        
+
         data = request.get_json() or {}
         cache_type = data.get('cache_type')
-        
+
         if cache_type:
             cache_clear(cache_type)
             return jsonify({'message': f'Cache {cache_type} cleared'})
         else:
             cache_clear()  # Clear all caches
             return jsonify({'message': 'All caches cleared'})
-            
+
     except Exception as e:
         logger.error(f"Error clearing cache: {e}")
-        return jsonify({'error': 'Internal server error'}), 500 
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/location', methods=['GET'])
+def get_location():
+    """Get current location settings."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+
+        return jsonify({
+            'zip_code': ham_conditions.zip_code,
+            'city': getattr(ham_conditions, 'city', 'Unknown'),
+            'state': getattr(ham_conditions, 'state', 'XX'),
+            'lat': ham_conditions.lat,
+            'lon': ham_conditions.lon,
+            'grid_square': ham_conditions.grid_square,
+            'timezone': ham_conditions.timezone
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting location: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/location', methods=['POST'])
+def update_location():
+    """Update location from ZIP code."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+
+        data = request.get_json() or {}
+        zip_code = data.get('zip_code', '').strip()
+
+        if not zip_code:
+            return jsonify({'error': 'ZIP code is required'}), 400
+
+        if not zip_code.isdigit() or len(zip_code) != 5:
+            return jsonify({'error': 'Invalid ZIP code format. Please enter a 5-digit US ZIP code.'}), 400
+
+        result = ham_conditions.update_location(zip_code)
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error updating location: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/location/lookup', methods=['GET'])
+def lookup_zip():
+    """Look up location info for a ZIP code without changing settings."""
+    try:
+        from utils.geocoding import zip_to_coordinates
+
+        zip_code = request.args.get('zip', '').strip()
+
+        if not zip_code:
+            return jsonify({'error': 'ZIP code parameter required'}), 400
+
+        if not zip_code.isdigit() or len(zip_code) != 5:
+            return jsonify({'error': 'Invalid ZIP code format'}), 400
+
+        result = zip_to_coordinates(zip_code)
+        if result:
+            return jsonify(result)
+        else:
+            return jsonify({'error': 'ZIP code not found'}), 404
+
+    except Exception as e:
+        logger.error(f"Error looking up ZIP: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
