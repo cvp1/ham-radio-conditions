@@ -150,9 +150,14 @@ class HamRadioConditions:
             solar_data = self.get_solar_conditions()
             weather_data = self.get_weather_conditions()
             time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone)
-            
-            return self.band_optimizer.optimize_bands(solar_data, weather_data, time_data)
-            
+            location_data = {'lat': self.lat, 'lon': self.lon}
+
+            # Get MUF for band optimization
+            muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
+            muf = muf_data.get('muf', 15.0)
+
+            return self.band_optimizer.optimize_bands(solar_data, weather_data, time_data, muf=muf)
+
         except Exception as e:
             logger.error(f"Error getting band conditions: {e}")
             return self._get_fallback_band_conditions()
@@ -358,9 +363,23 @@ class HamRadioConditions:
         return status
 
     def get_current_solar_conditions_debug(self) -> Dict:
-        """Get debug information about solar conditions."""
+        """Get debug information about solar conditions and MUF."""
+        solar_data = self.get_solar_conditions()
+        location_data = {'lat': self.lat, 'lon': self.lon}
+        muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
+
         return {
-            'solar_data': self.get_solar_conditions(),
+            'solar_data': solar_data,
+            'muf_calculation': {
+                'muf': muf_data.get('muf'),
+                'fof2': muf_data.get('fof2'),
+                'method': muf_data.get('method'),
+                'source': muf_data.get('source'),
+                'station': muf_data.get('station'),
+                'station_distance_km': muf_data.get('station_distance_km'),
+                'confidence': muf_data.get('confidence'),
+                'measurement_time': muf_data.get('measurement_time')
+            },
             'timestamp': datetime.now().isoformat()
         }
 

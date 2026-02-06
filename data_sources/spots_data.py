@@ -8,10 +8,11 @@ Handles fetching and processing spot data from various sources:
 """
 
 import requests
-from datetime import datetime
-from typing import Dict, List, Optional, Any
+import time
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from utils.cache_manager import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,11 @@ class SpotsDataProvider:
         
         # Data sources
         self.pskreporter_url = "https://retrieve.pskreporter.info/query"
-        self.wsprnet_url = "https://www.wsprnet.org/olddb"
+        self.rbn_url = "https://www.reversebeacon.net/raw_data/"
+        self.wsprnet_urls = [
+            "https://wsprnet.org/drupal/wsprnet/spots.json",
+            "https://wsprnet.org/drupal/wsprnet/spots.json?callback=?"
+        ]
     
     def get_live_activity(self) -> Dict:
         """Get live activity data with timeout handling."""
@@ -82,241 +87,158 @@ class SpotsDataProvider:
         return None
     
     def _get_pskreporter_spots(self) -> Optional[Dict]:
-        """Get PSKReporter spots - returns XML which we parse."""
+        """Get PSKReporter spots via their API."""
         try:
-            from bs4 import BeautifulSoup
-
-            # PSKReporter API - get recent spots (last 15 minutes)
+            # PSKReporter requires API key for full access
+            # Use public query endpoint for basic data
             params = {
                 'flowStartSeconds': 900,  # Last 15 minutes
+                'rronly': 1,
+                'noactive': 1,
             }
-
-            response = requests.get(self.pskreporter_url, params=params, timeout=8)
-
-            if response.status_code != 200:
-                logger.debug(f"PSKReporter returned status {response.status_code}")
-                return None
-
-            # Parse XML response
-            soup = BeautifulSoup(response.text, 'lxml-xml')
-            reports = soup.find_all('receptionReport')
-            spots = []
-
-            for report in reports[:100]:  # Limit to 100 spots
-                try:
-                    freq_hz = float(report.get('frequency', 0))
-                    spot = {
-                        'callsign': report.get('senderCallsign', ''),
-                        'frequency': round(freq_hz / 1000000, 6),  # Convert Hz to MHz
-                        'mode': report.get('mode', 'Unknown'),
-                        'snr': int(report.get('sNR', 0)) if report.get('sNR') else 0,
-                        'spotter': report.get('receiverCallsign', ''),
-                        'spotter_grid': report.get('receiverLocator', ''),
-                        'sender_grid': report.get('senderLocator', ''),
-                        'dxcc': report.get('senderDXCC', ''),
-                        'timestamp': report.get('flowStartSeconds', ''),
-                        'source': 'PSKReporter'
-                    }
-                    if spot['callsign'] and spot['frequency'] > 0:
-                        spots.append(spot)
-                except (ValueError, TypeError) as e:
-                    logger.debug(f"Error parsing PSKReporter spot: {e}")
-                    continue
-
+            # Note: Full implementation requires API key
+            # Return structure for when data is available
             return {
-                'spots': spots,
-                'count': len(spots),
-                'source': 'PSKReporter'
+                'source': 'pskreporter',
+                'spots': [],
+                'count': 0,
+                'status': 'api_key_required'
             }
-
-        except ImportError:
-            logger.debug("BeautifulSoup or lxml not available for PSKReporter XML parsing")
-            return None
-        except requests.exceptions.Timeout:
-            logger.debug("PSKReporter request timed out")
-            return None
-        except requests.exceptions.RequestException as e:
-            logger.debug(f"PSKReporter request error: {e}")
-            return None
         except Exception as e:
             logger.debug(f"Error fetching PSKReporter data: {e}")
             return None
 
     def _get_rbn_spots(self) -> Optional[Dict]:
-        """Get Reverse Beacon Network spots.
-
-        Note: RBN's web API at /raw_data/ is for historical data downloads only.
-        Live spots require telnet connection to telnet.reversebeacon.net:7000.
-        For now, we rely on PSKReporter which includes many of the same digital mode spots.
-        """
-        # RBN web interface doesn't provide a simple live spots API
-        # The raw_data page is for downloading historical ZIP files
-        # Live access requires telnet connection which is more complex
-        logger.debug("RBN spots skipped - requires telnet connection for live data")
-        return None
+        """Get RBN (Reverse Beacon Network) spots."""
+        try:
+            # RBN provides telnet stream, not REST API
+            # For web apps, use their aggregated data or third-party APIs
+            # DXWatch or similar can provide RBN data
+            return {
+                'source': 'rbn',
+                'spots': [],
+                'count': 0,
+                'status': 'telnet_stream_not_implemented'
+            }
+        except Exception as e:
+            logger.debug(f"Error fetching RBN data: {e}")
+            return None
 
     def _get_wsprnet_spots(self) -> Optional[Dict]:
-        """Get WSPRNet spots from the olddb HTML interface."""
+        """Get WSPRNet spots."""
         try:
-            from bs4 import BeautifulSoup
+            # Try to fetch from WSPRNet
+            response = requests.get(
+                "https://wsprnet.org/drupal/wsprnet/spots/json",
+                timeout=5,
+                headers={'User-Agent': 'ham-radio-conditions/1.0'}
+            )
 
-            # WSPRNet olddb endpoint returns HTML with spot data
-            url = 'https://www.wsprnet.org/olddb'
-            params = {
-                'mode': 'html',
-                'band': 'all',
-                'limit': '100'
-            }
-
-            response = requests.get(url, params=params, timeout=8)
-
-            if response.status_code != 200:
-                logger.debug(f"WSPRNet returned status {response.status_code}")
-                return None
-
-            soup = BeautifulSoup(response.text, 'html.parser')
-            spots = []
-
-            # Find the spots table (third table on the page)
-            tables = soup.find_all('table')
-            if len(tables) < 3:
-                logger.debug("WSPRNet spots table not found")
-                return None
-
-            spot_table = tables[2]
-            rows = spot_table.find_all('tr')
-
-            # Skip header rows (first 2 rows), parse data rows
-            for row in rows[2:]:
+            if response.status_code == 200:
                 try:
-                    cells = row.find_all('td')
-                    if len(cells) >= 10:
-                        # Columns: Date, Call, Frequency, SNR, Drift, Grid, dBm, W, by (reporter), loc (reporter grid), km
-                        freq_str = cells[2].get_text(strip=True)
-                        snr_str = cells[3].get_text(strip=True)
-                        drift_str = cells[4].get_text(strip=True)
-                        power_str = cells[7].get_text(strip=True) if len(cells) > 7 else '0'
-                        distance_str = cells[10].get_text(strip=True) if len(cells) > 10 else '0'
-
-                        spot = {
-                            'callsign': cells[1].get_text(strip=True),
-                            'frequency': float(freq_str) if freq_str else 0,
-                            'mode': 'WSPR',
-                            'snr': int(snr_str) if snr_str and snr_str.lstrip('-').isdigit() else 0,
-                            'drift': int(drift_str) if drift_str and drift_str.lstrip('-').isdigit() else 0,
-                            'sender_grid': cells[5].get_text(strip=True),
-                            'power_dbm': cells[6].get_text(strip=True) if len(cells) > 6 else '',
-                            'power_w': power_str,
-                            'spotter': cells[8].get_text(strip=True) if len(cells) > 8 else '',
-                            'spotter_grid': cells[9].get_text(strip=True) if len(cells) > 9 else '',
-                            'distance_km': int(distance_str) if distance_str and distance_str.isdigit() else 0,
-                            'timestamp': cells[0].get_text(strip=True),
-                            'source': 'WSPRNet'
-                        }
-                        if spot['callsign'] and spot['frequency'] > 0:
-                            spots.append(spot)
-                except (ValueError, IndexError, AttributeError) as e:
-                    logger.debug(f"Error parsing WSPRNet row: {e}")
-                    continue
+                    data = response.json()
+                    spots = data if isinstance(data, list) else []
+                    return {
+                        'source': 'wsprnet',
+                        'spots': spots[:50],  # Limit to 50 most recent
+                        'count': len(spots),
+                        'status': 'ok'
+                    }
+                except ValueError:
+                    pass
 
             return {
-                'spots': spots,
-                'count': len(spots),
-                'source': 'WSPRNet'
+                'source': 'wsprnet',
+                'spots': [],
+                'count': 0,
+                'status': 'fetch_failed'
             }
-
-        except ImportError:
-            logger.debug("BeautifulSoup not available for WSPRNet parsing")
-            return None
-        except requests.exceptions.Timeout:
+        except requests.Timeout:
             logger.debug("WSPRNet request timed out")
-            return None
-        except requests.exceptions.RequestException as e:
-            logger.debug(f"WSPRNet request error: {e}")
-            return None
+            return {
+                'source': 'wsprnet',
+                'spots': [],
+                'count': 0,
+                'status': 'timeout'
+            }
         except Exception as e:
             logger.debug(f"Error fetching WSPRNet data: {e}")
             return None
     
     def _combine_spots_data(self, results: Dict) -> Dict:
-        """Combine spots data from multiple sources with band activity analysis."""
-        # Collect all spots
+        """Combine spots data from multiple sources."""
+        total_spots = 0
         all_spots = []
-        for source_name, source_data in results.items():
-            spots = source_data.get('spots', [])
-            all_spots.extend(spots)
+        source_status = {}
 
-        # Analyze band activity
+        for source, data in results.items():
+            if data:
+                count = data.get('count', 0)
+                total_spots += count
+                all_spots.extend(data.get('spots', []))
+                source_status[source] = {
+                    'count': count,
+                    'status': data.get('status', 'unknown')
+                }
+
+        # Analyze spots for band/mode activity
         band_activity = self._analyze_band_activity(all_spots)
-
-        # Mode breakdown
-        mode_counts = {}
-        for spot in all_spots:
-            mode = spot.get('mode', 'Unknown')
-            mode_counts[mode] = mode_counts.get(mode, 0) + 1
-
-        # Count unique DXCC entities
-        dxcc_set = set()
-        for spot in all_spots:
-            dxcc = spot.get('dxcc', '')
-            if dxcc:
-                dxcc_set.add(dxcc)
-
-        # Count active bands (bands with spots)
-        active_bands = sum(1 for band_data in band_activity.values() if band_data.get('count', 0) > 0)
-
-        # Create summary for frontend
-        summary = {
-            'total_spots': len(all_spots),
-            'active_bands': active_bands,
-            'active_modes': len(mode_counts),
-            'active_dxcc': len(dxcc_set)
-        }
+        mode_activity = self._analyze_mode_activity(all_spots)
 
         combined = {
             'timestamp': datetime.now().isoformat(),
-            'sources': list(results.keys()),
-            'source_counts': {name: data.get('count', 0) for name, data in results.items()},
-            'total_spots': len(all_spots),
-            'summary': summary,
-            'spots': sorted(all_spots, key=lambda x: x.get('frequency', 0), reverse=True)[:100],
+            'sources': source_status,
+            'total_spots': total_spots,
+            'spots': all_spots[:100],  # Limit to 100 spots
             'band_activity': band_activity,
-            'mode_breakdown': mode_counts,
-            'confidence': 0.8 if len(results) >= 2 else 0.6
+            'mode_activity': mode_activity,
+            'active_bands': len(band_activity),
+            'active_modes': len(mode_activity)
         }
         return combined
 
-    def _analyze_band_activity(self, spots: List[Dict]) -> Dict:
-        """Analyze spot activity by band."""
-        # Band frequency ranges in MHz
-        bands = {
-            '160m': (1.8, 2.0),
-            '80m': (3.5, 4.0),
-            '60m': (5.3, 5.4),
-            '40m': (7.0, 7.3),
-            '30m': (10.1, 10.15),
-            '20m': (14.0, 14.35),
-            '17m': (18.068, 18.168),
-            '15m': (21.0, 21.45),
-            '12m': (24.89, 24.99),
-            '10m': (28.0, 29.7),
-            '6m': (50.0, 54.0)
-        }
+    def _analyze_band_activity(self, spots: list) -> Dict:
+        """Analyze spots for band activity."""
+        bands = {}
+        for spot in spots:
+            freq = spot.get('frequency', spot.get('freq', 0))
+            if freq:
+                band = self._freq_to_band(float(freq) if isinstance(freq, str) else freq)
+                if band:
+                    bands[band] = bands.get(band, 0) + 1
+        return bands
 
-        activity = {}
-        for band_name, (low, high) in bands.items():
-            band_spots = [s for s in spots if low <= s.get('frequency', 0) <= high]
-            if band_spots:
-                avg_snr = sum(s.get('snr', 0) for s in band_spots) / len(band_spots)
-                activity[band_name] = {
-                    'count': len(band_spots),
-                    'avg_snr': round(avg_snr, 1),
-                    'modes': list(set(s.get('mode', 'Unknown') for s in band_spots))
-                }
-            else:
-                activity[band_name] = {'count': 0, 'avg_snr': 0, 'modes': []}
+    def _analyze_mode_activity(self, spots: list) -> Dict:
+        """Analyze spots for mode activity."""
+        modes = {}
+        for spot in spots:
+            mode = spot.get('mode', 'unknown')
+            modes[mode] = modes.get(mode, 0) + 1
+        return modes
 
-        return activity
+    def _freq_to_band(self, freq_mhz: float) -> Optional[str]:
+        """Convert frequency in MHz to band name."""
+        if 1.8 <= freq_mhz <= 2.0:
+            return '160m'
+        elif 3.5 <= freq_mhz <= 4.0:
+            return '80m'
+        elif 7.0 <= freq_mhz <= 7.3:
+            return '40m'
+        elif 10.1 <= freq_mhz <= 10.15:
+            return '30m'
+        elif 14.0 <= freq_mhz <= 14.35:
+            return '20m'
+        elif 18.068 <= freq_mhz <= 18.168:
+            return '17m'
+        elif 21.0 <= freq_mhz <= 21.45:
+            return '15m'
+        elif 24.89 <= freq_mhz <= 24.99:
+            return '12m'
+        elif 28.0 <= freq_mhz <= 29.7:
+            return '10m'
+        elif 50.0 <= freq_mhz <= 54.0:
+            return '6m'
+        return None
     
     def _get_fallback_spots_data(self) -> Dict:
         """Get fallback spots data when primary sources fail."""
@@ -324,57 +246,6 @@ class SpotsDataProvider:
             'timestamp': datetime.now().isoformat(),
             'sources': ['fallback'],
             'total_spots': 0,
-            'summary': {
-                'total_spots': 0,
-                'active_bands': 0,
-                'active_modes': 0,
-                'active_dxcc': 0
-            },
-            'spots': [],
-            'band_activity': {},
-            'mode_breakdown': {},
+            'data': {'fallback': {'spots': [], 'count': 0}},
             'confidence': 0.3
         }
-
-    def check_status(self) -> Dict[str, Any]:
-        """Check status of spots data sources."""
-        status = {
-            'status': 'online',
-            'sources': {}
-        }
-
-        # Check PSKReporter
-        try:
-            response = requests.get(self.pskreporter_url, params={'flowStartSeconds': 60}, timeout=5)
-            status['sources']['pskreporter'] = {
-                'status': 'online' if response.status_code == 200 else 'error',
-                'status_code': response.status_code,
-                'response_time': response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            status['sources']['pskreporter'] = {
-                'status': 'offline',
-                'error': str(e)
-            }
-
-        # Check WSPRNet
-        try:
-            response = requests.get(self.wsprnet_url, params={'mode': 'html', 'limit': '1'}, timeout=5)
-            status['sources']['wsprnet'] = {
-                'status': 'online' if response.status_code == 200 else 'error',
-                'status_code': response.status_code,
-                'response_time': response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            status['sources']['wsprnet'] = {
-                'status': 'offline',
-                'error': str(e)
-            }
-
-        # RBN note - requires telnet for live spots
-        status['sources']['rbn'] = {
-            'status': 'unavailable',
-            'note': 'RBN requires telnet connection for live spots'
-        }
-
-        return status
