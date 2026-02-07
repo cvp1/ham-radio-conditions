@@ -129,7 +129,7 @@ class SpotsDataProvider:
                 spot_time = report.get('flowStartSeconds', '')
                 if spot_time:
                     try:
-                        spot_time = datetime.utcfromtimestamp(int(spot_time)).strftime('%H:%M')
+                        spot_time = datetime.utcfromtimestamp(int(spot_time)).strftime('%Y-%m-%dT%H:%M:%SZ')
                     except (ValueError, TypeError, OSError):
                         spot_time = ''
 
@@ -194,13 +194,24 @@ class SpotsDataProvider:
                 except (ValueError, TypeError):
                     freq_mhz = 0.0
 
+                # Normalize RBN time (UTC) to ISO format
+                rbn_time = entry.get('time', entry.get('ut', ''))
+                if rbn_time and 'T' not in str(rbn_time):
+                    # Bare HH:MM or HHMM — attach today's date and Z suffix
+                    t = str(rbn_time).replace(':', '')
+                    try:
+                        hh, mm = int(t[:2]), int(t[2:4])
+                        rbn_time = datetime.utcnow().strftime('%Y-%m-%d') + f'T{hh:02d}:{mm:02d}:00Z'
+                    except (ValueError, IndexError):
+                        pass
+
                 spot = {
                     'callsign': entry.get('dx', entry.get('callsign', '')),
                     'frequency': freq_mhz,
                     'mode': entry.get('mode', entry.get('md', '')),
                     'snr': snr,
                     'spotter': entry.get('spotter', entry.get('de', '')),
-                    'time': entry.get('time', entry.get('ut', '')),
+                    'time': rbn_time,
                     'dxcc': entry.get('dxcc', ''),
                     'source': 'RBN',
                     'comment': f"{snr} dB" if snr is not None else '',

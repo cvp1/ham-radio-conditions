@@ -29,7 +29,7 @@ def get_conditions():
         
         if conditions:
             # Ensure JSON safety by converting NaN values
-            from ham_radio_conditions import safe_json_serialize
+            from app_factory import safe_json_serialize
             safe_conditions = safe_json_serialize(conditions)
             
             # Cache the conditions

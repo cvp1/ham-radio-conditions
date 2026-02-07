@@ -913,6 +913,18 @@
             if (el) el.innerHTML = html;
         }
 
+        // Helper: Convert UTC ISO timestamp to local HH:MM
+        function formatLocalTime(utcStr) {
+            if (!utcStr) return 'N/A';
+            try {
+                const d = new Date(utcStr);
+                if (isNaN(d.getTime())) return utcStr;
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch(e) {
+                return utcStr;
+            }
+        }
+
         // Helper: Format value
         function formatValue(key, value) {
             if (key === 'sfi') {
@@ -1321,18 +1333,45 @@
             if (!weatherDiv) return;
             if (data.weather_conditions) {
                 const w = data.weather_conditions;
+                // Resolve location: prefer weather data, fall back to report location
+                const loc = data.location || {};
+                const city = w.city || loc.city || '';
+                const state = w.state || loc.state || '';
+                const locationStr = city && state ? `${city}, ${state}` : city || state || 'N/A';
+
+                // Format weather fields with units
+                const formatWeather = (key, value) => {
+                    switch(key) {
+                        case 'temperature': return `${Math.round(value)}°F`;
+                        case 'humidity': return `${Math.round(value)}%`;
+                        case 'pressure': return `${value} hPa`;
+                        case 'wind_speed': return `${value} mph`;
+                        case 'wind_direction': return `${value}°`;
+                        case 'visibility': return `${value} mi`;
+                        case 'cloud_cover': return `${Math.round(value)}%`;
+                        default: return value;
+                    }
+                };
+
+                const displayFields = ['temperature', 'humidity', 'wind_speed', 'wind_direction', 'pressure', 'cloud_cover', 'visibility'];
+                const labelMap = {
+                    temperature: 'Temp', humidity: 'Humidity', wind_speed: 'Wind',
+                    wind_direction: 'Wind Dir', pressure: 'Pressure',
+                    cloud_cover: 'Clouds', visibility: 'Visibility'
+                };
+
                 safeSetHTML(weatherDiv, `
                     <div class="space-y-2">
                     <div class="flex justify-between items-center">
                             <span class="text-gray-400">Location:</span>
-                            <span class="font-semibold">${w.city && w.state ? `${w.city}, ${w.state}` : 'N/A'}</span>
+                            <span class="font-semibold">${locationStr}</span>
                     </div>
-                    ${Object.entries(w)
-                        .filter(([key]) => !['source', 'city', 'state'].includes(key))
-                        .map(([key, value]) => `
+                    ${displayFields
+                        .filter(key => w[key] !== undefined)
+                        .map(key => `
                             <div class="flex justify-between items-center">
-                                <span class="text-gray-400">${key.replace('_', ' ').toUpperCase()}</span>
-                                <span class="font-semibold">${value}</span>
+                                <span class="text-gray-400">${labelMap[key] || key}</span>
+                                <span class="font-semibold">${formatWeather(key, w[key])}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -2678,9 +2717,8 @@
 
             const rows = act.activations.slice(0, 25).map(a => {
                 const typeCls = a.type === 'POTA' ? 'type-badge-pota' : 'type-badge-sota';
-                const timeStr = a.time ? new Date(a.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
                 return `<tr class="hover:bg-gray-800">
-                    <td class="px-4 py-2 text-sm">${timeStr || 'N/A'}</td>
+                    <td class="px-4 py-2 text-sm">${formatLocalTime(a.time)}</td>
                     <td class="px-4 py-2 font-mono">${a.callsign || 'N/A'}</td>
                     <td class="px-4 py-2"><span class="type-badge ${typeCls}">${a.type}</span></td>
                     <td class="px-4 py-2 text-sm">${a.reference || ''}</td>
@@ -2928,7 +2966,7 @@
                 const spots = data.live_activity.spots;
                 const spotsHtml = spots.slice(0, 20).map(spot => `
                     <tr class="hover:bg-gray-800">
-                        <td class="px-4 py-2 text-sm">${spot.time || spot.timestamp || 'N/A'}</td>
+                        <td class="px-4 py-2 text-sm">${formatLocalTime(spot.time || spot.timestamp)}</td>
                         <td class="px-4 py-2 font-mono">${spot.callsign || 'N/A'}</td>
                         <td class="px-4 py-2 text-sm">${spot.frequency || 'N/A'}</td>
                         <td class="px-4 py-2 text-sm">${spot.mode || 'N/A'}</td>

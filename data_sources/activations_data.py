@@ -84,8 +84,12 @@ class ActivationsDataProvider:
 
             spots = []
             for item in data[:50]:
+                pota_time = item.get('spotTime', '')
+                # Ensure UTC suffix for frontend conversion
+                if pota_time and not pota_time.endswith('Z') and '+' not in pota_time:
+                    pota_time = pota_time + 'Z'
                 spots.append({
-                    'time': item.get('spotTime', ''),
+                    'time': pota_time,
                     'callsign': item.get('activator', ''),
                     'type': 'POTA',
                     'reference': item.get('reference', ''),
@@ -122,8 +126,12 @@ class ActivationsDataProvider:
                 summit = item.get('summitCode', '')
                 reference = f"{ref}/{summit}" if ref and summit else ref or summit
 
+                sota_time = item.get('timeStamp', '')
+                # Ensure UTC suffix for frontend conversion
+                if sota_time and not sota_time.endswith('Z') and '+' not in sota_time:
+                    sota_time = sota_time + 'Z'
                 spots.append({
-                    'time': item.get('timeStamp', ''),
+                    'time': sota_time,
                     'callsign': item.get('activatorCallsign', ''),
                     'type': 'SOTA',
                     'reference': reference,

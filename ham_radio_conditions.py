@@ -255,9 +255,24 @@ class HamRadioConditions:
             # Get solar cycle info
             solar_cycle_info = self._get_solar_cycle_info(solar_data)
 
+            # Build band_conditions for frontend (day_rating / night_rating format)
+            is_day = time_data.get('is_day', True)
+            band_conditions_raw = self.get_band_conditions()
+            band_conditions = {}
+            raw_bands = band_conditions_raw.get('bands', band_conditions_raw) if isinstance(band_conditions_raw, dict) else {}
+            for band_name, band_info in raw_bands.items():
+                if isinstance(band_info, dict) and 'quality' in band_info:
+                    quality = band_info['quality']
+                    # Map quality to Good/Fair/Poor for ratings
+                    rating = 'Good' if quality in ('Excellent', 'Very Good', 'Good') else quality
+                    band_conditions[band_name] = {
+                        'day_rating': rating if is_day else self._off_period_rating(rating),
+                        'night_rating': rating if not is_day else self._off_period_rating(rating),
+                    }
+
             return {
                 'current_time': datetime.now().strftime('%I:%M %p %Z'),
-                'day_night': 'Day' if time_data.get('is_day', True) else 'Night',
+                'day_night': 'Day' if is_day else 'Night',
                 'propagation_parameters': {
                     'muf': f"{muf_value:.1f}",
                     'muf_source': muf_data.get('method', 'Traditional'),
@@ -266,6 +281,7 @@ class HamRadioConditions:
                     'best_bands': propagation_data.get('best_bands', ['20m', '40m']),
                     'skip_distances': self._calculate_skip_distances(muf_value)
                 },
+                'band_conditions': band_conditions,
                 'solar_cycle': solar_cycle_info,
                 'geomagnetic_data': geomagnetic_data,
                 'confidence': self._calculate_overall_confidence(muf_data, propagation_data)
@@ -425,6 +441,13 @@ class HamRadioConditions:
                 'sfi_trend': 'Unknown'
             }
     
+    @staticmethod
+    def _off_period_rating(rating: str) -> str:
+        """Downgrade a band rating for the off-period (day vs night)."""
+        if rating in ('Excellent', 'Very Good', 'Good'):
+            return 'Fair'
+        return 'Poor'
+
     def _get_fallback_band_conditions(self) -> Dict:
         """Get fallback band conditions when calculation fails."""
         return {
