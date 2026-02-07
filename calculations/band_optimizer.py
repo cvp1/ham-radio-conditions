@@ -185,9 +185,44 @@ class BandOptimizer:
     
     def _apply_weather_adjustments(self, bands: Dict, weather_data: Dict) -> Dict:
         """Apply weather-based adjustments to band recommendations."""
-        # Weather adjustments would be implemented here
-        # For now, return bands unchanged
+        if not weather_data:
+            return bands
+
+        humidity = self._parse_numeric(weather_data.get('humidity', 50))
+        pressure = self._parse_numeric(weather_data.get('pressure', 1013))
+        cloud_cover = self._parse_numeric(weather_data.get('cloud_cover', 0))
+
+        # High humidity + low pressure = increased atmospheric noise (QRN)
+        # Penalize lower bands which are more susceptible to static
+        if humidity > 80 and pressure < 1005:
+            for band in ['160m', '80m', '40m']:
+                if band in bands:
+                    bands[band]['score'] *= 0.85
+                    bands[band]['notes'] += ' (QRN likely)'
+
+        # Thunderstorm conditions - heavy penalty on low bands
+        conditions = str(weather_data.get('conditions', '')).lower()
+        if 'thunder' in conditions or 'storm' in conditions:
+            for band in ['160m', '80m', '40m', '30m']:
+                if band in bands:
+                    bands[band]['score'] *= 0.6
+                    bands[band]['notes'] = 'Thunderstorm QRN'
+
+        # Clear skies + high pressure = stable, small boost
+        if cloud_cover < 20 and pressure > 1020:
+            for band in bands:
+                bands[band]['score'] *= 1.05
+
         return bands
+
+    def _parse_numeric(self, value) -> float:
+        """Parse a numeric value from mixed-format weather data."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(str(value).split()[0])
+        except (ValueError, IndexError):
+            return 0.0
     
     def _sort_bands_by_quality(self, bands: Dict) -> Dict:
         """Sort bands by quality score."""

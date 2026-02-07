@@ -12,10 +12,14 @@ from .solar_data import SolarDataProvider
 from .weather_data import WeatherDataProvider
 from .spots_data import SpotsDataProvider
 from .geomagnetic_data import GeomagneticDataProvider
+from .activations_data import ActivationsDataProvider
+from .contest_data import ContestDataProvider
 
 __all__ = [
     'SolarDataProvider',
-    'WeatherDataProvider', 
+    'WeatherDataProvider',
     'SpotsDataProvider',
-    'GeomagneticDataProvider'
+    'GeomagneticDataProvider',
+    'ActivationsDataProvider',
+    'ContestDataProvider'
 ]

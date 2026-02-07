@@ -7,7 +7,7 @@
     
     <!-- PWA Meta Tags -->
     <meta name="description" content="Real-time ham radio propagation conditions, solar weather, and live spots">
-    <meta name="theme-color" content="#3B82F6">
+    <meta name="theme-color" content="#0B0F19">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Ham Radio">
@@ -37,43 +37,38 @@
     <!-- Stylesheets -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <style>
-        /* Professional Design System */
+        /* Dark Modern Design System */
         :root {
-            --primary-blue: #2563EB;
-            --primary-blue-dark: #1D4ED8;
-            --success-green: #059669;
-            --warning-yellow: #D97706;
-            --danger-red: #DC2626;
-            --purple-accent: #7C3AED;
-            --gray-50: #F9FAFB;
-            --gray-100: #F3F4F6;
-            --gray-200: #E5E7EB;
-            --gray-300: #D1D5DB;
-            --gray-400: #9CA3AF;
-            --gray-500: #6B7280;
-            --gray-600: #4B5563;
-            --gray-700: #374151;
-            --gray-800: #1F2937;
-            --gray-900: #111827;
-            --gray-950: #030712;
+            --bg-base: #0B0F19;
+            --bg-surface: #111827;
+            --bg-elevated: #1A2035;
+            --border-subtle: rgba(255,255,255,0.06);
+            --border-default: rgba(255,255,255,0.10);
+            --accent-primary: #06B6D4;
+            --accent-primary-muted: #0891B2;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-danger: #EF4444;
+            --text-primary: rgba(255,255,255,0.90);
+            --text-secondary: rgba(255,255,255,0.50);
+            --text-muted: rgba(255,255,255,0.30);
+            --shadow-card: 0 1px 3px rgba(0,0,0,0.4);
         }
 
-        /* Professional Card Design */
+        /* Card Design */
         .card {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: var(--shadow-card);
+            transition: border-color 0.2s ease;
         }
-        
+
         .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-            border-color: rgba(255, 255, 255, 0.15);
+            border-color: var(--border-default);
         }
 
         /* Professional Typography */
@@ -108,71 +103,50 @@
         }
 
         .status-excellent {
-            background: linear-gradient(135deg, #10B981, #059669);
-            color: white;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.15);
+            color: #6EE7B7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
         .status-good {
-            background: linear-gradient(135deg, #3B82F6, #2563EB);
-            color: white;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            background: rgba(6, 182, 212, 0.15);
+            color: #67E8F9;
+            border: 1px solid rgba(6, 182, 212, 0.3);
         }
 
         .status-fair {
-            background: linear-gradient(135deg, #F59E0B, #D97706);
-            color: white;
-            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+            background: rgba(245, 158, 11, 0.15);
+            color: #FCD34D;
+            border: 1px solid rgba(245, 158, 11, 0.3);
         }
 
         .status-poor {
-            background: linear-gradient(135deg, #EF4444, #DC2626);
-            color: white;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.15);
+            color: #FCA5A5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
-        /* Professional Band Condition Colors */
-        .condition-good { 
-            color: #10B981 !important; 
+        /* Band Condition Colors */
+        .condition-good {
+            color: #10B981 !important;
             font-weight: 600 !important;
-            text-shadow: 0 0 12px rgba(16, 185, 129, 0.4) !important;
         }
-        .condition-fair { 
-            color: #F59E0B !important; 
+        .condition-fair {
+            color: #F59E0B !important;
             font-weight: 600 !important;
-            text-shadow: 0 0 12px rgba(245, 158, 11, 0.4) !important;
         }
-        .condition-poor { 
-            color: #EF4444 !important; 
+        .condition-poor {
+            color: #EF4444 !important;
             font-weight: 600 !important;
-            text-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
         }
         
-        /* Professional Icon System */
-        .icon-solar { 
-            color: #F59E0B; 
-            filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.3));
-        }
-        .icon-band { 
-            color: #3B82F6; 
-            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.3));
-        }
-        .icon-weather { 
-            color: #10B981; 
-            filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.3));
-        }
-        .icon-dxcc { 
-            color: #8B5CF6; 
-            filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
-        }
-        .icon-spots { 
-            color: #EC4899; 
-            filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.3));
-        }
-        .icon-propagation { 
-            color: #8B5CF6; 
-            filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
-        }
+        /* Icon System */
+        .icon-solar { color: #F59E0B; }
+        .icon-band { color: #06B6D4; }
+        .icon-weather { color: #10B981; }
+        .icon-dxcc { color: #8B5CF6; }
+        .icon-spots { color: #EC4899; }
+        .icon-propagation { color: #06B6D4; }
         
         .section-icon {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -182,18 +156,17 @@
             filter: brightness(1.2);
         }
 
-        /* Professional Loading Animation */
+        /* Loading Animation */
         .loading-spinner {
             border: 3px solid rgba(255, 255, 255, 0.1);
             border-radius: 50%;
-            border-top: 3px solid #EC4899;
+            border-top: 3px solid var(--accent-primary);
             width: 24px;
             height: 24px;
             animation: spin 1s linear infinite;
             display: inline-block;
             vertical-align: middle;
             margin-right: 8px;
-            box-shadow: 0 0 12px rgba(236, 72, 153, 0.3);
         }
 
         @keyframes spin {
@@ -201,37 +174,23 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Professional Propagation Quality Classes */
-        .propagation-excellent { 
-            color: #10B981; 
-            text-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
-        }
-        .propagation-good { 
-            color: #3B82F6; 
-            text-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
-        }
-        .propagation-fair { 
-            color: #F59E0B; 
-            text-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
-        }
-        .propagation-poor { 
-            color: #EF4444; 
-            text-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
-        }
+        /* Propagation Quality Classes */
+        .propagation-excellent { color: #10B981; }
+        .propagation-good { color: #06B6D4; }
+        .propagation-fair { color: #F59E0B; }
+        .propagation-poor { color: #EF4444; }
 
-        /* Professional Data Cards */
+        /* Data Cards */
         .data-card {
-            background: linear-gradient(135deg, rgba(31, 41, 55, 0.8) 0%, rgba(17, 24, 39, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
             border-radius: 12px;
             padding: 1.5rem;
-            transition: all 0.3s ease;
+            transition: border-color 0.2s ease;
         }
 
         .data-card:hover {
-            background: linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(17, 24, 39, 1) 100%);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateY(-1px);
+            border-color: var(--border-default);
         }
 
         /* Professional Progress Bars */
@@ -249,40 +208,36 @@
             background: linear-gradient(90deg, #10B981, #059669);
         }
 
-        /* Professional Buttons */
+        /* Buttons */
         .btn-primary {
-            background: linear-gradient(135deg, #3B82F6, #2563EB);
-            color: white;
+            background: var(--accent-primary);
+            color: #0B0F19;
             border: none;
             border-radius: 8px;
             padding: 0.75rem 1.5rem;
             font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            transition: background 0.2s ease;
         }
 
         .btn-primary:hover {
-            background: linear-gradient(135deg, #2563EB, #1D4ED8);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+            background: var(--accent-primary-muted);
         }
 
         .btn-secondary {
-            background: linear-gradient(135deg, #6B7280, #4B5563);
-            color: white;
-            border: none;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-default);
             border-radius: 8px;
             padding: 0.75rem 1.5rem;
             font-weight: 600;
-            transition: all 0.3s ease;
+            transition: border-color 0.2s ease;
         }
 
         .btn-secondary:hover {
-            background: linear-gradient(135deg, #4B5563, #374151);
-            transform: translateY(-1px);
+            border-color: var(--accent-primary);
         }
 
-        /* Professional Table Styling */
+        /* Table Styling */
         .table-professional {
             border-collapse: separate;
             border-spacing: 0;
@@ -290,17 +245,20 @@
         }
 
         .table-professional th {
-            background: linear-gradient(135deg, rgba(31, 41, 55, 0.9), rgba(17, 24, 39, 0.95));
-            color: #F3F4F6;
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
             font-weight: 600;
-            padding: 1rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.75rem 1rem;
             text-align: left;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid var(--border-default);
         }
 
         .table-professional td {
-            padding: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-subtle);
             transition: background-color 0.2s ease;
         }
 
@@ -308,13 +266,13 @@
             background: rgba(255, 255, 255, 0.02);
         }
 
-        /* Professional Grid Layout */
+        /* Grid Layout */
         .grid-professional {
             display: grid;
             gap: 1.5rem;
         }
 
-        /* Professional Spacing */
+        /* Spacing */
         .space-professional > * + * {
             margin-top: 1.5rem;
         }
@@ -327,7 +285,7 @@
             }
         }
 
-        /* Professional Responsive Design */
+        /* Responsive Design */
         @media (max-width: 768px) {
             .card {
                 border-radius: 12px;
@@ -353,18 +311,219 @@
 
         /* Current conditions highlight */
         .current-conditions {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: rgba(6, 182, 212, 0.05);
+            border: 1px solid rgba(6, 182, 212, 0.15);
         }
 
         /* Future predictions highlight */
         .future-predictions {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
-            border: 1px solid rgba(139, 92, 246, 0.2);
+            background: rgba(6, 182, 212, 0.03);
+            border: 1px solid rgba(6, 182, 212, 0.10);
+        }
+
+        /* Alerts banner styles */
+        .alert-banner {
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+        .alert-banner.alert-warning {
+            background: rgba(217, 119, 6, 0.15);
+            border: 1px solid rgba(217, 119, 6, 0.3);
+        }
+        .alert-banner.alert-danger {
+            background: rgba(220, 38, 38, 0.15);
+            border: 1px solid rgba(220, 38, 38, 0.3);
+        }
+        .alert-banner.alert-info {
+            background: rgba(37, 99, 235, 0.15);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+        }
+        .alert-banner.alert-success {
+            background: rgba(5, 150, 105, 0.15);
+            border: 1px solid rgba(5, 150, 105, 0.3);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Error banner */
+        .error-banner {
+            background: rgba(220, 38, 38, 0.15);
+            border: 1px solid rgba(220, 38, 38, 0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            align-items: center;
+            gap: 12px;
+        }
+        .error-banner:not(.hidden) {
+            display: flex;
+        }
+
+        /* Refresh button spin animation */
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Band Status Pills */
+        .band-pills-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+        .band-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            border: 1px solid transparent;
+            transition: transform 0.15s ease;
+        }
+        .band-pill:hover { transform: scale(1.05); }
+        .band-pill-open {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6EE7B7;
+        }
+        .band-pill-fair {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #FCD34D;
+        }
+        .band-pill-closed {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #FCA5A5;
+        }
+        .pill-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .pill-dot-open {
+            background: #10B981;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        .pill-dot-fair { background: #F59E0B; }
+        .pill-dot-closed { background: #EF4444; }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Sparkline containers */
+        .sparkline-container {
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        /* POTA/SOTA type badges */
+        .type-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+        .type-badge-pota {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6EE7B7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .type-badge-sota {
+            background: rgba(245, 158, 11, 0.2);
+            color: #FCD34D;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        /* Contest styles */
+        .contest-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .contest-item:last-child { border-bottom: none; }
+        .contest-live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #EF4444;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+        .mode-badge {
+            display: inline-flex;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+        .mode-badge-cw { background: rgba(124, 58, 237, 0.2); color: #C4B5FD; border: 1px solid rgba(124, 58, 237, 0.3); }
+        .mode-badge-ssb { background: rgba(59, 130, 246, 0.2); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .mode-badge-rtty { background: rgba(236, 72, 153, 0.2); color: #F9A8D4; border: 1px solid rgba(236, 72, 153, 0.3); }
+        .mode-badge-digital { background: rgba(16, 185, 129, 0.2); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .mode-badge-mixed { background: rgba(107, 114, 128, 0.2); color: #D1D5DB; border: 1px solid rgba(107, 114, 128, 0.3); }
+
+        /* Tab System */
+        .tab-bar {
+            display: flex;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            padding: 0 1rem;
+        }
+        .tab-btn {
+            flex: 1;
+            max-width: 200px;
+            padding: 0.875rem 1.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        @media (max-width: 640px) {
+            .tab-btn { padding: 0.75rem 0.5rem; font-size: 0.8rem; }
+            .tab-label { display: none; }
+            .tab-btn i { margin-right: 0 !important; }
+        }
+        @media (min-width: 641px) and (max-width: 768px) {
+            .tab-btn { padding: 0.75rem 1rem; }
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
+<body class="min-h-screen" style="background: var(--bg-base); color: var(--text-primary);">
     <!-- Hidden data element -->
     <script id="data" type="application/json">
         {{ data|tojson|safe }}
@@ -374,20 +533,27 @@
         <!-- Header with Current Status -->
         <header class="text-center mb-8">
             <div class="flex items-center justify-between mb-6">
-                <div></div>
+                <div class="w-24"></div>
                 <h1 class="text-4xl font-display text-white">Ham Radio Conditions</h1>
-                <div></div>
+                <div class="w-24 flex justify-end">
+                    <button id="refresh-btn" onclick="manualRefresh()" class="text-gray-400 hover:text-cyan-400 transition-colors p-2 rounded-lg hover:bg-gray-800" title="Refresh Now">
+                        <i id="refresh-icon" class="fas fa-sync-alt text-lg"></i>
+                    </button>
+                </div>
             </div>
             <div class="space-y-3">
                 <p class="text-gray-300 font-body" id="timestamp"></p>
+                <div id="data-confidence" class="hidden text-xs mt-1">
+                    <span id="data-source-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"></span>
+                </div>
                 <!-- Location Display and ZIP Input -->
                 <div class="flex items-center justify-center gap-4 flex-wrap">
                     <div id="location-display" class="text-gray-400 font-body">
                         <span id="location-city">Loading...</span>
                         <span class="text-gray-500 mx-2">|</span>
-                        <span id="location-grid" class="text-blue-400"></span>
+                        <span id="location-grid" class="text-cyan-400"></span>
                     </div>
-                    <button id="change-location-btn" class="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1 transition-colors">
+                    <button id="change-location-btn" class="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1 transition-colors">
                         <i class="fas fa-map-marker-alt"></i>
                         <span>Change Location</span>
                     </button>
@@ -400,8 +566,8 @@
                                placeholder="Enter ZIP code"
                                maxlength="5"
                                pattern="[0-9]{5}"
-                               class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white text-center w-32 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
-                        <button id="zip-submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                               class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white text-center w-32 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none">
+                        <button id="zip-submit-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
                             <i class="fas fa-check"></i>
                             <span>Update</span>
                         </button>
@@ -415,163 +581,275 @@
             </div>
         </header>
 
-        <!-- Current Conditions Section -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-heading mb-4 flex items-center">
-                <i class="fas fa-satellite-dish mr-3 section-icon icon-propagation text-2xl"></i>
-                <span class="text-white">Current Conditions</span>
-                </h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Solar Conditions -->
-                <div class="card current-conditions rounded-lg p-4">
-                    <h3 class="text-lg font-heading mb-3 flex items-center">
-                        <i class="fas fa-sun mr-2 icon-solar"></i>
-                        <span>Solar</span>
-                    </h3>
-                    <div id="solar-conditions" class="space-y-2 text-sm"></div>
+        <!-- Error Banner (hidden by default) -->
+        <div id="error-banner" class="error-banner mb-4 hidden">
+            <i class="fas fa-exclamation-triangle text-red-400"></i>
+            <span id="error-message" class="text-red-300 text-sm flex-1"></span>
+            <button onclick="hideError()" class="text-gray-400 hover:text-white ml-2">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Alerts Section -->
+        <div id="alerts-container" class="mb-6"></div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar" id="tab-bar">
+            <button class="tab-btn active" data-tab="conditions" onclick="switchTab('conditions')">
+                <i class="fas fa-satellite-dish mr-2"></i><span class="tab-label">Conditions</span>
+            </button>
+            <button class="tab-btn" data-tab="activity" onclick="switchTab('activity')">
+                <i class="fas fa-broadcast-tower mr-2"></i><span class="tab-label">Activity</span>
+            </button>
+            <button class="tab-btn" data-tab="strategy" onclick="switchTab('strategy')">
+                <i class="fas fa-chess mr-2"></i><span class="tab-label">Strategy</span>
+            </button>
+        </div>
+
+        <!-- ============ TAB 1: CONDITIONS ============ -->
+        <div id="tab-conditions" class="tab-panel active">
+
+            <!-- Band Status Pills -->
+            <div id="band-status-pills" class="mb-6 mt-6">
+                <div class="band-pills-row" id="band-pills-container"></div>
             </div>
 
-                <!-- MUF & Propagation -->
-                <div class="card current-conditions rounded-lg p-4">
-                    <h3 class="text-lg font-heading mb-3 flex items-center">
-                        <i class="fas fa-broadcast-tower mr-2 icon-propagation"></i>
-                        <span>Propagation</span>
-                    </h3>
-                    <div id="propagation-current" class="space-y-2 text-sm"></div>
+            <!-- Current Conditions Section -->
+            <div class="mb-8">
+                <h2 class="text-2xl font-heading mb-4 flex items-center">
+                    <i class="fas fa-satellite-dish mr-3 section-icon icon-propagation text-2xl"></i>
+                    <span class="text-white">Current Conditions</span>
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Solar Conditions -->
+                    <div class="card current-conditions rounded-lg p-4">
+                        <h3 class="text-lg font-heading mb-3 flex items-center">
+                            <i class="fas fa-sun mr-2 icon-solar"></i>
+                            <span>Solar</span>
+                        </h3>
+                        <div id="solar-conditions" class="space-y-2 text-sm"></div>
                     </div>
 
-                <!-- Best Bands -->
-                <div class="card current-conditions rounded-lg p-4">
-                    <h3 class="text-lg font-heading mb-3 flex items-center">
-                        <i class="fas fa-signal mr-2 icon-band"></i>
-                        <span>Best Bands</span>
-                    </h3>
-                    <div id="best-bands-current" class="space-y-2 text-sm"></div>
-            </div>
+                    <!-- MUF & Propagation -->
+                    <div class="card current-conditions rounded-lg p-4">
+                        <h3 class="text-lg font-heading mb-3 flex items-center">
+                            <i class="fas fa-broadcast-tower mr-2 icon-propagation"></i>
+                            <span>Propagation</span>
+                        </h3>
+                        <div id="propagation-current" class="space-y-2 text-sm"></div>
+                    </div>
 
-                <!-- Weather -->
-                <div class="card current-conditions rounded-lg p-4">
-                    <h3 class="text-lg font-heading mb-3 flex items-center">
-                        <i class="fas fa-cloud-sun mr-2 icon-weather"></i>
-                        <span>Weather</span>
-                    </h3>
-                    <div id="weather-conditions" class="space-y-2 text-sm"></div>
+                    <!-- Best Bands -->
+                    <div class="card current-conditions rounded-lg p-4">
+                        <h3 class="text-lg font-heading mb-3 flex items-center">
+                            <i class="fas fa-signal mr-2 icon-band"></i>
+                            <span>Best Bands</span>
+                        </h3>
+                        <div id="best-bands-current" class="space-y-2 text-sm"></div>
+                    </div>
+
+                    <!-- Weather -->
+                    <div class="card current-conditions rounded-lg p-4">
+                        <h3 class="text-lg font-heading mb-3 flex items-center">
+                            <i class="fas fa-cloud-sun mr-2 icon-weather"></i>
+                            <span>Weather</span>
+                        </h3>
+                        <div id="weather-conditions" class="space-y-2 text-sm"></div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Detailed Band Conditions -->
+            <div class="mb-8">
+                <h2 class="text-2xl font-heading mb-4 flex items-center">
+                    <i class="fas fa-signal mr-3 section-icon icon-band text-2xl"></i>
+                    <span class="text-white">Band-by-Band Conditions</span>
+                </h2>
+                <div class="card rounded-lg p-6">
+                    <div id="band-conditions-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+                </div>
             </div>
 
-        <!-- Future Predictions & Analysis Section -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-heading mb-4 flex items-center">
-                <i class="fas fa-chart-line mr-3 section-icon icon-propagation text-2xl"></i>
-                <span class="text-white">Propagation Analysis & Forecast</span>
-                </h2>
-            
-            <div class="space-y-6">
-                <!-- Executive Summary -->
+            <!-- Solar Cycle Analysis -->
+            <div class="mb-8">
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
-                        <i class="fas fa-clipboard-list mr-3 text-blue-400"></i>
-                        <span>Executive Summary</span>
-                    </h3>
-                    <div id="executive-summary" class="space-y-3">
-                        <div class="text-gray-300 text-sm">Loading summary...</div>
-                    </div>
-                        </div>
-
-                <!-- Solar Cycle Analysis -->
-                <div class="card future-predictions rounded-lg p-6">
-                    <h3 class="text-xl font-heading mb-4 flex items-center">
-                        <i class="fas fa-chart-area mr-3 text-purple-400"></i>
+                        <i class="fas fa-chart-area mr-3" style="color: var(--accent-primary);"></i>
                         <span>Solar Cycle Analysis</span>
                     </h3>
                     <div id="solar-cycle-info" class="space-y-3"></div>
                 </div>
-                
-                <!-- Operating Strategy -->
+            </div>
+
+            <!-- Conditions Trend Chart -->
+            <div class="mb-8">
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
-                        <i class="fas fa-lightbulb mr-3 text-yellow-400"></i>
-                        <span>Operating Strategy & Recommendations</span>
+                        <i class="fas fa-chart-line mr-3 text-green-400"></i>
+                        <span>24-Hour Conditions Trend</span>
                     </h3>
-                    <div id="recommendations" class="space-y-3"></div>
-                        </div>
-
-
-                            </div>
-                        </div>
-
-        <!-- Detailed Band Conditions -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-heading mb-4 flex items-center">
-                <i class="fas fa-signal mr-3 section-icon icon-band text-2xl"></i>
-                <span class="text-white">Band-by-Band Conditions</span>
-            </h2>
-            
-            <div class="card rounded-lg p-6">
-                <div id="band-conditions-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+                    <div id="chart-container" style="position: relative; height: 280px;">
+                        <canvas id="conditions-chart"></canvas>
+                        <div id="chart-loading" class="text-gray-500 text-sm text-center py-8">Loading chart data...</div>
+                    </div>
                 </div>
             </div>
 
-        <!-- Live Activity -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-heading mb-4 flex items-center">
+        </div><!-- /tab-conditions -->
+
+        <!-- ============ TAB 2: ACTIVITY ============ -->
+        <div id="tab-activity" class="tab-panel">
+
+            <!-- Contest Calendar -->
+            <div id="contest-section" class="mb-6 mt-6" style="display:none;">
+                <div class="card rounded-lg p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-trophy text-yellow-400"></i>
+                        <h3 class="text-lg font-heading text-white">Contest Calendar</h3>
+                        <span id="contest-live-badge" class="hidden text-xs font-bold text-red-400 bg-red-900/30 px-2 py-0.5 rounded-full border border-red-800">LIVE</span>
+                    </div>
+                    <div id="contest-list" class="text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Live Activity -->
+            <div class="mb-8 mt-6">
+                <h2 class="text-2xl font-heading mb-4 flex items-center">
                     <i class="fas fa-broadcast-tower mr-3 section-icon icon-spots text-2xl"></i>
-                <span class="text-white">Live Activity</span>
-                <span id="spots-loading" class="loading-spinner ml-3" style="display: none;"></span>
-                <span id="spots-status" class="ml-2 text-sm text-gray-400">Ready</span>
+                    <span class="text-white">Live Activity</span>
+                    <span id="spots-loading" class="loading-spinner ml-3" style="display: none;"></span>
+                    <span id="spots-status" class="ml-2 text-sm text-gray-400">Ready</span>
                 </h2>
-            
-            <div class="card rounded-lg p-6">
-                <div id="live-activity">
-                    <div id="activity-summary" class="mb-6">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div class="data-card">
-                                <div class="text-gray-400 font-body text-sm mb-2">Total Spots</div>
-                                <div class="text-xl font-heading text-white">-</div>
-                            </div>
-                            <div class="data-card">
-                                <div class="text-gray-400 font-body text-sm mb-2">Active Bands</div>
-                                <div class="text-xl font-heading text-white">-</div>
-                            </div>
-                            <div class="data-card">
-                                <div class="text-gray-400 font-body text-sm mb-2">Active Modes</div>
-                                <div class="text-xl font-heading text-white">-</div>
-                            </div>
-                            <div class="data-card">
-                                <div class="text-gray-400 font-body text-sm mb-2">Active DXCC</div>
-                                <div class="text-xl font-heading text-white">-</div>
+
+                <div class="card rounded-lg p-6">
+                    <div id="live-activity">
+                        <div id="activity-summary" class="mb-6">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="data-card">
+                                    <div class="text-gray-400 font-body text-sm mb-2">Total Spots</div>
+                                    <div class="text-xl font-heading text-white">-</div>
+                                </div>
+                                <div class="data-card">
+                                    <div class="text-gray-400 font-body text-sm mb-2">Active Bands</div>
+                                    <div class="text-xl font-heading text-white">-</div>
+                                </div>
+                                <div class="data-card">
+                                    <div class="text-gray-400 font-body text-sm mb-2">Active Modes</div>
+                                    <div class="text-xl font-heading text-white">-</div>
+                                </div>
+                                <div class="data-card">
+                                    <div class="text-gray-400 font-body text-sm mb-2">Active DXCC</div>
+                                    <div class="text-xl font-heading text-white">-</div>
+                                </div>
                             </div>
                         </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="table-professional min-w-full">
+                                <thead>
+                                    <tr class="text-left">
+                                        <th class="px-4 py-3 font-heading">Time</th>
+                                        <th class="px-4 py-3 font-heading">Callsign</th>
+                                        <th class="px-4 py-3 font-heading">Frequency</th>
+                                        <th class="px-4 py-3 font-heading">Mode</th>
+                                        <th class="px-4 py-3 font-heading">DXCC</th>
+                                        <th class="px-4 py-3 font-heading">Source</th>
+                                        <th class="px-4 py-3 font-heading">Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="spots-table-body">
+                                    <tr>
+                                        <td colspan="7" class="px-4 py-2 text-center text-gray-400">
+                                            Loading spots data...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    
+                </div>
+            </div>
+
+            <!-- POTA/SOTA Activations -->
+            <div id="activations-section" class="mb-8" style="display:none;">
+                <h2 class="text-2xl font-heading mb-4 flex items-center">
+                    <i class="fas fa-mountain-sun mr-3 section-icon text-green-400 text-2xl"></i>
+                    <span class="text-white">POTA/SOTA Activations</span>
+                </h2>
+
+                <div class="card rounded-lg p-6">
+                    <!-- Summary Cards -->
+                    <div id="activations-summary" class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="data-card text-center">
+                            <div class="text-gray-400 font-body text-sm mb-1">Total</div>
+                            <div class="text-xl font-heading text-white" id="act-total">0</div>
+                        </div>
+                        <div class="data-card text-center">
+                            <div class="text-gray-400 font-body text-sm mb-1">POTA</div>
+                            <div class="text-xl font-heading text-green-400" id="act-pota">0</div>
+                        </div>
+                        <div class="data-card text-center">
+                            <div class="text-gray-400 font-body text-sm mb-1">SOTA</div>
+                            <div class="text-xl font-heading text-yellow-400" id="act-sota">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Activations Table -->
                     <div class="overflow-x-auto">
                         <table class="table-professional min-w-full">
                             <thead>
                                 <tr class="text-left">
                                     <th class="px-4 py-3 font-heading">Time</th>
                                     <th class="px-4 py-3 font-heading">Callsign</th>
+                                    <th class="px-4 py-3 font-heading">Type</th>
+                                    <th class="px-4 py-3 font-heading">Reference</th>
+                                    <th class="px-4 py-3 font-heading">Name</th>
                                     <th class="px-4 py-3 font-heading">Frequency</th>
                                     <th class="px-4 py-3 font-heading">Mode</th>
-                                    <th class="px-4 py-3 font-heading">DXCC</th>
-                                    <th class="px-4 py-3 font-heading">Source</th>
-                                    <th class="px-4 py-3 font-heading">Comment</th>
                                 </tr>
                             </thead>
-                            <tbody id="spots-table-body">
+                            <tbody id="activations-table-body">
                                 <tr>
-                                    <td colspan="7" class="px-4 py-2 text-center text-gray-400">
-                                        Loading spots data...
-                                    </td>
+                                    <td colspan="7" class="px-4 py-2 text-center text-gray-400">Loading activations...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        </div>
-        
+
+        </div><!-- /tab-activity -->
+
+        <!-- ============ TAB 3: STRATEGY ============ -->
+        <div id="tab-strategy" class="tab-panel">
+
+            <!-- Executive Summary -->
+            <div class="mb-8 mt-6">
+                <div class="card future-predictions rounded-lg p-6">
+                    <h3 class="text-xl font-heading mb-4 flex items-center">
+                        <i class="fas fa-clipboard-list mr-3" style="color: var(--accent-primary);"></i>
+                        <span>Executive Summary</span>
+                    </h3>
+                    <div id="executive-summary" class="space-y-3">
+                        <div class="text-gray-300 text-sm">Loading summary...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Operating Strategy & Recommendations -->
+            <div class="mb-8">
+                <div class="card future-predictions rounded-lg p-6">
+                    <h3 class="text-xl font-heading mb-4 flex items-center">
+                        <i class="fas fa-lightbulb mr-3 text-yellow-400"></i>
+                        <span>Operating Strategy & Recommendations</span>
+                    </h3>
+                    <div id="recommendations" class="space-y-3"></div>
+                </div>
+            </div>
+
+        </div><!-- /tab-strategy -->
+
         <!-- Footer -->
         <footer class="mt-16 pt-8 border-t border-gray-800">
             <div class="container mx-auto px-4">
@@ -601,6 +879,20 @@
     <script>
         // Global Safari detection
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+        // Tab switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const panel = document.getElementById('tab-' + tabId);
+            if (panel) panel.classList.add('active');
+            const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+            if (btn) btn.classList.add('active');
+            try { localStorage.setItem('activeTab', tabId); } catch(e) {}
+            if (tabId === 'conditions' && conditionsChart) {
+                setTimeout(() => conditionsChart.resize(), 50);
+            }
+        }
 
         // Cache DOM elements
         const timestampEl = document.getElementById('timestamp');
@@ -803,27 +1095,64 @@
                     locationGrid.textContent = loc.grid_square || '';
                 }
             }
+
+            // Update data confidence indicator
+            const confidenceDiv = document.getElementById('data-confidence');
+            const badge = document.getElementById('data-source-badge');
+            if (confidenceDiv && badge) {
+                const params = data.propagation_summary?.propagation_parameters || {};
+                const mufSource = params.muf_source || '';
+                const weatherSource = data.weather?.source || '';
+
+                let level = 'live';
+                let label = 'Live Data';
+                let color = 'bg-green-600 text-green-100';
+
+                if (mufSource.toLowerCase().includes('ionosonde')) {
+                    level = 'live';
+                    label = 'Ionosonde + Live APIs';
+                    color = 'bg-green-600 text-green-100';
+                } else if (mufSource.toLowerCase().includes('formula') || weatherSource === 'OpenWeather') {
+                    level = 'calculated';
+                    label = 'Calculated + APIs';
+                    color = 'bg-blue-600 text-blue-100';
+                } else if (mufSource.toLowerCase().includes('fallback') || weatherSource === 'Simulated') {
+                    level = 'fallback';
+                    label = 'Fallback Data';
+                    color = 'bg-yellow-600 text-yellow-100';
+                }
+
+                badge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${color}`;
+                badge.innerHTML = `<i class="fas fa-circle text-xs" style="font-size:6px"></i> ${label}`;
+                confidenceDiv.classList.remove('hidden');
+            }
         }
 
         function updateSolarConditions(data) {
             if (!solarDiv) return;
-            
+
             const displayFields = ['sfi', 'a_index', 'k_index', 'aurora', 'sunspots', 'xray'];
-            
+
             safeSetHTML(solarDiv, displayFields
                 .filter(key => data.solar_conditions[key] !== undefined)
                 .map(key => {
-                    const label = key === 'sfi' ? 'SFI' : 
-                                 key === 'a_index' ? 'A-Index' : 
-                                 key === 'k_index' ? 'K-Index' : 
+                    const label = key === 'sfi' ? 'SFI' :
+                                 key === 'a_index' ? 'A-Index' :
+                                 key === 'k_index' ? 'K-Index' :
                                  key.replace('_', ' ').toUpperCase();
+                    let sparkline = '';
+                    if (key === 'sfi') sparkline = '<span id="sparkline-sfi"></span>';
+                    if (key === 'k_index') sparkline = '<span id="sparkline-kindex"></span>';
                     return `
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">${label}</span>
-                            <span class="font-semibold">${formatValue(key, data.solar_conditions[key])}</span>
+                            <span class="font-semibold">${formatValue(key, data.solar_conditions[key])}${sparkline}</span>
                         </div>
                     `;
                 }).join(''));
+
+            // Fetch and render sparklines after DOM is updated
+            fetchAndRenderSparklines();
         }
 
         function updatePropagationCurrent(data) {
@@ -2227,11 +2556,189 @@
             safeSetHTML(riskAssessmentDiv, finalHtml);
         }
 
+        // === Feature 2: Band Status Pills ===
+        function updateBandStatusPills(data) {
+            const container = document.getElementById('band-pills-container');
+            if (!container) return;
+
+            const bandConditions = data.propagation_summary?.band_conditions;
+            if (!bandConditions || Object.keys(bandConditions).length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const bandOrder = ['160m','80m','40m','30m','20m','17m','15m','12m','10m','6m'];
+            const qualityMap = (q) => {
+                if (!q) return 'closed';
+                const ql = q.toLowerCase();
+                if (ql === 'excellent' || ql === 'very good' || ql === 'good') return 'open';
+                if (ql === 'fair') return 'fair';
+                return 'closed';
+            };
+
+            const isDay = (data.propagation_summary?.day_night || 'Day') === 'Day';
+            const ratingKey = isDay ? 'day_rating' : 'night_rating';
+
+            const sorted = Object.entries(bandConditions).sort(([a], [b]) => {
+                const ia = bandOrder.indexOf(a.toLowerCase());
+                const ib = bandOrder.indexOf(b.toLowerCase());
+                return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+            });
+
+            container.innerHTML = sorted.map(([band, cond]) => {
+                const rating = cond[ratingKey] || cond.day_rating || 'Poor';
+                const status = qualityMap(rating);
+                const label = status.toUpperCase();
+                return `<span class="band-pill band-pill-${status}">
+                    <span class="pill-dot pill-dot-${status}"></span>
+                    <span>${band}</span>
+                    <span style="opacity:0.7">${label}</span>
+                </span>`;
+            }).join('');
+        }
+
+        // === Feature 4: Sparklines ===
+        let sparklineCache = null;
+        let sparklineCacheTime = 0;
+
+        function renderSparkline(containerId, values, color, width, height) {
+            width = width || 80;
+            height = height || 20;
+            const el = document.getElementById(containerId);
+            if (!el || !values || values.length < 2) {
+                if (el) el.innerHTML = '';
+                return;
+            }
+
+            const filtered = values.filter(v => v != null && !isNaN(v));
+            if (filtered.length < 2) { el.innerHTML = ''; return; }
+
+            const min = Math.min(...filtered);
+            const max = Math.max(...filtered);
+            const range = max - min || 1;
+
+            const points = filtered.map((v, i) => {
+                const x = (i / (filtered.length - 1)) * width;
+                const y = height - ((v - min) / range) * (height - 2) - 1;
+                return `${x.toFixed(1)},${y.toFixed(1)}`;
+            }).join(' ');
+
+            el.innerHTML = `<svg width="${width}" height="${height}" class="sparkline-container">
+                <polyline fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${points}"/>
+            </svg>`;
+        }
+
+        async function fetchAndRenderSparklines() {
+            const now = Date.now();
+            if (sparklineCache && (now - sparklineCacheTime) < 300000) {
+                applySparklines(sparklineCache);
+                return;
+            }
+            try {
+                const resp = await fetch('/api/conditions/history?hours=6');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const history = data.history || [];
+                if (history.length < 2) return;
+                sparklineCache = history;
+                sparklineCacheTime = now;
+                applySparklines(history);
+            } catch (e) {
+                console.debug('Sparkline fetch failed:', e);
+            }
+        }
+
+        function applySparklines(history) {
+            const sfiValues = history.map(h => parseFloat(h.sfi) || null);
+            const kValues = history.map(h => parseFloat(h.k_index) || null);
+            renderSparkline('sparkline-sfi', sfiValues, '#F59E0B', 80, 20);
+            renderSparkline('sparkline-kindex', kValues, '#EF4444', 80, 20);
+        }
+
+        // === Feature 1: POTA/SOTA Activations ===
+        function updateActivations(data) {
+            const section = document.getElementById('activations-section');
+            const tbody = document.getElementById('activations-table-body');
+            if (!section || !tbody) return;
+
+            const act = data.activations;
+            if (!act || !act.activations || act.activations.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            const s = act.summary || {};
+            const totalEl = document.getElementById('act-total');
+            const potaEl = document.getElementById('act-pota');
+            const sotaEl = document.getElementById('act-sota');
+            if (totalEl) totalEl.textContent = s.total || act.total_count || 0;
+            if (potaEl) potaEl.textContent = s.pota || act.pota_count || 0;
+            if (sotaEl) sotaEl.textContent = s.sota || act.sota_count || 0;
+
+            const rows = act.activations.slice(0, 25).map(a => {
+                const typeCls = a.type === 'POTA' ? 'type-badge-pota' : 'type-badge-sota';
+                const timeStr = a.time ? new Date(a.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+                return `<tr class="hover:bg-gray-800">
+                    <td class="px-4 py-2 text-sm">${timeStr || 'N/A'}</td>
+                    <td class="px-4 py-2 font-mono">${a.callsign || 'N/A'}</td>
+                    <td class="px-4 py-2"><span class="type-badge ${typeCls}">${a.type}</span></td>
+                    <td class="px-4 py-2 text-sm">${a.reference || ''}</td>
+                    <td class="px-4 py-2 text-sm text-gray-300">${(a.name || '').substring(0, 40)}</td>
+                    <td class="px-4 py-2 text-sm">${a.frequency || ''}</td>
+                    <td class="px-4 py-2 text-sm">${a.mode || ''}</td>
+                </tr>`;
+            }).join('');
+
+            tbody.innerHTML = rows || '<tr><td colspan="7" class="px-4 py-2 text-center text-gray-400">No activations</td></tr>';
+        }
+
+        // === Feature 3: Contest Calendar ===
+        function updateContests(data) {
+            const section = document.getElementById('contest-section');
+            const listEl = document.getElementById('contest-list');
+            const liveBadge = document.getElementById('contest-live-badge');
+            if (!section || !listEl) return;
+
+            const ct = data.contests;
+            if (!ct || !ct.contests || ct.contests.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            const hasActive = ct.active_count > 0;
+            if (liveBadge) {
+                liveBadge.classList.toggle('hidden', !hasActive);
+            }
+
+            const modeClass = (m) => {
+                const ml = (m || '').toLowerCase();
+                if (ml === 'cw') return 'mode-badge-cw';
+                if (ml === 'ssb') return 'mode-badge-ssb';
+                if (ml === 'rtty') return 'mode-badge-rtty';
+                if (ml === 'digital') return 'mode-badge-digital';
+                return 'mode-badge-mixed';
+            };
+
+            listEl.innerHTML = ct.contests.slice(0, 5).map(c => {
+                const isActive = c.status === 'active';
+                return `<div class="contest-item">
+                    ${isActive ? '<span class="contest-live-dot"></span>' : '<span style="width:8px"></span>'}
+                    <div class="flex-1 min-w-0">
+                        <div class="text-white text-sm font-semibold truncate">${c.name || ''}</div>
+                        <div class="text-gray-400 text-xs">${c.time_info || ''}</div>
+                    </div>
+                    <span class="mode-badge ${modeClass(c.mode)}">${c.mode || 'Mixed'}</span>
+                </div>`;
+            }).join('');
+        }
+
         // Main update function
         function updateAllUI(data) {
             console.log('Updating UI with data:', data);
             console.log('Propagation summary structure:', data.propagation_summary);
-            
+
             updateTimestampAndLocation(data);
             updateSolarConditions(data);
             updatePropagationCurrent(data);
@@ -2243,6 +2750,107 @@
             updateRecommendations(data);
 
             updateLiveActivity(data);
+
+            // Render alerts if present
+            if (data.alerts) {
+                renderAlerts(data.alerts);
+            }
+
+            // New features
+            updateBandStatusPills(data);
+            updateActivations(data);
+            updateContests(data);
+        }
+
+        // Error display functions
+        function showError(message) {
+            const banner = document.getElementById('error-banner');
+            const msgEl = document.getElementById('error-message');
+            if (banner && msgEl) {
+                msgEl.textContent = message;
+                banner.classList.remove('hidden');
+            }
+        }
+
+        function hideError() {
+            const banner = document.getElementById('error-banner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        // Alerts rendering
+        function renderAlerts(alerts) {
+            const container = document.getElementById('alerts-container');
+            if (!container) return;
+
+            if (!alerts || alerts.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const severityMap = {
+                'critical': { css: 'alert-danger', icon: 'fa-exclamation-circle', color: 'text-red-400' },
+                'warning': { css: 'alert-warning', icon: 'fa-exclamation-triangle', color: 'text-yellow-400' },
+                'info': { css: 'alert-info', icon: 'fa-info-circle', color: 'text-blue-400' },
+                'success': { css: 'alert-success', icon: 'fa-check-circle', color: 'text-green-400' }
+            };
+
+            const html = alerts.map(alert => {
+                const style = severityMap[alert.severity] || severityMap['info'];
+                return `
+                    <div class="alert-banner ${style.css}">
+                        <i class="fas ${style.icon} ${style.color} mt-0.5"></i>
+                        <div class="flex-1">
+                            <div class="font-heading text-white text-sm">${alert.title || ''}</div>
+                            <div class="text-gray-300 text-xs mt-1">${alert.message || ''}</div>
+                            ${alert.recommendation ? `<div class="text-gray-400 text-xs mt-1"><i class="fas fa-lightbulb mr-1"></i>${alert.recommendation}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        // Fetch fresh conditions from API
+        let isFetching = false;
+
+        async function fetchConditions() {
+            if (isFetching) return;
+            isFetching = true;
+
+            const refreshIcon = document.getElementById('refresh-icon');
+            if (refreshIcon) refreshIcon.classList.add('spin');
+
+            try {
+                const response = await fetch('/api/conditions');
+
+                // Detect stale cache from service worker
+                detectStaleCache(response);
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                updateAllUI(data);
+                if (!response.headers.get('X-Cache-Stale')) {
+                    hideError();
+                }
+                console.log('Conditions refreshed at', new Date().toLocaleTimeString());
+
+                // Also refresh the chart
+                renderConditionsChart();
+            } catch (err) {
+                console.error('Failed to fetch conditions:', err);
+                showError('Failed to refresh data. Will retry automatically.');
+            } finally {
+                isFetching = false;
+                if (refreshIcon) refreshIcon.classList.remove('spin');
+            }
+        }
+
+        function manualRefresh() {
+            fetchConditions();
         }
 
         // Initialize UI when page loads
@@ -2259,6 +2867,17 @@
             } catch (error) {
                 console.error('Error parsing initial data:', error);
             }
+
+            // Restore saved tab
+            try {
+                const savedTab = localStorage.getItem('activeTab');
+                if (savedTab && document.getElementById('tab-' + savedTab)) {
+                    switchTab(savedTab);
+                }
+            } catch(e) {}
+
+            // Load conditions trend chart
+            renderConditionsChart();
         });
 
         // Live spots functionality
@@ -2342,14 +2961,111 @@
             // Implementation for changelog display
         }
 
+        // Conditions trend chart
+        let conditionsChart = null;
+
+        async function renderConditionsChart() {
+            try {
+                const response = await fetch('/api/conditions/history?hours=24');
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const history = data.history || [];
+
+                const chartLoading = document.getElementById('chart-loading');
+                const canvas = document.getElementById('conditions-chart');
+
+                if (history.length < 2) {
+                    if (chartLoading) chartLoading.textContent = 'Not enough data yet. Chart will appear after a few snapshots.';
+                    return;
+                }
+
+                if (chartLoading) chartLoading.style.display = 'none';
+                if (canvas) canvas.style.display = 'block';
+
+                const labels = history.map(h => {
+                    const d = new Date(h.timestamp);
+                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                });
+                const mufData = history.map(h => h.muf);
+                const kData = history.map(h => h.k_index);
+
+                if (conditionsChart) conditionsChart.destroy();
+
+                const ctx = canvas.getContext('2d');
+                conditionsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'MUF (MHz)',
+                                data: mufData,
+                                borderColor: '#06B6D4',
+                                backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'K-Index',
+                                data: kData,
+                                borderColor: '#EF4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                fill: false,
+                                tension: 0.3,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { labels: { color: '#9CA3AF' } }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#6B7280', maxTicksLimit: 12 },
+                                grid: { color: 'rgba(255,255,255,0.04)' }
+                            },
+                            y: {
+                                type: 'linear', position: 'left',
+                                title: { display: true, text: 'MUF (MHz)', color: '#06B6D4' },
+                                ticks: { color: '#06B6D4' },
+                                grid: { color: 'rgba(255,255,255,0.04)' }
+                            },
+                            y1: {
+                                type: 'linear', position: 'right',
+                                title: { display: true, text: 'K-Index', color: '#EF4444' },
+                                ticks: { color: '#EF4444', stepSize: 1 },
+                                grid: { drawOnChartArea: false },
+                                min: 0, max: 9
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to render conditions chart:', err);
+            }
+        }
+
+        // Stale cache detection
+        function detectStaleCache(response) {
+            if (response && response.headers && response.headers.get('X-Cache-Stale') === 'true') {
+                showError('Offline — showing cached data');
+            }
+        }
+
         // Auto-refresh functionality
         let refreshInterval;
         
         function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => {
-                // Refresh data every 5 minutes
                 console.log('Auto-refreshing data...');
-                // Implement data refresh logic here
+                fetchConditions();
             }, 5 * 60 * 1000);
         }
 

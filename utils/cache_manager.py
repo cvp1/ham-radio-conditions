@@ -349,6 +349,18 @@ def get_cache_manager() -> CacheManager:
             'max_age': 600,  # 10 minutes
             'max_memory_bytes': 1 * 1024 * 1024  # 1MB
         })
+
+        _cache_manager.register_cache('activations', {
+            'max_size': 10,
+            'max_age': 180,  # 3 minutes
+            'max_memory_bytes': 2 * 1024 * 1024  # 2MB
+        })
+
+        _cache_manager.register_cache('contests', {
+            'max_size': 5,
+            'max_age': 1800,  # 30 minutes
+            'max_memory_bytes': 1 * 1024 * 1024  # 1MB
+        })
     
     return _cache_manager
 

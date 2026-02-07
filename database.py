@@ -52,11 +52,26 @@ class Database:
                     )
                 ''')
                 
+                # Create conditions_history table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS conditions_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        muf REAL,
+                        sfi REAL,
+                        k_index REAL,
+                        a_index REAL,
+                        quality TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
                 # Create indexes for better performance
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_timestamp ON spots(timestamp)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_callsign ON spots(callsign)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_frequency ON spots(frequency)')
-                
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_conditions_history_timestamp ON conditions_history(timestamp)')
+
                 conn.commit()
                 logger.info(f"Database initialized successfully at {self.db_path}")
                 
@@ -175,6 +190,40 @@ class Database:
                 'source': 'Database Error'
             }
     
+    def store_conditions_snapshot(self, muf: float, sfi: float, k_index: float, a_index: float, quality: str) -> bool:
+        """Store a conditions history snapshot."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO conditions_history (timestamp, muf, sfi, k_index, a_index, quality)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), muf, sfi, k_index, a_index, quality))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error storing conditions snapshot: {e}")
+            return False
+
+    def get_conditions_history(self, hours: int = 24, limit: int = 144) -> List[Dict]:
+        """Get conditions history for the last N hours."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                threshold = datetime.now() - timedelta(hours=hours)
+                cursor.execute('''
+                    SELECT timestamp, muf, sfi, k_index, a_index, quality
+                    FROM conditions_history
+                    WHERE datetime(timestamp) >= datetime(?)
+                    ORDER BY timestamp ASC
+                    LIMIT ?
+                ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'), limit))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting conditions history: {e}")
+            return []
+
     def store_user_preference(self, key: str, value: str) -> bool:
         """Store a user preference"""
         try:
@@ -219,13 +268,20 @@ class Database:
                 
                 # Clean up old spots
                 cursor.execute('''
-                    DELETE FROM spots 
+                    DELETE FROM spots
                     WHERE datetime(timestamp) < datetime(?)
                 ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
                 spots_deleted = cursor.rowcount
-                
+
+                # Clean up old conditions history (keep 7 days)
+                cursor.execute('''
+                    DELETE FROM conditions_history
+                    WHERE datetime(timestamp) < datetime(?)
+                ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
+                history_deleted = cursor.rowcount
+
                 conn.commit()
-                logger.info(f"Cleaned up {spots_deleted} old spots")
+                logger.info(f"Cleaned up {spots_deleted} old spots, {history_deleted} old conditions snapshots")
                 
         except Exception as e:
             logger.error(f"Error cleaning up old data: {e}")

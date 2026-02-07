@@ -8,6 +8,7 @@ Handles fetching and processing spot data from various sources:
 """
 
 import requests
+import xml.etree.ElementTree as ET
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -67,12 +68,12 @@ class SpotsDataProvider:
                 }
                 
                 results = {}
-                timeout = 5  # 5 second timeout
-                
+                timeout = 15  # 15 second timeout for all sources
+
                 for future in as_completed(futures, timeout=timeout):
                     source = futures[future]
                     try:
-                        result = future.result(timeout=2)
+                        result = future.result(timeout=5)
                         if result:
                             results[source] = result
                     except Exception as e:
@@ -87,38 +88,130 @@ class SpotsDataProvider:
         return None
     
     def _get_pskreporter_spots(self) -> Optional[Dict]:
-        """Get PSKReporter spots via their API."""
+        """Get PSKReporter spots via their public query API."""
         try:
-            # PSKReporter requires API key for full access
-            # Use public query endpoint for basic data
             params = {
                 'flowStartSeconds': 900,  # Last 15 minutes
                 'rronly': 1,
                 'noactive': 1,
+                'grid': self.grid_square[:4],
+                'appcontact': 'ham-radio-conditions@github.com',
             }
-            # Note: Full implementation requires API key
-            # Return structure for when data is available
+            response = requests.get(
+                self.pskreporter_url,
+                params=params,
+                timeout=10,
+                headers={'User-Agent': 'ham-radio-conditions/1.0'}
+            )
+            response.raise_for_status()
+
+            root = ET.fromstring(response.content)
+            spots = []
+            # Find all receptionReport elements (handle potential XML namespaces)
+            reports = root.findall('.//{*}receptionReport')
+            if not reports:
+                reports = root.findall('.//receptionReport')
+
+            for report in reports[:50]:
+                freq_hz = report.get('frequency', '0')
+                try:
+                    freq_mhz = float(freq_hz) / 1e6
+                except (ValueError, TypeError):
+                    freq_mhz = 0.0
+
+                snr_val = report.get('sNR', '')
+                try:
+                    snr = int(snr_val)
+                except (ValueError, TypeError):
+                    snr = None
+
+                # Extract timestamp from flowStartSeconds or senderDXCC
+                spot_time = report.get('flowStartSeconds', '')
+                if spot_time:
+                    try:
+                        spot_time = datetime.utcfromtimestamp(int(spot_time)).strftime('%H:%M')
+                    except (ValueError, TypeError, OSError):
+                        spot_time = ''
+
+                spot = {
+                    'callsign': report.get('senderCallsign', ''),
+                    'frequency': freq_mhz,
+                    'mode': report.get('mode', ''),
+                    'snr': snr,
+                    'spotter': report.get('receiverCallsign', ''),
+                    'time': spot_time,
+                    'dxcc': report.get('senderDXCCCode', report.get('senderDXCC', '')),
+                    'source': 'PSKReporter',
+                    'comment': f"SNR: {snr}" if snr is not None else '',
+                }
+                spots.append(spot)
+
             return {
                 'source': 'pskreporter',
-                'spots': [],
-                'count': 0,
-                'status': 'api_key_required'
+                'spots': spots,
+                'count': len(spots),
+                'status': 'ok'
             }
         except Exception as e:
             logger.debug(f"Error fetching PSKReporter data: {e}")
             return None
 
     def _get_rbn_spots(self) -> Optional[Dict]:
-        """Get RBN (Reverse Beacon Network) spots."""
+        """Get RBN (Reverse Beacon Network) spots via HamQTH RBN API."""
         try:
-            # RBN provides telnet stream, not REST API
-            # For web apps, use their aggregated data or third-party APIs
-            # DXWatch or similar can provide RBN data
+            response = requests.get(
+                'https://www.hamqth.com/rbn_data.php',
+                params={
+                    'data': 1,
+                    'age': 900,  # Last 15 minutes
+                    'order': 3,  # Sort by age
+                },
+                timeout=8,
+                headers={
+                    'User-Agent': 'ham-radio-conditions/1.0',
+                    'Accept': 'application/json',
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            spots = []
+            # HamQTH returns a dict with 'rbn' key containing spot list
+            entries = data if isinstance(data, list) else data.get('rbn', data.get('spots', []))
+            if isinstance(entries, dict):
+                entries = list(entries.values()) if entries else []
+
+            for entry in entries[:50]:
+                snr_val = entry.get('snr', entry.get('db', ''))
+                try:
+                    snr = int(snr_val)
+                except (ValueError, TypeError):
+                    snr = None
+
+                freq_val = entry.get('freq', entry.get('frequency', 0))
+                try:
+                    freq_mhz = float(freq_val) / 1000.0 if float(freq_val) > 1000 else float(freq_val)
+                except (ValueError, TypeError):
+                    freq_mhz = 0.0
+
+                spot = {
+                    'callsign': entry.get('dx', entry.get('callsign', '')),
+                    'frequency': freq_mhz,
+                    'mode': entry.get('mode', entry.get('md', '')),
+                    'snr': snr,
+                    'spotter': entry.get('spotter', entry.get('de', '')),
+                    'time': entry.get('time', entry.get('ut', '')),
+                    'dxcc': entry.get('dxcc', ''),
+                    'source': 'RBN',
+                    'comment': f"{snr} dB" if snr is not None else '',
+                }
+                spots.append(spot)
+
             return {
                 'source': 'rbn',
-                'spots': [],
-                'count': 0,
-                'status': 'telnet_stream_not_implemented'
+                'spots': spots,
+                'count': len(spots),
+                'status': 'ok'
             }
         except Exception as e:
             logger.debug(f"Error fetching RBN data: {e}")
@@ -185,6 +278,13 @@ class SpotsDataProvider:
         band_activity = self._analyze_band_activity(all_spots)
         mode_activity = self._analyze_mode_activity(all_spots)
 
+        # Count unique DXCC entities
+        dxcc_set = set()
+        for spot in all_spots:
+            dxcc = spot.get('dxcc', '')
+            if dxcc:
+                dxcc_set.add(str(dxcc))
+
         combined = {
             'timestamp': datetime.now().isoformat(),
             'sources': source_status,
@@ -193,7 +293,13 @@ class SpotsDataProvider:
             'band_activity': band_activity,
             'mode_activity': mode_activity,
             'active_bands': len(band_activity),
-            'active_modes': len(mode_activity)
+            'active_modes': len(mode_activity),
+            'summary': {
+                'total_spots': total_spots,
+                'active_bands': len(band_activity),
+                'active_modes': len(mode_activity),
+                'active_dxcc': len(dxcc_set)
+            }
         }
         return combined
 

@@ -7,15 +7,17 @@ that uses extracted data source and calculation modules.
 
 import os
 import time
+import math
 from datetime import datetime
 from typing import Dict, Optional, List
 import logging
 from dotenv import load_dotenv
 
 # Import our refactored modules
-from data_sources import SolarDataProvider, WeatherDataProvider, SpotsDataProvider, GeomagneticDataProvider
+from data_sources import SolarDataProvider, WeatherDataProvider, SpotsDataProvider, GeomagneticDataProvider, ActivationsDataProvider, ContestDataProvider
 from calculations import MUFCalculator, PropagationCalculator, BandOptimizer, TimeAnalyzer
 from utils.cache_manager import cache_get, cache_set, cache_clear
+from utils.alerts import AlertsManager
 from utils.geocoding import zip_to_coordinates, latlon_to_grid
 from dxcc_data import get_dxcc_by_grid, grid_to_latlon as dxcc_grid_to_latlon
 
@@ -133,6 +135,8 @@ class HamRadioConditions:
         self.weather_provider = WeatherDataProvider(self.lat, self.lon)
         self.spots_provider = SpotsDataProvider(self.lat, self.lon, self.grid_square)
         self.geomagnetic_provider = GeomagneticDataProvider(self.lat, self.lon)
+        self.activations_provider = ActivationsDataProvider()
+        self.contest_provider = ContestDataProvider()
     
     def _initialize_calculators(self):
         """Initialize calculation utilities."""
@@ -140,6 +144,7 @@ class HamRadioConditions:
         self.propagation_calculator = PropagationCalculator()
         self.band_optimizer = BandOptimizer()
         self.time_analyzer = TimeAnalyzer()
+        self.alerts_manager = AlertsManager()
     
     def _initialize_state(self):
         """Initialize application state."""
@@ -176,9 +181,12 @@ class HamRadioConditions:
                 'weather_conditions': self.get_weather_conditions(),
                 'band_conditions': self.get_band_conditions(),
                 'propagation_summary': self.get_propagation_summary(),
-                'live_activity': self.get_live_activity()
+                'live_activity': self.get_live_activity(),
+                'activations': self.get_activations(),
+                'contests': self.get_contests(),
+                'alerts': self.get_alerts()
             }
-            
+
             # Cache the report
             cache_set('conditions', 'current', report, max_age=600)  # 10 minutes
             logger.info("Generated and cached new conditions report")
@@ -202,7 +210,7 @@ class HamRadioConditions:
         try:
             solar_data = self.get_solar_conditions()
             weather_data = self.get_weather_conditions()
-            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone)
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
             location_data = {'lat': self.lat, 'lon': self.lon}
 
             # Get MUF for band optimization
@@ -238,7 +246,7 @@ class HamRadioConditions:
             geomagnetic_data = self.geomagnetic_provider.get_geomagnetic_coordinates()
 
             # Get time data for day/night status
-            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone)
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
 
             # Format MUF as string for frontend compatibility
             muf_value = muf_data.get('muf', 15.0)
@@ -253,10 +261,10 @@ class HamRadioConditions:
                 'propagation_parameters': {
                     'muf': f"{muf_value:.1f}",
                     'muf_source': muf_data.get('method', 'Traditional'),
-                    'muf_confidence': f"{muf_confidence:.0%}" if muf_confidence >= 0.7 else 'Low (Estimated)',
+                    'muf_confidence': f"{muf_confidence:.0%}" if muf_confidence >= 0.7 else f"{muf_confidence:.0%} ({muf_data.get('method', 'Estimated')})",
                     'quality': propagation_data.get('quality', 'Fair'),
                     'best_bands': propagation_data.get('best_bands', ['20m', '40m']),
-                    'skip_distances': {}
+                    'skip_distances': self._calculate_skip_distances(muf_value)
                 },
                 'solar_cycle': solar_cycle_info,
                 'geomagnetic_data': geomagnetic_data,
@@ -270,12 +278,78 @@ class HamRadioConditions:
     def get_live_activity(self) -> Dict:
         """Get live activity from spots provider."""
         return self.spots_provider.get_live_activity()
-    
+
+    def get_activations(self) -> Dict:
+        """Get POTA/SOTA activations."""
+        try:
+            return self.activations_provider.get_combined_activations()
+        except Exception as e:
+            logger.error(f"Error getting activations: {e}")
+            return {'activations': [], 'total_count': 0, 'pota_count': 0, 'sota_count': 0, 'summary': {'total': 0, 'pota': 0, 'sota': 0}}
+
+    def get_contests(self) -> Dict:
+        """Get contest calendar data."""
+        try:
+            return self.contest_provider.get_contests()
+        except Exception as e:
+            logger.error(f"Error getting contests: {e}")
+            return {'contests': [], 'active_count': 0, 'upcoming_count': 0}
+
+    def get_alerts(self) -> list:
+        """Get condition-based alerts."""
+        try:
+            solar_data = self.get_solar_conditions()
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
+            weather_data = self.get_weather_conditions()
+            location_data = {'lat': self.lat, 'lon': self.lon}
+            muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
+            muf = muf_data.get('muf', 15.0)
+            return self.alerts_manager.evaluate_conditions(solar_data, time_data, muf, weather_data)
+        except Exception as e:
+            logger.error(f"Error getting alerts: {e}")
+            return []
+
     def _calculate_overall_confidence(self, muf_data: Dict, propagation_data: Dict) -> float:
         """Calculate overall confidence in predictions."""
         muf_conf = muf_data.get('confidence', 0.5)
         prop_conf = propagation_data.get('confidence', 0.5)
         return (muf_conf + prop_conf) / 2
+
+    def _calculate_skip_distances(self, muf: float) -> Dict:
+        """Calculate skip distances per band based on MUF and F2 layer geometry."""
+        EARTH_RADIUS = 6371  # km
+        F2_HEIGHT = 300  # km, typical F2 layer height
+
+        band_frequencies = {
+            '160m': 1.8, '80m': 3.5, '40m': 7.0, '30m': 10.1,
+            '20m': 14.0, '17m': 18.1, '15m': 21.0, '12m': 24.9,
+            '10m': 28.0, '6m': 50.0
+        }
+
+        skip_distances = {}
+        for band, freq in band_frequencies.items():
+            if freq > muf:
+                skip_distances[band] = 'No propagation'
+                continue
+
+            # Calculate skip distance using F2 layer reflection geometry
+            # Critical angle: sin(ic) = freq / muf
+            ratio = freq / muf
+            if ratio >= 1.0:
+                skip_distances[band] = 'No propagation'
+                continue
+
+            critical_angle = math.asin(ratio)
+
+            # Skip distance = 2 * Earth_radius * arctan(cos(ic) * h / (R + h * sin(ic)))
+            # Simplified: skip ≈ 2 * sqrt(2 * R * h) * cos(ic) for single hop
+            skip_km = 2 * math.sqrt(2 * EARTH_RADIUS * F2_HEIGHT) * math.cos(critical_angle)
+            max_single_hop = 2 * EARTH_RADIUS * math.acos(EARTH_RADIUS / (EARTH_RADIUS + F2_HEIGHT))
+
+            skip_km = min(skip_km, max_single_hop)
+            skip_distances[band] = f"{int(skip_km)} km"
+
+        return skip_distances
 
     def _get_solar_cycle_info(self, solar_data: Dict) -> Dict:
         """Get solar cycle information derived from SFI."""
@@ -449,6 +523,7 @@ class HamRadioConditions:
     def safe_json_serialize(obj):
         """Safely serialize an object to JSON."""
         import math
+
         if isinstance(obj, float):
             if math.isnan(obj) or math.isinf(obj):
                 return "N/A"

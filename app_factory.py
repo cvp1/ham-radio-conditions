@@ -157,12 +157,41 @@ def register_routes(app):
 def configure_background_tasks(app, services):
     """Configure background tasks."""
     task_manager = services['task_manager']
-    
+
     # Configure periodic tasks
     task_manager.add_task(
         'update_conditions',
         lambda: services['ham_conditions'].generate_report(),
         interval_seconds=300  # 5 minutes
     )
-    
+
+    # Store conditions snapshot every 10 minutes for history chart
+    def store_conditions_snapshot():
+        try:
+            from database import get_database
+            from utils.cache_manager import cache_get
+            conditions = cache_get('conditions', 'current')
+            if not conditions:
+                return
+            db = get_database()
+            solar = conditions.get('solar_conditions', {})
+            prop = conditions.get('propagation_summary', {})
+            muf = prop.get('muf', 0)
+            sfi_raw = solar.get('sfi', '100')
+            sfi = float(str(sfi_raw).replace(' SFI', '').strip()) if sfi_raw else 100.0
+            k_raw = solar.get('k_index', '2')
+            k_index = float(str(k_raw).strip()) if k_raw else 2.0
+            a_raw = solar.get('a_index', '5')
+            a_index = float(str(a_raw).strip()) if a_raw else 5.0
+            quality = prop.get('overall_quality', 'Unknown')
+            db.store_conditions_snapshot(muf, sfi, k_index, a_index, quality)
+        except Exception as e:
+            logger.error(f"Error storing conditions snapshot: {e}")
+
+    task_manager.add_task(
+        'store_conditions_history',
+        store_conditions_snapshot,
+        interval_seconds=600  # 10 minutes
+    )
+
     logger.info("Background tasks configured") 

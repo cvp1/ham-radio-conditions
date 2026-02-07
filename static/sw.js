@@ -1,6 +1,6 @@
 // Service Worker with improved cache management and update handling
 const APP_VERSION = '3.0.1';
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE = `ham-radio-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `ham-radio-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `ham-radio-api-${CACHE_VERSION}`;
@@ -29,7 +29,9 @@ const API_ENDPOINTS = {
   '/api/spots/status': { strategy: 'network-first', maxAge: 1 * 60 * 1000 }, // 1 minute
   '/api/conditions': { strategy: 'network-first', maxAge: 5 * 60 * 1000 }, // 5 minutes
   '/api/update-location': { strategy: 'network-only', maxAge: 0 }, // No caching for POST requests
-  '/api/cache/clear': { strategy: 'network-only', maxAge: 0 } // No caching for cache clear
+  '/api/cache/clear': { strategy: 'network-only', maxAge: 0 }, // No caching for cache clear
+  '/api/activations': { strategy: 'network-first', maxAge: 3 * 60 * 1000 }, // 3 minutes
+  '/api/contests': { strategy: 'cache-first', maxAge: 30 * 60 * 1000 } // 30 minutes
 };
 
 // Safari-specific detection
@@ -195,12 +197,18 @@ async function handleNetworkFirst(request, maxAge, cacheName) {
     console.log('Network failed, trying cache for:', request.url);
   }
   
-  // Fall back to cache
+  // Fall back to valid (non-expired) cache
   const cachedResponse = await getValidCachedResponse(request, maxAge, cacheName);
   if (cachedResponse) {
     return cachedResponse;
   }
-  
+
+  // Try returning ANY cached response, even expired (stale)
+  const staleResponse = await getStaleCachedResponse(request, cacheName);
+  if (staleResponse) {
+    return staleResponse;
+  }
+
   // Return offline response
   return new Response(
     JSON.stringify({
@@ -369,6 +377,29 @@ async function getValidCachedResponse(request, maxAge, cacheName) {
     console.error('Error getting cached response:', error);
   }
   
+  return null;
+}
+
+// Get stale (expired) cached response as last resort
+async function getStaleCachedResponse(request, cacheName) {
+  try {
+    const cache = await caches.open(cacheName);
+    const response = await cache.match(request);
+
+    if (response) {
+      // Return the stale response with a header so the frontend can detect it
+      const headers = new Headers(response.headers);
+      headers.set('X-Cache-Stale', 'true');
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headers
+      });
+    }
+  } catch (error) {
+    console.error('Error getting stale cached response:', error);
+  }
   return null;
 }
 

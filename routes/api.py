@@ -99,6 +99,70 @@ def get_weather():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@api_bp.route('/alerts', methods=['GET'])
+def get_alerts():
+    """Get current condition-based alerts."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+
+        alerts = ham_conditions.get_alerts()
+        return jsonify({'alerts': alerts, 'count': len(alerts)})
+
+    except Exception as e:
+        logger.error(f"Error getting alerts: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/activations', methods=['GET'])
+def get_activations():
+    """Get POTA/SOTA activator data."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+
+        cached = cache_get('activations', 'combined')
+        if cached:
+            return jsonify(cached)
+
+        data = ham_conditions.get_activations()
+        if data:
+            cache_set('activations', 'combined', data, max_age=180)
+            return jsonify(data)
+        else:
+            return jsonify({'error': 'Failed to get activations data'}), 500
+
+    except Exception as e:
+        logger.error(f"Error getting activations: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/contests', methods=['GET'])
+def get_contests():
+    """Get contest calendar data."""
+    try:
+        ham_conditions = current_app.config.get('HAM_CONDITIONS')
+        if not ham_conditions:
+            return jsonify({'error': 'Ham conditions service not available'}), 503
+
+        cached = cache_get('contests', 'current')
+        if cached:
+            return jsonify(cached)
+
+        data = ham_conditions.get_contests()
+        if data:
+            cache_set('contests', 'current', data, max_age=1800)
+            return jsonify(data)
+        else:
+            return jsonify({'error': 'Failed to get contest data'}), 500
+
+    except Exception as e:
+        logger.error(f"Error getting contests: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @api_bp.route('/version', methods=['GET'])
 def get_version():
     """Get current version information."""
@@ -250,6 +314,25 @@ def get_update_status():
         
     except Exception as e:
         logger.error(f"Error getting update status: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@api_bp.route('/conditions/history', methods=['GET'])
+def get_conditions_history():
+    """Get conditions history for charting."""
+    try:
+        from database import get_database
+        db = get_database()
+        hours = request.args.get('hours', '24', type=str)
+        try:
+            hours = int(hours)
+        except ValueError:
+            hours = 24
+        hours = max(1, min(168, hours))  # 1 hour to 7 days
+        history = db.get_conditions_history(hours=hours)
+        return jsonify({'history': history, 'count': len(history), 'hours': hours})
+    except Exception as e:
+        logger.error(f"Error getting conditions history: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 

@@ -267,6 +267,10 @@ class MUFCalculator:
             # Apply M-factor for 3000km path
             muf = self.M_FACTOR_3000 * adjusted_foF2
 
+            # Apply seasonal adjustment
+            lat = location_data.get('lat', 40.0)
+            muf = self._apply_seasonal_adjustment(muf, lat)
+
             return round(muf, 2)
 
         except Exception as e:
@@ -313,6 +317,34 @@ class MUFCalculator:
             else:
                 return 0.45
         return 0.45
+
+    def _apply_seasonal_adjustment(self, base_muf: float, lat: float) -> float:
+        """Apply seasonal adjustment to MUF based on latitude and month."""
+        from datetime import datetime
+        month = datetime.now().month
+
+        # Latitude weight: strongest at mid-latitudes (30-50 deg)
+        abs_lat = abs(lat)
+        lat_weight = 1.0 - abs(abs_lat - 40) / 50.0
+        lat_weight = max(0.2, min(1.0, lat_weight))
+
+        # Seasonal factors
+        if month in (3, 4, 9, 10):  # Equinox months
+            factor = 1.0 + 0.10 * lat_weight  # +10% enhancement
+        elif month in (12, 1, 2):  # Winter (northern hemisphere)
+            if lat >= 0:
+                factor = 1.0 + 0.05 * lat_weight  # Winter anomaly +5%
+            else:
+                factor = 1.0 - 0.10 * lat_weight  # Summer reduction -10%
+        elif month in (6, 7, 8):  # Summer (northern hemisphere)
+            if lat >= 0:
+                factor = 1.0 - 0.10 * lat_weight  # Summer reduction -10%
+            else:
+                factor = 1.0 + 0.05 * lat_weight  # Winter anomaly +5%
+        else:
+            factor = 1.0  # Transition months
+
+        return base_muf * factor
 
     def _get_fallback_muf(self) -> Dict:
         """Get fallback MUF data when all calculations fail."""

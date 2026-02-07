@@ -7,16 +7,17 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        body { background: #0B0F19; }
         .card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #111827;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
+<body class="text-white min-h-screen flex items-center justify-center">
     <div class="container mx-auto px-4 text-center">
-        <div class="card rounded-lg p-8 max-w-md mx-auto">
+        <div class="card p-8 max-w-md mx-auto">
             <div class="mb-6">
                 <i class="fas fa-wifi-slash text-6xl text-gray-400 mb-4"></i>
                 <h1 class="text-3xl font-bold mb-2">You're Offline</h1>
@@ -24,9 +25,9 @@
                     Ham Radio Conditions is currently unavailable. Please check your internet connection and try again.
                 </p>
             </div>
-            
+
             <div class="space-y-4">
-                <div class="bg-gray-800 p-4 rounded-lg">
+                <div class="p-4 rounded-lg" style="background: #1A2035;">
                     <h2 class="text-lg font-semibold mb-2">What you can do:</h2>
                     <ul class="text-left text-gray-300 space-y-2">
                         <li class="flex items-center">
@@ -43,27 +44,28 @@
                         </li>
                     </ul>
                 </div>
-                
-                <button onclick="window.location.reload()" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors">
+
+                <button onclick="window.location.reload()"
+                        class="w-full text-white px-6 py-3 rounded-lg transition-colors"
+                        style="background: #06B6D4; color: #0B0F19; font-weight: 600;">
                     <i class="fas fa-redo mr-2"></i>
                     Try Again
                 </button>
             </div>
-            
+
             <div class="mt-6 text-sm text-gray-500">
                 <p>Ham Radio Conditions PWA</p>
                 <p>Version 1.0</p>
             </div>
         </div>
     </div>
-    
+
     <script>
         // Check for online status
         window.addEventListener('online', () => {
             window.location.reload();
         });
-        
+
         // Auto-retry every 30 seconds
         setInterval(() => {
             if (navigator.onLine) {
@@ -72,4 +74,4 @@
         }, 30000);
     </script>
 </body>
-</html> 
+</html>

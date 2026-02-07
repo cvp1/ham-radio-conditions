@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import Dict
 import logging
 import pytz
+from astral import LocationInfo
+from astral.sun import sun
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ class TimeAnalyzer:
             'late_night': {'start': 23, 'end': 5, 'description': 'Late Night - Lowest bands'}
         }
     
-    def analyze_current_time(self, lat: float, timezone_str: str) -> Dict:
+    def analyze_current_time(self, lat: float, timezone_str: str, lon: float = 0.0) -> Dict:
         """Analyze current time and determine propagation period."""
         try:
             # Get current time in specified timezone
@@ -37,7 +39,7 @@ class TimeAnalyzer:
             current_hour = now.hour
             
             # Calculate sunrise/sunset times (simplified)
-            sunrise_hour, sunset_hour = self._calculate_sunrise_sunset(lat)
+            sunrise_hour, sunset_hour, sunrise_time, sunset_time = self._calculate_sunrise_sunset(lat, lon, timezone_str)
             
             # Determine if it's daytime
             is_day = sunrise_hour <= current_hour < sunset_hour
@@ -56,34 +58,34 @@ class TimeAnalyzer:
                 'is_day': is_day,
                 'period': period,
                 'description': period_info.get('description', 'Unknown period'),
-                'sunrise': f"{sunrise_hour:02d}:00 AM",
-                'sunset': f"{sunset_hour:02d}:00 PM"
+                'sunrise': sunrise_time,
+                'sunset': sunset_time
             }
             
         except Exception as e:
             logger.error(f"Error analyzing current time: {e}")
             return self._get_fallback_time_data()
     
-    def _calculate_sunrise_sunset(self, lat: float) -> tuple[int, int]:
-        """Calculate sunrise and sunset hours (simplified)."""
-        # Simplified calculation - in practice would use astral library
-        if lat > 0:  # Northern hemisphere
-            sunrise_hour = 6
-            sunset_hour = 18
-        else:  # Southern hemisphere
-            sunrise_hour = 6
-            sunset_hour = 18
-        
-        # Adjust for season (simplified)
-        month = datetime.now().month
-        if month in [12, 1, 2]:  # Winter
-            sunrise_hour += 1
-            sunset_hour -= 1
-        elif month in [6, 7, 8]:  # Summer
-            sunrise_hour -= 1
-            sunset_hour += 1
-        
-        return sunrise_hour, sunset_hour
+    def _calculate_sunrise_sunset(self, lat: float, lon: float = 0.0, timezone_str: str = 'UTC') -> tuple:
+        """Calculate sunrise and sunset using astral library."""
+        try:
+            tz = pytz.timezone(timezone_str)
+            loc = LocationInfo(latitude=lat, longitude=lon, timezone=timezone_str)
+            s = sun(loc.observer, date=datetime.now(tz).date(), tzinfo=tz)
+
+            sunrise_dt = s['sunrise']
+            sunset_dt = s['sunset']
+
+            sunrise_hour = sunrise_dt.hour
+            sunset_hour = sunset_dt.hour
+
+            sunrise_str = sunrise_dt.strftime('%I:%M %p')
+            sunset_str = sunset_dt.strftime('%I:%M %p')
+
+            return sunrise_hour, sunset_hour, sunrise_str, sunset_str
+        except Exception as e:
+            logger.warning(f"Astral calculation failed, using fallback: {e}")
+            return 6, 18, "6:00 AM", "6:00 PM"
     
     def _determine_time_period(self, current_hour: int, sunrise_hour: int, sunset_hour: int) -> str:
         """Determine time period based on current hour."""

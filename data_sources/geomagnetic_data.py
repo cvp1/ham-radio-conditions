@@ -81,17 +81,54 @@ class GeomagneticDataProvider:
         return geomag_lat_deg, geomag_lon_deg
     
     def _calculate_magnetic_declination(self) -> float:
-        """Calculate magnetic declination for the location."""
-        # Simplified calculation - in practice would use IGRF model
-        # This is a rough approximation
-        declination = 0.0
-        
-        # Basic approximation based on latitude and longitude
-        if self.lat > 0:  # Northern hemisphere
-            declination = self.lon * 0.1  # Rough approximation
-        else:  # Southern hemisphere
-            declination = -self.lon * 0.1
-            
+        """Calculate magnetic declination using NOAA NCEI API with dipole fallback."""
+        # Try NOAA NCEI Magnetic Declination API (free, no key needed)
+        try:
+            import requests
+            from datetime import datetime
+
+            params = {
+                'lat1': self.lat,
+                'lon1': self.lon,
+                'key': 'zNEw7',  # Public demo key for NCEI
+                'resultFormat': 'json'
+            }
+            response = requests.get(
+                'https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination',
+                params=params,
+                timeout=5
+            )
+            if response.status_code == 200:
+                data = response.json()
+                result = data.get('result', [{}])
+                if result:
+                    declination = result[0].get('declination', None)
+                    if declination is not None:
+                        return round(float(declination), 1)
+        except Exception as e:
+            logger.debug(f"NOAA declination API failed, using dipole model: {e}")
+
+        # Fallback: Tilted dipole model (much better than lon * 0.1)
+        return self._dipole_declination()
+
+    def _dipole_declination(self) -> float:
+        """Calculate magnetic declination using tilted dipole model."""
+        # Geomagnetic north pole (2024 IGRF-13)
+        pole_lat = math.radians(86.5)
+        pole_lon = math.radians(-164.0)
+
+        lat_r = math.radians(self.lat)
+        lon_r = math.radians(self.lon)
+
+        # Declination from spherical trigonometry
+        numerator = math.cos(pole_lat) * math.sin(pole_lon - lon_r)
+        denominator = (math.cos(lat_r) * math.sin(pole_lat) -
+                       math.sin(lat_r) * math.cos(pole_lat) * math.cos(pole_lon - lon_r))
+
+        if abs(denominator) < 1e-10:
+            return 0.0
+
+        declination = math.degrees(math.atan2(numerator, denominator))
         return round(declination, 1)
     
     def _get_fallback_geomagnetic_data(self) -> Dict:
