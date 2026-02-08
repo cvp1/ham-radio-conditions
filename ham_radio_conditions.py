@@ -10,6 +10,7 @@ import time
 import math
 from datetime import datetime
 from typing import Dict, Optional, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 from dotenv import load_dotenv
 
@@ -163,8 +164,48 @@ class HamRadioConditions:
             if cached_report:
                 cached_report['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
                 return cached_report
-            
-            # Generate new report
+
+            start_time = time.time()
+
+            # Phase 1: Fetch all independent data sources in parallel
+            fetch_results = {}
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {
+                    executor.submit(self.solar_provider.get_solar_conditions): 'solar',
+                    executor.submit(self.weather_provider.get_weather_conditions): 'weather',
+                    executor.submit(self.spots_provider.get_live_activity): 'spots',
+                    executor.submit(self.activations_provider.get_combined_activations): 'activations',
+                    executor.submit(self.contest_provider.get_contests): 'contests',
+                }
+                for future in as_completed(futures, timeout=25):
+                    key = futures[future]
+                    try:
+                        fetch_results[key] = future.result(timeout=5)
+                    except Exception as e:
+                        logger.error(f"Error fetching {key}: {e}")
+                        fetch_results[key] = None
+
+            solar_data = fetch_results.get('solar') or self.solar_provider._get_fallback_solar_data()
+            weather_data = fetch_results.get('weather') or {}
+
+            # Phase 2: Compute derived values using pre-fetched data (no re-fetching)
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
+            location_data = {'lat': self.lat, 'lon': self.lon, 'grid_square': self.grid_square}
+            muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
+
+            band_conditions = self._compute_band_conditions(solar_data, weather_data, time_data, muf_data)
+            propagation_summary = self._compute_propagation_summary(
+                solar_data, weather_data, time_data, muf_data, band_conditions
+            )
+
+            try:
+                alerts = self.alerts_manager.evaluate_conditions(
+                    solar_data, time_data, muf_data.get('muf', 15.0), weather_data
+                )
+            except Exception as e:
+                logger.error(f"Error computing alerts: {e}")
+                alerts = []
+
             report = {
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z'),
                 'callsign': self.callsign,
@@ -177,22 +218,23 @@ class HamRadioConditions:
                     'grid_square': self.grid_square,
                     'timezone': self.timezone
                 },
-                'solar_conditions': self.get_solar_conditions(),
-                'weather_conditions': self.get_weather_conditions(),
-                'band_conditions': self.get_band_conditions(),
-                'propagation_summary': self.get_propagation_summary(),
-                'live_activity': self.get_live_activity(),
-                'activations': self.get_activations(),
-                'contests': self.get_contests(),
-                'alerts': self.get_alerts()
+                'solar_conditions': solar_data,
+                'weather_conditions': weather_data,
+                'band_conditions': band_conditions,
+                'propagation_summary': propagation_summary,
+                'live_activity': fetch_results.get('spots') or self.spots_provider._get_fallback_spots_data(),
+                'activations': fetch_results.get('activations') or {'activations': [], 'total_count': 0, 'pota_count': 0, 'sota_count': 0, 'summary': {'total': 0, 'pota': 0, 'sota': 0}},
+                'contests': fetch_results.get('contests') or {'contests': [], 'active_count': 0, 'upcoming_count': 0},
+                'alerts': alerts,
             }
 
             # Cache the report
             cache_set('conditions', 'current', report, max_age=600)  # 10 minutes
-            logger.info("Generated and cached new conditions report")
-            
+            elapsed = time.time() - start_time
+            logger.info(f"Generated and cached new conditions report in {elapsed:.2f}s")
+
             return report
-            
+
         except Exception as e:
             logger.error(f"Error generating report: {e}")
             return None
@@ -206,64 +248,62 @@ class HamRadioConditions:
         return self.weather_provider.get_weather_conditions()
     
     def get_band_conditions(self) -> Dict:
-        """Get band conditions using band optimizer."""
+        """Get band conditions using band optimizer (for direct API calls)."""
         try:
             solar_data = self.get_solar_conditions()
             weather_data = self.get_weather_conditions()
             time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
             location_data = {'lat': self.lat, 'lon': self.lon}
-
-            # Get MUF for band optimization
             muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
-            muf = muf_data.get('muf', 15.0)
-
-            return self.band_optimizer.optimize_bands(solar_data, weather_data, time_data, muf=muf)
-
+            return self._compute_band_conditions(solar_data, weather_data, time_data, muf_data)
         except Exception as e:
             logger.error(f"Error getting band conditions: {e}")
             return self._get_fallback_band_conditions()
-    
+
+    def _compute_band_conditions(self, solar_data: Dict, weather_data: Dict, time_data: Dict, muf_data: Dict) -> Dict:
+        """Compute band conditions from pre-fetched data."""
+        try:
+            muf = muf_data.get('muf', 15.0)
+            return self.band_optimizer.optimize_bands(solar_data, weather_data, time_data, muf=muf)
+        except Exception as e:
+            logger.error(f"Error computing band conditions: {e}")
+            return self._get_fallback_band_conditions()
+
     def get_propagation_summary(self) -> Dict:
-        """Get propagation summary using calculators."""
+        """Get propagation summary (for direct API calls)."""
         try:
             solar_data = self.get_solar_conditions()
             weather_data = self.get_weather_conditions()
-            location_data = {
-                'lat': self.lat,
-                'lon': self.lon,
-                'grid_square': self.grid_square
-            }
-
-            # Calculate MUF
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
+            location_data = {'lat': self.lat, 'lon': self.lon, 'grid_square': self.grid_square}
             muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
+            band_conditions = self._compute_band_conditions(solar_data, weather_data, time_data, muf_data)
+            return self._compute_propagation_summary(solar_data, weather_data, time_data, muf_data, band_conditions)
+        except Exception as e:
+            logger.error(f"Error generating propagation summary: {e}")
+            return self._get_fallback_propagation_summary()
 
-            # Calculate propagation
+    def _compute_propagation_summary(self, solar_data: Dict, weather_data: Dict, time_data: Dict, muf_data: Dict, band_conditions_raw: Dict) -> Dict:
+        """Compute propagation summary from pre-fetched data."""
+        try:
             propagation_data = self.propagation_calculator.calculate_propagation(
                 solar_data, weather_data, muf_data
             )
 
-            # Get geomagnetic data
             geomagnetic_data = self.geomagnetic_provider.get_geomagnetic_coordinates()
 
-            # Get time data for day/night status
-            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
-
-            # Format MUF as string for frontend compatibility
             muf_value = muf_data.get('muf', 15.0)
             muf_confidence = muf_data.get('confidence', 0.5)
 
-            # Get solar cycle info
             solar_cycle_info = self._get_solar_cycle_info(solar_data)
 
             # Build band_conditions for frontend (day_rating / night_rating format)
             is_day = time_data.get('is_day', True)
-            band_conditions_raw = self.get_band_conditions()
             band_conditions = {}
             raw_bands = band_conditions_raw.get('bands', band_conditions_raw) if isinstance(band_conditions_raw, dict) else {}
             for band_name, band_info in raw_bands.items():
                 if isinstance(band_info, dict) and 'quality' in band_info:
                     quality = band_info['quality']
-                    # Map quality to Good/Fair/Poor for ratings
                     rating = 'Good' if quality in ('Excellent', 'Very Good', 'Good') else quality
                     band_conditions[band_name] = {
                         'day_rating': rating if is_day else self._off_period_rating(rating),
@@ -288,7 +328,7 @@ class HamRadioConditions:
             }
 
         except Exception as e:
-            logger.error(f"Error generating propagation summary: {e}")
+            logger.error(f"Error computing propagation summary: {e}")
             return self._get_fallback_propagation_summary()
     
     def get_live_activity(self) -> Dict:
@@ -312,15 +352,14 @@ class HamRadioConditions:
             return {'contests': [], 'active_count': 0, 'upcoming_count': 0}
 
     def get_alerts(self) -> list:
-        """Get condition-based alerts."""
+        """Get condition-based alerts (for direct API calls)."""
         try:
             solar_data = self.get_solar_conditions()
-            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
             weather_data = self.get_weather_conditions()
+            time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
             location_data = {'lat': self.lat, 'lon': self.lon}
             muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
-            muf = muf_data.get('muf', 15.0)
-            return self.alerts_manager.evaluate_conditions(solar_data, time_data, muf, weather_data)
+            return self.alerts_manager.evaluate_conditions(solar_data, time_data, muf_data.get('muf', 15.0), weather_data)
         except Exception as e:
             logger.error(f"Error getting alerts: {e}")
             return []

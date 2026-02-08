@@ -27,7 +27,9 @@ class SpotsDataProvider:
         self.lon = lon
         self.grid_square = grid_square
         self.cache_duration = 300  # 5 minutes
-        
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
+
         # Data sources
         self.pskreporter_url = "https://retrieve.pskreporter.info/query"
         self.rbn_url = "https://www.reversebeacon.net/raw_data/"
@@ -97,11 +99,10 @@ class SpotsDataProvider:
                 'grid': self.grid_square[:4],
                 'appcontact': 'ham-radio-conditions@github.com',
             }
-            response = requests.get(
+            response = self.session.get(
                 self.pskreporter_url,
                 params=params,
                 timeout=10,
-                headers={'User-Agent': 'ham-radio-conditions/1.0'}
             )
             response.raise_for_status()
 
@@ -159,7 +160,7 @@ class SpotsDataProvider:
     def _get_rbn_spots(self) -> Optional[Dict]:
         """Get RBN (Reverse Beacon Network) spots via HamQTH RBN API."""
         try:
-            response = requests.get(
+            response = self.session.get(
                 'https://www.hamqth.com/rbn_data.php',
                 params={
                     'data': 1,
@@ -167,10 +168,7 @@ class SpotsDataProvider:
                     'order': 3,  # Sort by age
                 },
                 timeout=8,
-                headers={
-                    'User-Agent': 'ham-radio-conditions/1.0',
-                    'Accept': 'application/json',
-                }
+                headers={'Accept': 'application/json'},
             )
             response.raise_for_status()
             data = response.json()
@@ -232,10 +230,9 @@ class SpotsDataProvider:
         """Get WSPRNet spots."""
         try:
             # Try to fetch from WSPRNet
-            response = requests.get(
+            response = self.session.get(
                 "https://wsprnet.org/drupal/wsprnet/spots/json",
                 timeout=5,
-                headers={'User-Agent': 'ham-radio-conditions/1.0'}
             )
 
             if response.status_code == 200:

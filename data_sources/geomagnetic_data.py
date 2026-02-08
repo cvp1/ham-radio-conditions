@@ -5,6 +5,7 @@ Handles fetching and processing geomagnetic data for propagation analysis.
 """
 
 import math
+import requests
 from datetime import datetime
 from typing import Dict, Tuple
 import logging
@@ -14,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 class GeomagneticDataProvider:
     """Provider for geomagnetic data."""
-    
+
     def __init__(self, lat: float, lon: float):
         self.lat = lat
         self.lon = lon
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
         
     def get_geomagnetic_coordinates(self) -> Dict:
         """Get geomagnetic coordinates for the location."""
@@ -82,18 +85,14 @@ class GeomagneticDataProvider:
     
     def _calculate_magnetic_declination(self) -> float:
         """Calculate magnetic declination using NOAA NCEI API with dipole fallback."""
-        # Try NOAA NCEI Magnetic Declination API (free, no key needed)
         try:
-            import requests
-            from datetime import datetime
-
             params = {
                 'lat1': self.lat,
                 'lon1': self.lon,
                 'key': 'zNEw7',  # Public demo key for NCEI
                 'resultFormat': 'json'
             }
-            response = requests.get(
+            response = self.session.get(
                 'https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination',
                 params=params,
                 timeout=5

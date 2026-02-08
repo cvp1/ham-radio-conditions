@@ -21,6 +21,8 @@ class ActivationsDataProvider:
 
     def __init__(self):
         self.cache_duration = 180  # 3 minutes
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
 
     def get_combined_activations(self) -> Dict:
         """Get combined POTA and SOTA activations."""
@@ -72,10 +74,9 @@ class ActivationsDataProvider:
     def get_pota_spots(self) -> List[Dict]:
         """Get current POTA activator spots."""
         try:
-            response = requests.get(
+            response = self.session.get(
                 'https://api.pota.app/spot/activator',
                 timeout=8,
-                headers={'User-Agent': 'ham-radio-conditions/1.0'}
             )
             response.raise_for_status()
             data = response.json()
@@ -107,13 +108,10 @@ class ActivationsDataProvider:
     def get_sota_spots(self) -> List[Dict]:
         """Get current SOTA activator spots."""
         try:
-            response = requests.get(
+            response = self.session.get(
                 'https://api2.sota.org.uk/api/spots/-1/all?limit=50',
                 timeout=8,
-                headers={
-                    'User-Agent': 'ham-radio-conditions/1.0',
-                    'Accept': 'application/json',
-                }
+                headers={'Accept': 'application/json'},
             )
             response.raise_for_status()
             data = response.json()

@@ -119,7 +119,7 @@ class Database:
                 
                 cursor.execute('''
                     SELECT * FROM spots 
-                    WHERE datetime(timestamp) >= datetime(?)
+                    WHERE timestamp >= ?
                     ORDER BY timestamp DESC
                     LIMIT ?
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'), limit))
@@ -156,21 +156,21 @@ class Database:
                 # Get total spots
                 cursor.execute('''
                     SELECT COUNT(*) FROM spots 
-                    WHERE datetime(timestamp) >= datetime(?)
+                    WHERE timestamp >= ?
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'),))
                 total_spots = cursor.fetchone()[0]
                 
                 # Get unique modes
                 cursor.execute('''
                     SELECT DISTINCT mode FROM spots 
-                    WHERE datetime(timestamp) >= datetime(?) AND mode != 'Unknown'
+                    WHERE timestamp >= ? AND mode != 'Unknown'
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'),))
                 modes = [row[0] for row in cursor.fetchall()]
                 
                 # Get unique DXCC entities
                 cursor.execute('''
                     SELECT DISTINCT dxcc FROM spots 
-                    WHERE datetime(timestamp) >= datetime(?) AND dxcc != ''
+                    WHERE timestamp >= ? AND dxcc != ''
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'),))
                 dxcc_entities = [row[0] for row in cursor.fetchall()]
                 
@@ -215,7 +215,7 @@ class Database:
                 cursor.execute('''
                     SELECT timestamp, muf, sfi, k_index, a_index, quality
                     FROM conditions_history
-                    WHERE datetime(timestamp) >= datetime(?)
+                    WHERE timestamp >= ?
                     ORDER BY timestamp ASC
                     LIMIT ?
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'), limit))
@@ -269,14 +269,14 @@ class Database:
                 # Clean up old spots
                 cursor.execute('''
                     DELETE FROM spots
-                    WHERE datetime(timestamp) < datetime(?)
+                    WHERE timestamp < ?
                 ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
                 spots_deleted = cursor.rowcount
 
                 # Clean up old conditions history (keep 7 days)
                 cursor.execute('''
                     DELETE FROM conditions_history
-                    WHERE datetime(timestamp) < datetime(?)
+                    WHERE timestamp < ?
                 ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
                 history_deleted = cursor.rowcount
 

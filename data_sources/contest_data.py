@@ -26,6 +26,8 @@ class ContestDataProvider:
     def __init__(self):
         self.rss_url = 'https://www.contestcalendar.com/contestcal.php?mode=xml'
         self.cache_duration = 1800  # 30 minutes
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
 
     def get_contests(self) -> Dict:
         """Get current and upcoming contests."""
@@ -56,10 +58,9 @@ class ContestDataProvider:
     def _fetch_contests(self) -> List[Dict]:
         """Fetch and parse contests from WA7BNM RSS feed."""
         try:
-            response = requests.get(
+            response = self.session.get(
                 self.rss_url,
                 timeout=10,
-                headers={'User-Agent': 'ham-radio-conditions/1.0'}
             )
             response.raise_for_status()
 

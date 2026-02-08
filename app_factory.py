@@ -176,15 +176,18 @@ def configure_background_tasks(app, services):
             db = get_database()
             solar = conditions.get('solar_conditions', {})
             prop = conditions.get('propagation_summary', {})
-            muf = prop.get('muf', 0)
+            params = prop.get('propagation_parameters', {})
+            muf_raw = params.get('muf', '0')
+            muf = float(str(muf_raw).strip()) if muf_raw else 0.0
             sfi_raw = solar.get('sfi', '100')
             sfi = float(str(sfi_raw).replace(' SFI', '').strip()) if sfi_raw else 100.0
             k_raw = solar.get('k_index', '2')
             k_index = float(str(k_raw).strip()) if k_raw else 2.0
             a_raw = solar.get('a_index', '5')
             a_index = float(str(a_raw).strip()) if a_raw else 5.0
-            quality = prop.get('overall_quality', 'Unknown')
+            quality = params.get('quality', 'Unknown')
             db.store_conditions_snapshot(muf, sfi, k_index, a_index, quality)
+            logger.debug(f"Stored conditions snapshot: MUF={muf}, SFI={sfi}, K={k_index}")
         except Exception as e:
             logger.error(f"Error storing conditions snapshot: {e}")
 
@@ -194,4 +197,7 @@ def configure_background_tasks(app, services):
         interval_seconds=600  # 10 minutes
     )
 
-    logger.info("Background tasks configured") 
+    # Start background tasks
+    task_manager.start_all()
+
+    logger.info("Background tasks configured and started")

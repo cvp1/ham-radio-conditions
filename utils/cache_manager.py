@@ -3,6 +3,7 @@ Cache Manager for Ham Radio Conditions app.
 Provides centralized cache management with versioning, expiration, and cleanup.
 """
 
+import sys
 import time
 import threading
 import logging
@@ -10,7 +11,6 @@ from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta
 from collections import OrderedDict
 import hashlib
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +28,11 @@ class CacheEntry:
         self.size = self._calculate_size()
     
     def _calculate_size(self) -> int:
-        """Calculate approximate size of the cache entry."""
+        """Estimate size of the cache entry (O(1) via sys.getsizeof)."""
         try:
-            if isinstance(self.value, (dict, list)):
-                return len(json.dumps(self.value))
-            elif isinstance(self.value, str):
-                return len(self.value)
-            else:
-                return len(str(self.value))
+            return sys.getsizeof(self.value)
         except:
-            return 100  # Default size
+            return 100
     
     def is_expired(self) -> bool:
         """Check if the cache entry has expired."""

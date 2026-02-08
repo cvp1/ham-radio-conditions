@@ -11,6 +11,7 @@ import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 from utils.cache_manager import cache_get, cache_set
 
@@ -19,11 +20,13 @@ logger = logging.getLogger(__name__)
 
 class SolarDataProvider:
     """Provider for solar data from multiple sources."""
-    
+
     def __init__(self):
         self.hamqsl_url = "https://www.hamqsl.com/solarxml.php"
         self.noaa_url = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
         self.cache_duration = 300  # 5 minutes
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
         
     def get_solar_conditions(self) -> Dict[str, Any]:
         """Get enhanced solar conditions with multiple data sources."""
@@ -48,7 +51,7 @@ class SolarDataProvider:
     def _fetch_hamqsl_data(self) -> Optional[Dict[str, Any]]:
         """Fetch solar data from HamQSL XML feed."""
         try:
-            response = requests.get(self.hamqsl_url, timeout=10)
+            response = self.session.get(self.hamqsl_url, timeout=10)
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
                 
@@ -71,30 +74,29 @@ class SolarDataProvider:
             return None
     
     def _enhance_solar_data(self, base_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Enhance solar data with additional sources."""
+        """Enhance solar data with additional sources (fetched in parallel)."""
         enhanced = base_data.copy()
-        
-        # Add NOAA data
-        noaa_data = self._get_noaa_space_weather()
-        if noaa_data:
-            enhanced.update(noaa_data)
-        
-        # Add storm data
-        storm_data = self._get_geomagnetic_storm_data()
-        if storm_data:
-            enhanced.update(storm_data)
 
-        # Add solar flare data
-        flare_data = self._get_solar_flare_data()
-        if flare_data:
-            enhanced.update(flare_data)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(self._get_noaa_space_weather): 'noaa',
+                executor.submit(self._get_geomagnetic_storm_data): 'storm',
+                executor.submit(self._get_solar_flare_data): 'flare',
+            }
+            for future in as_completed(futures, timeout=12):
+                try:
+                    result = future.result(timeout=5)
+                    if result:
+                        enhanced.update(result)
+                except Exception:
+                    pass
 
         return enhanced
     
     def _get_noaa_space_weather(self) -> Optional[Dict[str, Any]]:
         """Get NOAA space weather data."""
         try:
-            response = requests.get(self.noaa_url, timeout=5)
+            response = self.session.get(self.noaa_url, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if data:
@@ -111,7 +113,7 @@ class SolarDataProvider:
     def _get_geomagnetic_storm_data(self) -> Optional[Dict[str, Any]]:
         """Get geomagnetic storm data from NOAA SWPC K-index forecast."""
         try:
-            response = requests.get(
+            response = self.session.get(
                 "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
                 timeout=8
             )
@@ -147,7 +149,7 @@ class SolarDataProvider:
                     # Try to fetch active alert count (only last 24 hours)
                     storm_alerts = 0
                     try:
-                        alerts_resp = requests.get(
+                        alerts_resp = self.session.get(
                             "https://services.swpc.noaa.gov/products/alerts.json",
                             timeout=8
                         )
@@ -188,7 +190,7 @@ class SolarDataProvider:
         try:
             start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
             url = f"https://api.nasa.gov/DONKI/FLR?startDate={start_date}&api_key=DEMO_KEY"
-            response = requests.get(url, timeout=8)
+            response = self.session.get(url, timeout=8)
             if response.status_code == 200:
                 data = response.json()
                 if data and len(data) > 0:

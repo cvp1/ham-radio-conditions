@@ -16,11 +16,13 @@ logger = logging.getLogger(__name__)
 
 class WeatherDataProvider:
     """Provider for weather data."""
-    
+
     def __init__(self, lat: float, lon: float):
         self.lat = lat
         self.lon = lon
         self.cache_duration = 1800  # 30 minutes
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
         
     def get_weather_conditions(self) -> Dict:
         """Get weather conditions with caching."""
@@ -53,7 +55,7 @@ class WeatherDataProvider:
         units = 'imperial' if temp_unit == 'F' else 'metric'
 
         try:
-            response = requests.get(
+            response = self.session.get(
                 'https://api.openweathermap.org/data/2.5/weather',
                 params={
                     'lat': self.lat,

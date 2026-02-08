@@ -2849,13 +2849,17 @@
             container.innerHTML = html;
         }
 
-        // Fetch fresh conditions from API
-        let isFetching = false;
+        // Fetch fresh conditions from API (with promise coalescing)
+        let _fetchInFlight = null;
 
-        async function fetchConditions() {
-            if (isFetching) return;
-            isFetching = true;
+        function fetchConditions() {
+            if (_fetchInFlight) return _fetchInFlight;
+            _fetchInFlight = _doFetchConditions();
+            _fetchInFlight.finally(() => { _fetchInFlight = null; });
+            return _fetchInFlight;
+        }
 
+        async function _doFetchConditions() {
             const refreshIcon = document.getElementById('refresh-icon');
             if (refreshIcon) refreshIcon.classList.add('spin');
 
@@ -2882,7 +2886,6 @@
                 console.error('Failed to fetch conditions:', err);
                 showError('Failed to refresh data. Will retry automatically.');
             } finally {
-                isFetching = false;
                 if (refreshIcon) refreshIcon.classList.remove('spin');
             }
         }

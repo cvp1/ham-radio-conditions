@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 
 class TaskManager:
     """Manages background tasks with scheduling and monitoring."""
-    
+
     def __init__(self):
         self.tasks = {}
         self.running = False
         self.thread = None
         self.lock = threading.Lock()
+        self._wake_event = threading.Event()
     
     def add_task(self, name: str, task_func: Callable, interval_seconds: int = 300):
         """Add a new background task."""
@@ -63,27 +64,32 @@ class TaskManager:
             logger.info("Task manager stopped")
     
     def _run_scheduler(self):
-        """Main scheduler loop."""
+        """Main scheduler loop — sleeps until next task is due."""
         while self.running:
             try:
-                current_time = time.time()
-                
+                now = time.time()
+                next_run = None
+
                 with self.lock:
                     for name, task_info in self.tasks.items():
-                        if current_time >= task_info['next_run']:
-                            # Run task in separate thread to avoid blocking
+                        if now >= task_info['next_run']:
+                            task_info['next_run'] = now + task_info['interval']
                             threading.Thread(
                                 target=self._run_task,
                                 args=(name, task_info),
                                 daemon=True
                             ).start()
-                
-                # Sleep for a short interval
-                time.sleep(1)
-                
+                        if next_run is None or task_info['next_run'] < next_run:
+                            next_run = task_info['next_run']
+
+                sleep_time = max(1, (next_run or 60) - time.time())
+                self._wake_event.wait(timeout=sleep_time)
+                self._wake_event.clear()
+
             except Exception as e:
                 logger.error(f"Error in scheduler loop: {e}")
-                time.sleep(5)
+                self._wake_event.wait(timeout=5)
+                self._wake_event.clear()
     
     def _run_task(self, name: str, task_info: dict):
         """Run a single task with error handling."""
