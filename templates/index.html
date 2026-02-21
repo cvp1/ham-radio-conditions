@@ -457,9 +457,9 @@
         /* Contest styles */
         .contest-item {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 12px;
-            padding: 10px 0;
+            padding: 12px 0;
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .contest-item:last-child { border-bottom: none; }
@@ -470,7 +470,21 @@
             background: #EF4444;
             animation: pulse-dot 1.5s ease-in-out infinite;
             flex-shrink: 0;
+            margin-top: 5px;
         }
+        .contest-tab-btn {
+            transition: color 0.15s, border-color 0.15s;
+            cursor: pointer;
+            background: none;
+            border-left: none;
+            border-right: none;
+            border-top: none;
+        }
+        .contest-tab-btn.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary) !important;
+        }
+        .contest-tab-btn:hover { color: #e5e7eb; }
         .mode-badge {
             display: inline-flex;
             padding: 2px 8px;
@@ -601,6 +615,9 @@
             <button class="tab-btn" data-tab="activity" onclick="switchTab('activity')">
                 <i class="fas fa-broadcast-tower mr-2"></i><span class="tab-label">Activity</span>
             </button>
+            <button class="tab-btn" data-tab="contests" onclick="switchTab('contests')">
+                <i class="fas fa-trophy mr-2"></i><span class="tab-label">Contests</span>
+            </button>
             <button class="tab-btn" data-tab="strategy" onclick="switchTab('strategy')">
                 <i class="fas fa-chess mr-2"></i><span class="tab-label">Strategy</span>
             </button>
@@ -700,18 +717,6 @@
 
         <!-- ============ TAB 2: ACTIVITY ============ -->
         <div id="tab-activity" class="tab-panel">
-
-            <!-- Contest Calendar -->
-            <div id="contest-section" class="mb-6 mt-6" style="display:none;">
-                <div class="card rounded-lg p-4">
-                    <div class="flex items-center gap-3 mb-3">
-                        <i class="fas fa-trophy text-yellow-400"></i>
-                        <h3 class="text-lg font-heading text-white">Contest Calendar</h3>
-                        <span id="contest-live-badge" class="hidden text-xs font-bold text-red-400 bg-red-900/30 px-2 py-0.5 rounded-full border border-red-800">LIVE</span>
-                    </div>
-                    <div id="contest-list" class="text-sm"></div>
-                </div>
-            </div>
 
             <!-- Live Activity -->
             <div class="mb-8 mt-6">
@@ -821,7 +826,54 @@
 
         </div><!-- /tab-activity -->
 
-        <!-- ============ TAB 3: STRATEGY ============ -->
+        <!-- ============ TAB 3: CONTESTS ============ -->
+        <div id="tab-contests" class="tab-panel">
+            <div class="mb-6 mt-6">
+                <h2 class="text-2xl font-heading mb-4 flex items-center">
+                    <i class="fas fa-trophy mr-3 section-icon text-yellow-400 text-2xl"></i>
+                    <span class="text-white">Contest Calendar</span>
+                    <span id="contest-active-badge" class="hidden ml-3 text-xs font-bold text-red-400 bg-red-900/30 px-2 py-0.5 rounded-full border border-red-800">LIVE</span>
+                    <span id="contests-loading" class="loading-spinner ml-3" style="display:none;"></span>
+                </h2>
+
+                <!-- Contest sub-tabs -->
+                <div class="flex gap-2 mb-4 border-b border-gray-700">
+                    <button id="ctab-today" class="contest-tab-btn active px-4 py-2 text-sm font-heading border-b-2 text-white" onclick="switchContestTab('today')">
+                        <i class="fas fa-calendar-day mr-1"></i>Today
+                        <span id="ctab-today-count" class="ml-1 text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full"></span>
+                    </button>
+                    <button id="ctab-week" class="contest-tab-btn px-4 py-2 text-sm font-heading border-b-2 border-transparent text-gray-400" onclick="switchContestTab('week')">
+                        <i class="fas fa-calendar-week mr-1"></i>This Week
+                        <span id="ctab-week-count" class="ml-1 text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full"></span>
+                    </button>
+                    <button id="ctab-upcoming" class="contest-tab-btn px-4 py-2 text-sm font-heading border-b-2 border-transparent text-gray-400" onclick="switchContestTab('upcoming')">
+                        <i class="fas fa-calendar-alt mr-1"></i>Upcoming
+                        <span id="ctab-upcoming-count" class="ml-1 text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full"></span>
+                    </button>
+                </div>
+
+                <div class="card rounded-lg p-4">
+                    <div id="contest-panel-today" class="contest-panel">
+                        <div id="contest-today-list" class="text-sm">
+                            <div class="text-gray-400 text-sm py-4 text-center">Loading contests...</div>
+                        </div>
+                    </div>
+                    <div id="contest-panel-week" class="contest-panel" style="display:none;">
+                        <div id="contest-week-list" class="text-sm"></div>
+                    </div>
+                    <div id="contest-panel-upcoming" class="contest-panel" style="display:none;">
+                        <div id="contest-upcoming-list" class="text-sm"></div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-gray-500 mt-2 text-right">
+                    Source: <a href="https://www.contestcalendar.com/" target="_blank" class="hover:text-gray-300">WA7BNM Contest Calendar</a>
+                    &nbsp;•&nbsp; Times UTC
+                </div>
+            </div>
+        </div><!-- /tab-contests -->
+
+        <!-- ============ TAB 4: STRATEGY ============ -->
         <div id="tab-strategy" class="tab-panel">
 
             <!-- Executive Summary -->
@@ -891,6 +943,9 @@
             try { localStorage.setItem('activeTab', tabId); } catch(e) {}
             if (tabId === 'conditions' && conditionsChart) {
                 setTimeout(() => conditionsChart.resize(), 50);
+            }
+            if (tabId === 'contests' && !_contestData) {
+                fetchContests();
             }
         }
 
@@ -2731,45 +2786,109 @@
             tbody.innerHTML = rows || '<tr><td colspan="7" class="px-4 py-2 text-center text-gray-400">No activations</td></tr>';
         }
 
-        // === Feature 3: Contest Calendar ===
-        function updateContests(data) {
-            const section = document.getElementById('contest-section');
-            const listEl = document.getElementById('contest-list');
-            const liveBadge = document.getElementById('contest-live-badge');
-            if (!section || !listEl) return;
+        // === Contest Calendar ===
+        let _contestData = null;
 
-            const ct = data.contests;
-            if (!ct || !ct.contests || ct.contests.length === 0) {
-                section.style.display = 'none';
+        function modeClass(m) {
+            const ml = (m || '').toLowerCase();
+            if (ml === 'cw') return 'mode-badge-cw';
+            if (ml === 'ssb') return 'mode-badge-ssb';
+            if (ml === 'rtty') return 'mode-badge-rtty';
+            if (ml === 'digital') return 'mode-badge-digital';
+            return 'mode-badge-mixed';
+        }
+
+        function renderContestList(contests, listElId) {
+            const listEl = document.getElementById(listElId);
+            if (!listEl) return;
+            if (!contests || contests.length === 0) {
+                listEl.innerHTML = '<div class="text-gray-400 text-sm py-6 text-center">No contests in this period.</div>';
                 return;
             }
-
-            section.style.display = '';
-            const hasActive = ct.active_count > 0;
-            if (liveBadge) {
-                liveBadge.classList.toggle('hidden', !hasActive);
-            }
-
-            const modeClass = (m) => {
-                const ml = (m || '').toLowerCase();
-                if (ml === 'cw') return 'mode-badge-cw';
-                if (ml === 'ssb') return 'mode-badge-ssb';
-                if (ml === 'rtty') return 'mode-badge-rtty';
-                if (ml === 'digital') return 'mode-badge-digital';
-                return 'mode-badge-mixed';
-            };
-
-            listEl.innerHTML = ct.contests.slice(0, 5).map(c => {
+            listEl.innerHTML = contests.map(c => {
                 const isActive = c.status === 'active';
+                const nameHtml = c.link
+                    ? `<a href="${c.link}" target="_blank" class="text-white hover:text-blue-300 font-semibold">${c.name || ''}</a>`
+                    : `<span class="text-white font-semibold">${c.name || ''}</span>`;
+                const times = c.start && c.end
+                    ? `<div class="text-gray-500 text-xs mt-0.5">${formatContestTime(c.start)} – ${formatContestTime(c.end)} UTC</div>`
+                    : '';
                 return `<div class="contest-item">
-                    ${isActive ? '<span class="contest-live-dot"></span>' : '<span style="width:8px"></span>'}
+                    ${isActive ? '<span class="contest-live-dot"></span>' : '<span style="width:8px;height:8px;flex-shrink:0;display:inline-block;"></span>'}
                     <div class="flex-1 min-w-0">
-                        <div class="text-white text-sm font-semibold truncate">${c.name || ''}</div>
-                        <div class="text-gray-400 text-xs">${c.time_info || ''}</div>
+                        <div class="text-sm">${nameHtml}</div>
+                        <div class="text-yellow-300 text-xs font-medium">${c.time_info || ''}</div>
+                        ${times}
                     </div>
                     <span class="mode-badge ${modeClass(c.mode)}">${c.mode || 'Mixed'}</span>
                 </div>`;
             }).join('');
+        }
+
+        function formatContestTime(iso) {
+            if (!iso) return '';
+            try {
+                const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
+                return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });
+            } catch(e) { return iso; }
+        }
+
+        function switchContestTab(which) {
+            ['today','week','upcoming'].forEach(t => {
+                const btn = document.getElementById('ctab-' + t);
+                const panel = document.getElementById('contest-panel-' + t);
+                if (btn) btn.classList.remove('active');
+                if (panel) panel.style.display = 'none';
+            });
+            const activeBtn = document.getElementById('ctab-' + which);
+            const activePanel = document.getElementById('contest-panel-' + which);
+            if (activeBtn) activeBtn.classList.add('active');
+            if (activePanel) activePanel.style.display = '';
+        }
+
+        function updateContests(data) {
+            const badge = document.getElementById('contest-active-badge');
+            const ct = data.contests;
+            if (!ct) return;
+            _contestData = ct;
+
+            const hasActive = (ct.active_count || 0) > 0;
+            if (badge) badge.classList.toggle('hidden', !hasActive);
+
+            // Update tab counts
+            const todayCount = (ct.today || []).length;
+            const weekCount = (ct.this_week || []).length;
+            const upcomingCount = (ct.upcoming || []).length;
+
+            const tc = document.getElementById('ctab-today-count');
+            const wc = document.getElementById('ctab-week-count');
+            const uc = document.getElementById('ctab-upcoming-count');
+            if (tc) tc.textContent = todayCount || '';
+            if (wc) wc.textContent = weekCount || '';
+            if (uc) uc.textContent = upcomingCount || '';
+
+            renderContestList(ct.today || [], 'contest-today-list');
+            renderContestList(ct.this_week || [], 'contest-week-list');
+            renderContestList(ct.upcoming || [], 'contest-upcoming-list');
+        }
+
+        async function fetchContests() {
+            const spinner = document.getElementById('contests-loading');
+            if (spinner) spinner.style.display = '';
+            try {
+                const resp = await fetch('/api/contests');
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const ct = await resp.json();
+                updateContests({ contests: ct });
+            } catch(e) {
+                console.error('Error fetching contests:', e);
+                ['contest-today-list','contest-week-list','contest-upcoming-list'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = '<div class="text-gray-400 text-sm py-4 text-center">Failed to load contests.</div>';
+                });
+            } finally {
+                if (spinner) spinner.style.display = 'none';
+            }
         }
 
         // Main update function

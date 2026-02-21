@@ -1,36 +1,30 @@
 """
 Contest calendar data provider for ham radio conditions.
 
-Fetches upcoming and active contests from WA7BNM Contest Calendar RSS feed.
+Fetches upcoming and active contests from the OpenHamClock contest API.
 """
 
-import re
 import requests
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 import logging
 from utils.cache_manager import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
-MONTH_MAP = {
-    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
-}
+API_URL = 'https://open-hamclock-production.up.railway.app/api/contests'
 
 
 class ContestDataProvider:
     """Provider for ham radio contest calendar data."""
 
     def __init__(self):
-        self.rss_url = 'https://www.contestcalendar.com/contestcal.php?mode=xml'
         self.cache_duration = 1800  # 30 minutes
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
 
     def get_contests(self) -> Dict:
-        """Get current and upcoming contests."""
+        """Get current and upcoming contests categorized by time window."""
         try:
             cached = cache_get('contests', 'current')
             if cached:
@@ -38,14 +32,44 @@ class ContestDataProvider:
 
             contests = self._fetch_contests()
 
-            active = [c for c in contests if c.get('status') == 'active']
-            upcoming = [c for c in contests if c.get('status') == 'upcoming']
+            now = datetime.utcnow()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = today_start + timedelta(days=1)
+            week_end = today_start + timedelta(days=7)
+
+            today = []
+            this_week = []
+            upcoming = []
+
+            for c in contests:
+                status = c.get('status')
+                start_dt = c.get('_start_dt')
+
+                if status == 'active':
+                    today.append(c)
+                elif status == 'upcoming' and start_dt:
+                    if start_dt < today_end:
+                        today.append(c)
+                    elif start_dt < week_end:
+                        this_week.append(c)
+                    else:
+                        upcoming.append(c)
+                elif status == 'upcoming':
+                    upcoming.append(c)
+
+            # Strip internal datetime objects before returning
+            for c in contests:
+                c.pop('_start_dt', None)
+                c.pop('_end_dt', None)
 
             result = {
                 'timestamp': datetime.now().isoformat(),
-                'contests': contests[:10],
-                'active_count': len(active),
-                'upcoming_count': len(upcoming),
+                'contests': contests,
+                'today': today,
+                'this_week': this_week,
+                'upcoming': upcoming,
+                'active_count': len([c for c in contests if c.get('status') == 'active']),
+                'upcoming_count': len([c for c in contests if c.get('status') == 'upcoming']),
             }
 
             cache_set('contests', 'current', result, self.cache_duration)
@@ -56,136 +80,60 @@ class ContestDataProvider:
             return self._get_fallback()
 
     def _fetch_contests(self) -> List[Dict]:
-        """Fetch and parse contests from WA7BNM RSS feed."""
+        """Fetch contests from the OpenHamClock JSON API."""
         try:
-            response = self.session.get(
-                self.rss_url,
-                timeout=10,
-            )
+            response = self.session.get(API_URL, timeout=10)
             response.raise_for_status()
+            raw = response.json()
 
-            root = ET.fromstring(response.content)
             contests = []
-
-            for item in root.findall('.//item'):
-                title = self._get_text(item, 'title')
-                link = self._get_text(item, 'link')
-                description = self._get_text(item, 'description')
-
-                if not title:
+            for item in raw:
+                name = item.get('name', '')
+                if not name:
                     continue
 
-                start_dt, end_dt = self._parse_contest_times(description)
-                mode = self._detect_mode(title)
+                start_dt = self._parse_iso(item.get('start'))
+                end_dt = self._parse_iso(item.get('end'))
                 status, time_info = self._determine_status(start_dt, end_dt)
 
                 contests.append({
-                    'name': title,
-                    'link': link,
-                    'description': description,
-                    'mode': mode,
+                    'name': name,
+                    'link': item.get('url', ''),
+                    'mode': item.get('mode', 'Mixed'),
                     'status': status,
                     'time_info': time_info,
                     'start': start_dt.isoformat() if start_dt else None,
                     'end': end_dt.isoformat() if end_dt else None,
+                    # Internal use for bucketing; stripped before returning
+                    '_start_dt': start_dt,
+                    '_end_dt': end_dt,
                 })
 
-            # Sort: active first, then upcoming by start time
+            # Active first, then by start time
             contests.sort(key=lambda c: (
                 0 if c['status'] == 'active' else 1,
                 c.get('start') or '9999'
             ))
 
+            logger.info(f"Fetched {len(contests)} contests from OpenHamClock API")
             return contests
 
         except Exception as e:
-            logger.debug(f"Error fetching contest RSS: {e}")
+            logger.error(f"Error fetching contests from API: {e}")
             return []
 
-    def _get_text(self, element, tag: str) -> str:
-        el = element.find(tag)
-        return el.text.strip() if el is not None and el.text else ''
-
-    def _parse_contest_times(self, description: str):
-        """Parse start/end times from contest description text."""
-        if not description:
-            return None, None
-
-        now = datetime.utcnow()
-        year = now.year
-
-        # Pattern: "HHMMz, Mon DD to HHMMz, Mon DD" (multi-day)
-        multi = re.search(
-            r'(\d{4})[Zz],?\s+(\w{3})\s+(\d{1,2})\s+to\s+(\d{4})[Zz],?\s+(\w{3})\s+(\d{1,2})',
-            description
-        )
-        if multi:
-            return self._build_datetimes(
-                year,
-                multi.group(2), int(multi.group(3)), multi.group(1),
-                multi.group(5), int(multi.group(6)), multi.group(4),
-            )
-
-        # Pattern: "HHMMz-HHMMz, Mon DD" (single-day)
-        single = re.search(
-            r'(\d{4})[Zz]\s*[-–]\s*(\d{4})[Zz],?\s+(\w{3})\s+(\d{1,2})',
-            description
-        )
-        if single:
-            return self._build_datetimes(
-                year,
-                single.group(3), int(single.group(4)), single.group(1),
-                single.group(3), int(single.group(4)), single.group(2),
-            )
-
-        return None, None
-
-    def _build_datetimes(self, year, s_mon, s_day, s_time, e_mon, e_day, e_time):
-        """Build datetime objects from parsed fields."""
+    def _parse_iso(self, s: str):
+        """Parse ISO 8601 string (with or without Z) to naive UTC datetime."""
+        if not s:
+            return None
         try:
-            s_month = MONTH_MAP.get(s_mon)
-            e_month = MONTH_MAP.get(e_mon)
-            if not s_month or not e_month:
-                return None, None
-
-            s_hour = int(s_time[:2])
-            s_min = int(s_time[2:])
-            e_hour = int(e_time[:2])
-            e_min = int(e_time[2:])
-
-            start_dt = datetime(year, s_month, s_day, s_hour, s_min)
-
-            # Handle 2400Z as midnight next day
-            if e_hour == 24:
-                end_dt = datetime(year, e_month, e_day, 0, 0) + timedelta(days=1)
-            else:
-                end_dt = datetime(year, e_month, e_day, e_hour, e_min)
-
-            # If end is before start, it spans into next year
-            if end_dt < start_dt:
-                end_dt = end_dt.replace(year=year + 1)
-
-            return start_dt, end_dt
-
-        except (ValueError, TypeError) as e:
-            logger.debug(f"Error building contest datetime: {e}")
-            return None, None
-
-    def _detect_mode(self, title: str) -> str:
-        """Detect contest mode from title keywords."""
-        t = title.upper()
-        if 'CW' in t:
-            return 'CW'
-        if 'SSB' in t or 'PHONE' in t:
-            return 'SSB'
-        if 'RTTY' in t:
-            return 'RTTY'
-        if 'FT8' in t or 'FT4' in t or 'DIGI' in t:
-            return 'Digital'
-        return 'Mixed'
+            # Python 3.9 fromisoformat doesn't handle Z suffix
+            return datetime.fromisoformat(s.replace('Z', '+00:00')).replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            return None
 
     def _determine_status(self, start_dt, end_dt):
-        """Determine if a contest is active, upcoming, or past."""
+        """Compute active/upcoming status and a human-readable time_info string."""
         now = datetime.utcnow()
 
         if start_dt and end_dt:
@@ -200,8 +148,7 @@ class ContestDataProvider:
                 hours = int((until.total_seconds() % 86400) // 3600)
                 if days > 0:
                     return 'upcoming', f'Starts in {days}d {hours}h'
-                else:
-                    return 'upcoming', f'Starts in {hours}h'
+                return 'upcoming', f'Starts in {hours}h'
             else:
                 return 'past', 'Ended'
         elif start_dt and now < start_dt:
@@ -218,6 +165,9 @@ class ContestDataProvider:
         return {
             'timestamp': datetime.now().isoformat(),
             'contests': [],
+            'today': [],
+            'this_week': [],
+            'upcoming': [],
             'active_count': 0,
             'upcoming_count': 0,
         }

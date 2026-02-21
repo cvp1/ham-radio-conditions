@@ -224,7 +224,7 @@ class HamRadioConditions:
                 'propagation_summary': propagation_summary,
                 'live_activity': fetch_results.get('spots') or self.spots_provider._get_fallback_spots_data(),
                 'activations': fetch_results.get('activations') or {'activations': [], 'total_count': 0, 'pota_count': 0, 'sota_count': 0, 'summary': {'total': 0, 'pota': 0, 'sota': 0}},
-                'contests': fetch_results.get('contests') or {'contests': [], 'active_count': 0, 'upcoming_count': 0},
+                'contests': fetch_results.get('contests') or {'contests': [], 'today': [], 'this_week': [], 'upcoming': [], 'active_count': 0, 'upcoming_count': 0},
                 'alerts': alerts,
             }
 
