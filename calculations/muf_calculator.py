@@ -17,18 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class MUFCalculator:
-    """Calculator for Maximum Usable Frequency (MUF).
-
-    Uses real ionosonde data from GIRO network (via prop.kc2g.com) as primary
-    source, with improved formula-based calculation as fallback.
-    """
+    """Maximum Usable Frequency (MUF) from GIRO ionosonde data, with a formula fallback."""
 
     IONOSONDE_API = "https://prop.kc2g.com/api/stations.json"
-    IONOSONDE_CACHE_SECONDS = 300  # 5 minutes
+    IONOSONDE_CACHE_SECONDS = 300
 
-    # Corrected coefficients based on ionosonde validation
-    # Old values: FOF2_COEFFICIENT=0.4, M_FACTOR=0.85
-    FOF2_COEFFICIENT = 0.75  # Validated against ionosonde data
+    FOF2_COEFFICIENT = 0.75
     M_FACTOR_3000 = 3.0      # M-factor for 3000km path (typical range 2.5-4.0)
 
     def __init__(self):
@@ -55,7 +49,6 @@ class MUFCalculator:
             lat = location_data.get('lat', 40.0)
             lon = location_data.get('lon', -100.0)
 
-            # Try ionosonde data first
             ionosonde_result = self._get_ionosonde_muf(lat, lon)
 
             if ionosonde_result:
@@ -73,7 +66,6 @@ class MUFCalculator:
                     'measurement_time': ionosonde_result['timestamp']
                 }
 
-            # Fallback to formula-based calculation
             formula_muf = self._calculate_enhanced_muf(solar_data, location_data)
             formula_fof2 = self.FOF2_COEFFICIENT * math.sqrt(sfi)
 
@@ -98,16 +90,14 @@ class MUFCalculator:
             if not stations:
                 return None
 
-            # Find nearest station with valid data
             nearest = self._find_nearest_station(stations, lat, lon)
             if not nearest:
                 return None
 
-            # Calculate confidence based on distance and measurement confidence
             distance_km = nearest['distance_km']
             station_confidence = nearest['confidence'] / 100.0
 
-            # Reduce confidence for distant stations (>2000km = lower confidence)
+            # Distant stations (>2000 km) are less representative.
             distance_factor = max(0.5, 1.0 - (distance_km / 4000.0))
             overall_confidence = station_confidence * distance_factor
 
@@ -129,7 +119,6 @@ class MUFCalculator:
         """Fetch ionosonde data with caching."""
         now = datetime.now()
 
-        # Return cached data if fresh
         if (self._ionosonde_cache is not None and
             self._ionosonde_cache_time is not None and
             (now - self._ionosonde_cache_time).total_seconds() < self.IONOSONDE_CACHE_SECONDS):
@@ -143,7 +132,6 @@ class MUFCalculator:
             with urllib.request.urlopen(req, timeout=10) as response:
                 data = json.loads(response.read().decode('utf-8'))
 
-            # Filter for valid recent measurements
             valid_stations = []
             cutoff_time = now - timedelta(hours=2)
 
@@ -204,7 +192,6 @@ class MUFCalculator:
             station_lat = station['lat']
             station_lon = station['lon']
 
-            # Calculate approximate distance in km
             distance = self._haversine_distance(lat, lon_normalized, station_lat, station_lon)
 
             if distance < min_distance:
@@ -230,12 +217,7 @@ class MUFCalculator:
         return R * c
 
     def _calculate_formula_muf(self, sfi: float) -> float:
-        """Calculate MUF using corrected formula.
-
-        Uses validated coefficients:
-        - foF2 = 0.75 * sqrt(SFI)
-        - MUF(3000) = 3.0 * foF2
-        """
+        """Formula MUF: foF2 = 0.75 * sqrt(SFI); MUF(3000) = 3.0 * foF2."""
         foF2 = self.FOF2_COEFFICIENT * math.sqrt(sfi)
         muf = self.M_FACTOR_3000 * foF2
         return round(muf, 2)
@@ -247,27 +229,21 @@ class MUFCalculator:
             k_index = self._extract_k_index(solar_data)
             a_index = self._extract_a_index(solar_data)
 
-            # Base foF2 with corrected coefficient
             foF2 = self.FOF2_COEFFICIENT * math.sqrt(sfi)
 
-            # Apply geomagnetic adjustments
             # K-index: 5% reduction per point above 2
             k_adjustment = 1.0 - max(0, (k_index - 2) * 0.05)
 
             # A-index: 1% reduction per point above 10
             a_adjustment = 1.0 - max(0, (a_index - 10) * 0.01)
 
-            # Ensure adjustments don't go below 0.5
             k_adjustment = max(0.5, k_adjustment)
             a_adjustment = max(0.5, a_adjustment)
 
-            # Calculate adjusted foF2
             adjusted_foF2 = foF2 * k_adjustment * a_adjustment
 
-            # Apply M-factor for 3000km path
             muf = self.M_FACTOR_3000 * adjusted_foF2
 
-            # Apply seasonal adjustment
             lat = location_data.get('lat', 40.0)
             muf = self._apply_seasonal_adjustment(muf, lat)
 
@@ -305,7 +281,6 @@ class MUFCalculator:
     def _calculate_muf_confidence(self, muf: float, sfi: float) -> float:
         """Calculate confidence for formula-based MUF."""
         # Formula-based has lower confidence than ionosonde
-        # Base confidence around 0.6 for formula
         expected_muf = self.FOF2_COEFFICIENT * math.sqrt(sfi) * self.M_FACTOR_3000
 
         if expected_muf > 0:
@@ -328,19 +303,18 @@ class MUFCalculator:
         lat_weight = 1.0 - abs(abs_lat - 40) / 50.0
         lat_weight = max(0.2, min(1.0, lat_weight))
 
-        # Seasonal factors
         if month in (3, 4, 9, 10):  # Equinox months
-            factor = 1.0 + 0.10 * lat_weight  # +10% enhancement
+            factor = 1.0 + 0.10 * lat_weight
         elif month in (12, 1, 2):  # Winter (northern hemisphere)
             if lat >= 0:
-                factor = 1.0 + 0.05 * lat_weight  # Winter anomaly +5%
+                factor = 1.0 + 0.05 * lat_weight
             else:
-                factor = 1.0 - 0.10 * lat_weight  # Summer reduction -10%
+                factor = 1.0 - 0.10 * lat_weight
         elif month in (6, 7, 8):  # Summer (northern hemisphere)
             if lat >= 0:
-                factor = 1.0 - 0.10 * lat_weight  # Summer reduction -10%
+                factor = 1.0 - 0.10 * lat_weight
             else:
-                factor = 1.0 + 0.05 * lat_weight  # Winter anomaly +5%
+                factor = 1.0 + 0.05 * lat_weight
         else:
             factor = 1.0  # Transition months
 
@@ -358,7 +332,6 @@ class MUFCalculator:
             'method': 'Fallback'
         }
 
-    # Legacy method for backwards compatibility
     def _calculate_traditional_muf(self, sfi: float) -> float:
-        """Legacy method - now uses corrected formula."""
+        """Alias for _calculate_formula_muf, kept for compatibility."""
         return self._calculate_formula_muf(sfi)

@@ -100,7 +100,6 @@ def validate_env_file():
     
     print("🔍 Validating .env file...")
     
-    # Check required variables
     missing_required = []
     for var in required_vars:
         if var not in content or f'{var}=your_' in content:
@@ -110,7 +109,6 @@ def validate_env_file():
         print(f"❌ Missing required variables: {', '.join(missing_required)}")
         return False
     
-    # Check optional variables
     missing_optional = []
     for var in optional_vars:
         if var not in content or f'{var}=your_' in content:

@@ -8,7 +8,6 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Create blueprint
 pwa_bp = Blueprint('pwa', __name__)
 
 

@@ -40,8 +40,7 @@ class AccuracyTracker:
             'status': 'pending_validation'
         }
         
-        # Store in cache
-        cache_set('predictions', prediction_id, prediction_record, max_age=86400 * 7)  # 7 days
+        cache_set('predictions', prediction_id, prediction_record, max_age=86400 * 7)
         
         logger.info(f"Recorded prediction {prediction_id} for {prediction_type}")
         return prediction_id
@@ -49,29 +48,24 @@ class AccuracyTracker:
     def record_actual_result(self, prediction_id: str, actual_result: Dict[str, Any]) -> Dict[str, Any]:
         """Record the actual result and calculate accuracy."""
         try:
-            # Get the original prediction
             prediction_record = cache_get('predictions', prediction_id)
             if not prediction_record:
                 logger.error(f"Prediction {prediction_id} not found")
                 return {'error': 'Prediction not found'}
             
-            # Calculate accuracy metrics
             accuracy_metrics = self._calculate_accuracy_metrics(
                 prediction_record['prediction'], 
                 actual_result,
                 prediction_record['type']
             )
             
-            # Update the prediction record
             prediction_record['actual_result'] = actual_result
             prediction_record['accuracy_metrics'] = accuracy_metrics
             prediction_record['status'] = 'validated'
             prediction_record['validation_timestamp'] = datetime.now().isoformat()
             
-            # Store updated record
             cache_set('predictions', prediction_id, prediction_record, max_age=86400 * 7)
             
-            # Add to accuracy history
             self._add_to_accuracy_history(accuracy_metrics, prediction_record['type'])
             
             logger.info(f"Recorded actual result for {prediction_id}: {accuracy_metrics['overall_accuracy']:.2f}")
@@ -118,7 +112,6 @@ class AccuracyTracker:
         if actual_muf == 0:
             return {'overall_accuracy': 0.0, 'individual_metrics': {'muf_error': 'No actual MUF data'}}
         
-        # Calculate relative error
         relative_error = abs(pred_muf - actual_muf) / actual_muf
         accuracy = max(0, 1 - relative_error)
         
@@ -140,14 +133,12 @@ class AccuracyTracker:
         if not actual_bands:
             return {'overall_accuracy': 0.0, 'individual_metrics': {'band_error': 'No actual band data'}}
         
-        # Compare band quality predictions
         band_accuracy_scores = []
         for band in ['20m', '40m', '80m', '15m', '10m']:
             if band in pred_bands and band in actual_bands:
                 pred_quality = pred_bands[band].get('quality', 'Unknown')
                 actual_quality = actual_bands[band].get('quality', 'Unknown')
                 
-                # Simple quality comparison
                 quality_scores = {'Excellent': 5, 'Very Good': 4, 'Good': 3, 'Fair': 2, 'Poor': 1, 'Unknown': 0}
                 pred_score = quality_scores.get(pred_quality, 0)
                 actual_score = quality_scores.get(actual_quality, 0)
@@ -194,7 +185,7 @@ class AccuracyTracker:
         if not actual_bands:
             return {'overall_accuracy': 0.0, 'individual_metrics': {'bands_error': 'No actual bands data'}}
         
-        # Calculate Jaccard similarity (intersection over union)
+        # Jaccard similarity (intersection over union)
         pred_set = set(pred_bands)
         actual_set = set(actual_bands)
         
@@ -206,7 +197,7 @@ class AccuracyTracker:
         
         jaccard_similarity = intersection / union if union > 0 else 0
         
-        # Also calculate position-weighted accuracy
+        # Position-weighted accuracy
         position_accuracy = 0
         for i, band in enumerate(actual_bands[:5]):  # Top 5 bands
             if band in pred_bands:
@@ -240,7 +231,6 @@ class AccuracyTracker:
         
         self.accuracy_data.append(history_entry)
         
-        # Also store in cache for persistence
         cache_set('accuracy_history', f"{prediction_type}_{datetime.now().strftime('%Y%m%d')}", 
                  list(self.accuracy_data), max_age=86400 * 30)
     
@@ -248,7 +238,6 @@ class AccuracyTracker:
                            days: int = 7) -> Dict[str, Any]:
         """Get accuracy summary for specified time period."""
         try:
-            # Filter data by time period and type
             cutoff_time = datetime.now() - timedelta(days=days)
             filtered_data = []
             
@@ -261,7 +250,6 @@ class AccuracyTracker:
             if not filtered_data:
                 return {'error': 'No accuracy data available for the specified period'}
             
-            # Calculate statistics
             accuracies = [entry['accuracy'] for entry in filtered_data]
             
             summary = {
@@ -288,11 +276,9 @@ class AccuracyTracker:
         if len(accuracies) < 2:
             return 'insufficient_data'
         
-        # Simple linear trend calculation
         x = np.arange(len(accuracies))
         y = np.array(accuracies)
         
-        # Calculate slope
         slope = np.polyfit(x, y, 1)[0]
         
         if slope > 0.01:
@@ -307,12 +293,10 @@ class AccuracyTracker:
         summary = self.get_accuracy_summary(prediction_type, days=7)
         
         if 'error' in summary:
-            return 0.5  # Default confidence
+            return 0.5
         
-        # Base confidence on recent accuracy
         recent_accuracy = summary['recent_accuracy']
         
-        # Adjust for trend
         if summary['accuracy_trend'] == 'improving':
             confidence = min(0.95, recent_accuracy + 0.1)
         elif summary['accuracy_trend'] == 'declining':

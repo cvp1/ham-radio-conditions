@@ -64,7 +64,6 @@ class CacheManager:
         self.cleanup_thread = None
         self.running = False
         
-        # Start cleanup thread
         self._start_cleanup_thread()
     
     def _start_cleanup_thread(self):
@@ -79,7 +78,7 @@ class CacheManager:
         """Background worker for cache cleanup."""
         while self.running:
             try:
-                time.sleep(300)  # Run cleanup every 5 minutes (production optimized)
+                time.sleep(300)
                 self.cleanup_expired()
                 self.cleanup_oversized()
             except Exception as e:
@@ -109,12 +108,10 @@ class CacheManager:
             
             entry = cache[key]
             
-            # Check if expired
             if entry.is_expired():
                 del cache[key]
                 return None
             
-            # Mark as accessed
             entry.access()
             return entry.value
     
@@ -128,22 +125,17 @@ class CacheManager:
             cache = self.caches[cache_name]
             config = self.cache_configs[cache_name]
             
-            # Use config max_age if not specified
             if max_age is None:
                 max_age = config.get('max_age', 300)
             
-            # Create cache entry
             entry = CacheEntry(key, value, max_age)
             
-            # Check if we need to make space
             if len(cache) >= config.get('max_size', self.max_size):
                 self._evict_entries(cache_name, 1)
             
-            # Check memory limits
             if self._get_cache_memory_usage(cache_name) + entry.size > config.get('max_memory_bytes', self.max_memory_bytes):
                 self._evict_entries(cache_name, 1)
             
-            # Store the entry
             cache[key] = entry
             return True
     
@@ -195,15 +187,12 @@ class CacheManager:
                 max_size = config.get('max_size', self.max_size)
                 max_memory = config.get('max_memory_bytes', self.max_memory_bytes)
                 
-                # Check size limit
                 if len(cache) > max_size:
                     excess = len(cache) - max_size
                     self._evict_entries(cache_name, excess)
                 
-                # Check memory limit
                 current_memory = self._get_cache_memory_usage(cache_name)
                 if current_memory > max_memory:
-                    # Calculate how much memory to free
                     memory_to_free = current_memory - max_memory
                     self._evict_entries_by_memory(cache_name, memory_to_free)
     
@@ -214,10 +203,8 @@ class CacheManager:
             cache.clear()
             return
         
-        # Sort by last accessed time (oldest first)
         entries = sorted(cache.items(), key=lambda x: x[1].last_accessed)
         
-        # Remove oldest entries
         for i in range(count):
             if i < len(entries):
                 key = entries[i][0]
@@ -228,7 +215,6 @@ class CacheManager:
         cache = self.caches[cache_name]
         freed_memory = 0
         
-        # Sort by last accessed time (oldest first)
         entries = sorted(cache.items(), key=lambda x: x[1].last_accessed)
         
         for key, entry in entries:
@@ -310,7 +296,6 @@ class CacheManager:
         logger.info("Cache manager shutdown complete")
 
 
-# Global cache manager instance
 _cache_manager = None
 
 
@@ -320,41 +305,40 @@ def get_cache_manager() -> CacheManager:
     if _cache_manager is None:
         _cache_manager = CacheManager()
         
-        # Register default caches
         _cache_manager.register_cache('default', {
             'max_size': 20,
-            'max_age': 300,  # 5 minutes
-            'max_memory_bytes': 5 * 1024 * 1024  # 5MB
+            'max_age': 300,
+            'max_memory_bytes': 5 * 1024 * 1024
         })
         
         _cache_manager.register_cache('conditions', {
             'max_size': 10,
-            'max_age': 300,  # 5 minutes
-            'max_memory_bytes': 10 * 1024 * 1024  # 10MB
+            'max_age': 300,
+            'max_memory_bytes': 10 * 1024 * 1024
         })
         
         _cache_manager.register_cache('spots', {
             'max_size': 50,
-            'max_age': 120,  # 2 minutes
-            'max_memory_bytes': 5 * 1024 * 1024  # 5MB
+            'max_age': 120,
+            'max_memory_bytes': 5 * 1024 * 1024
         })
         
         _cache_manager.register_cache('weather', {
             'max_size': 20,
-            'max_age': 600,  # 10 minutes
-            'max_memory_bytes': 1 * 1024 * 1024  # 1MB
+            'max_age': 600,
+            'max_memory_bytes': 1 * 1024 * 1024
         })
 
         _cache_manager.register_cache('activations', {
             'max_size': 10,
-            'max_age': 180,  # 3 minutes
-            'max_memory_bytes': 2 * 1024 * 1024  # 2MB
+            'max_age': 180,
+            'max_memory_bytes': 2 * 1024 * 1024
         })
 
         _cache_manager.register_cache('contests', {
             'max_size': 5,
-            'max_age': 1800,  # 30 minutes
-            'max_memory_bytes': 1 * 1024 * 1024  # 1MB
+            'max_age': 1800,
+            'max_memory_bytes': 1 * 1024 * 1024
         })
     
     return _cache_manager

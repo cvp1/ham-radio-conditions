@@ -1,9 +1,4 @@
-"""
-Refactored Ham Radio Conditions - Main Application Class
-
-This is a simplified, refactored version of the original HamRadioConditions class
-that uses extracted data source and calculation modules.
-"""
+"""Lightweight HamRadioConditions variant with a fixed location and sequential fetches."""
 
 import os
 import time
@@ -12,20 +7,17 @@ from typing import Dict, Optional, List
 import logging
 from dotenv import load_dotenv
 
-# Import our refactored modules
 from data_sources import SolarDataProvider, WeatherDataProvider, SpotsDataProvider, GeomagneticDataProvider
 from calculations import MUFCalculator, PropagationCalculator, BandOptimizer, TimeAnalyzer
 from utils.cache_manager import cache_get, cache_set
 from dxcc_data import get_dxcc_by_grid, grid_to_latlon
 
-# Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
 
-# Load environment variables
 load_dotenv()
 
 
@@ -34,20 +26,15 @@ class HamRadioConditions:
     
     def __init__(self, zip_code: Optional[str] = None):
         """Initialize the ham radio conditions system."""
-        # Version information
         self.version = "2.2.0"
         self.build_date = "2024-12-19"
         
-        # Location setup
         self._setup_location(zip_code)
         
-        # Initialize data providers
         self._initialize_data_providers()
         
-        # Initialize calculators
         self._initialize_calculators()
         
-        # Initialize state
         self._initialize_state()
         
         logger.info(f"HamRadioConditions initialized for {self.grid_square}")
@@ -55,14 +42,14 @@ class HamRadioConditions:
     def _setup_location(self, zip_code: Optional[str]):
         """Setup location data from ZIP code."""
         if not zip_code:
-            zip_code = "85630"  # Default to St. David, AZ
+            zip_code = "85630"
         
-        # Convert ZIP to coordinates (simplified)
+        # Fixed coordinates; the ZIP is not geocoded here.
         self.zip_code = zip_code
-        self.lat = 31.8973  # Would be calculated from ZIP
-        self.lon = -110.2154  # Would be calculated from ZIP
-        self.grid_square = "DM41vv"  # Would be calculated from coordinates
-        self.timezone = "America/Los_Angeles"  # Would be determined from location
+        self.lat = 31.8973
+        self.lon = -110.2154
+        self.grid_square = "DM41vv"
+        self.timezone = "America/Los_Angeles"
     
     def _initialize_data_providers(self):
         """Initialize data source providers."""
@@ -90,13 +77,11 @@ class HamRadioConditions:
     def generate_report(self) -> Optional[Dict]:
         """Generate complete conditions report with caching."""
         try:
-            # Try to get from cache first
             cached_report = cache_get('conditions', 'current')
             if cached_report:
                 cached_report['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
                 return cached_report
             
-            # Generate new report
             report = {
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z'),
                 'callsign': self.callsign,
@@ -107,8 +92,7 @@ class HamRadioConditions:
                 'live_activity': self.get_live_activity()
             }
             
-            # Cache the report
-            cache_set('conditions', 'current', report, max_age=600)  # 10 minutes
+            cache_set('conditions', 'current', report, max_age=600)
             logger.info("Generated and cached new conditions report")
             
             return report
@@ -149,15 +133,12 @@ class HamRadioConditions:
                 'grid_square': self.grid_square
             }
             
-            # Calculate MUF
             muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
             
-            # Calculate propagation
             propagation_data = self.propagation_calculator.calculate_propagation(
                 solar_data, weather_data, muf_data
             )
             
-            # Get geomagnetic data
             geomagnetic_data = self.geomagnetic_provider.get_geomagnetic_coordinates()
             
             return {
@@ -218,14 +199,12 @@ class HamRadioConditions:
         print("📊 HAM RADIO CONDITIONS REPORT")
         print("="*60)
         
-        # Solar conditions
         if 'solar_conditions' in report:
             solar = report['solar_conditions']
             print(f"☀️  Solar Flux: {solar.get('sfi', 'N/A')}")
             print(f"📡 K-Index: {solar.get('k_index', 'N/A')}")
             print(f"🌡️  A-Index: {solar.get('a_index', 'N/A')}")
         
-        # Propagation summary
         if 'propagation_summary' in report:
             prop = report['propagation_summary']
             print(f"\n📈 MUF: {prop.get('muf', 'N/A')} MHz")
@@ -240,15 +219,13 @@ def main():
     print("🔧 Ham Radio Conditions - Refactored Version")
     print("=" * 60)
     
-    # Get location from user
     zip_code = input("Enter your ZIP code (or press Enter for default): ").strip()
     if not zip_code:
-        zip_code = "85630"  # Default to St. David, AZ
+        zip_code = "85630"
     
     print(f"📍 Location: {zip_code}")
     print("🔄 Initializing system...")
     
-    # Create conditions instance
     hrc = HamRadioConditions(zip_code=zip_code)
     
     def update_report():
@@ -257,7 +234,6 @@ def main():
             print(f"\n⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("-" * 60)
             
-            # Generate report
             report = hrc.generate_report()
             
             if report:
@@ -268,7 +244,6 @@ def main():
         except Exception as e:
             print(f"❌ Error updating report: {e}")
     
-    # Generate initial report
     print("📋 Generating initial report...")
     update_report()
 
@@ -277,11 +252,10 @@ def main():
         last_update = time.time()
         while True:
             current_time = time.time()
-            # Update every hour
-            if current_time - last_update >= 3600:  # 1 hour
+            if current_time - last_update >= 3600:
                 update_report()
                 last_update = current_time
-            time.sleep(60)  # Check every minute
+            time.sleep(60)
     except KeyboardInterrupt:
         print("\n👋 Shutting down...")
 

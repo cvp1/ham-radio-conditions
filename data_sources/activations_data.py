@@ -20,7 +20,7 @@ class ActivationsDataProvider:
     """Provider for POTA and SOTA activation data."""
 
     def __init__(self):
-        self.cache_duration = 180  # 3 minutes
+        self.cache_duration = 180
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
 

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ham Radio Conditions</title>
     
-    <!-- PWA Meta Tags -->
     <meta name="description" content="Real-time ham radio propagation conditions, solar weather, and live spots">
     <meta name="theme-color" content="#0B0F19">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +12,6 @@
     <meta name="apple-mobile-web-app-title" content="Ham Radio">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <!-- Safari-specific meta tags -->
     <meta name="apple-touch-fullscreen" content="yes">
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
@@ -23,10 +21,8 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     
-    <!-- App Icons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-72x72.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-72x72.png">
     <link rel="apple-touch-icon" href="/static/icons/icon-152x152.png">
@@ -34,13 +30,12 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="167x167" href="/static/icons/icon-152x152.png">
     
-    <!-- Stylesheets -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <style>
-        /* Dark Modern Design System */
+        /* Theme variables */
         :root {
             --bg-base: #0B0F19;
             --bg-surface: #111827;
@@ -58,7 +53,7 @@
             --shadow-card: 0 1px 3px rgba(0,0,0,0.4);
         }
 
-        /* Card Design */
+        /* Cards */
         .card {
             background: var(--bg-surface);
             border: 1px solid var(--border-subtle);
@@ -71,7 +66,7 @@
             border-color: var(--border-default);
         }
 
-        /* Professional Typography */
+        /* Typography */
         .font-display {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-weight: 700;
@@ -90,7 +85,7 @@
             line-height: 1.6;
         }
 
-        /* Enhanced Status Indicators */
+        /* Status indicators */
         .status-indicator {
             display: inline-flex;
             align-items: center;
@@ -193,7 +188,7 @@
             border-color: var(--border-default);
         }
 
-        /* Professional Progress Bars */
+        /* Progress bars */
         .progress-bar {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 9999px;
@@ -538,13 +533,11 @@
     </style>
 </head>
 <body class="min-h-screen" style="background: var(--bg-base); color: var(--text-primary);">
-    <!-- Hidden data element -->
     <script id="data" type="application/json">
         {{ data|tojson|safe }}
     </script>
 
     <div class="container mx-auto px-4 py-8">
-        <!-- Header with Current Status -->
         <header class="text-center mb-8">
             <div class="flex items-center justify-between mb-6">
                 <div class="w-24"></div>
@@ -560,7 +553,6 @@
                 <div id="data-confidence" class="hidden text-xs mt-1">
                     <span id="data-source-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"></span>
                 </div>
-                <!-- Location Display and ZIP Input -->
                 <div class="flex items-center justify-center gap-4 flex-wrap">
                     <div id="location-display" class="text-gray-400 font-body">
                         <span id="location-city">Loading...</span>
@@ -572,7 +564,6 @@
                         <span>Change Location</span>
                     </button>
                 </div>
-                <!-- ZIP Code Input (hidden by default) -->
                 <div id="zip-input-container" class="hidden mt-4">
                     <div class="flex items-center justify-center gap-2 max-w-xs mx-auto">
                         <input type="text"
@@ -595,7 +586,6 @@
             </div>
         </header>
 
-        <!-- Error Banner (hidden by default) -->
         <div id="error-banner" class="error-banner mb-4 hidden">
             <i class="fas fa-exclamation-triangle text-red-400"></i>
             <span id="error-message" class="text-red-300 text-sm flex-1"></span>
@@ -604,10 +594,8 @@
             </button>
         </div>
 
-        <!-- Alerts Section -->
         <div id="alerts-container" class="mb-6"></div>
 
-        <!-- Tab Bar -->
         <div class="tab-bar" id="tab-bar">
             <button class="tab-btn active" data-tab="conditions" onclick="switchTab('conditions')">
                 <i class="fas fa-satellite-dish mr-2"></i><span class="tab-label">Conditions</span>
@@ -626,12 +614,10 @@
         <!-- ============ TAB 1: CONDITIONS ============ -->
         <div id="tab-conditions" class="tab-panel active">
 
-            <!-- Band Status Pills -->
             <div id="band-status-pills" class="mb-6 mt-6">
                 <div class="band-pills-row" id="band-pills-container"></div>
             </div>
 
-            <!-- Current Conditions Section -->
             <div class="mb-8">
                 <h2 class="text-2xl font-heading mb-4 flex items-center">
                     <i class="fas fa-satellite-dish mr-3 section-icon icon-propagation text-2xl"></i>
@@ -639,7 +625,6 @@
                 </h2>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- Solar Conditions -->
                     <div class="card current-conditions rounded-lg p-4">
                         <h3 class="text-lg font-heading mb-3 flex items-center">
                             <i class="fas fa-sun mr-2 icon-solar"></i>
@@ -648,7 +633,6 @@
                         <div id="solar-conditions" class="space-y-2 text-sm"></div>
                     </div>
 
-                    <!-- MUF & Propagation -->
                     <div class="card current-conditions rounded-lg p-4">
                         <h3 class="text-lg font-heading mb-3 flex items-center">
                             <i class="fas fa-broadcast-tower mr-2 icon-propagation"></i>
@@ -657,7 +641,6 @@
                         <div id="propagation-current" class="space-y-2 text-sm"></div>
                     </div>
 
-                    <!-- Best Bands -->
                     <div class="card current-conditions rounded-lg p-4">
                         <h3 class="text-lg font-heading mb-3 flex items-center">
                             <i class="fas fa-signal mr-2 icon-band"></i>
@@ -666,7 +649,6 @@
                         <div id="best-bands-current" class="space-y-2 text-sm"></div>
                     </div>
 
-                    <!-- Weather -->
                     <div class="card current-conditions rounded-lg p-4">
                         <h3 class="text-lg font-heading mb-3 flex items-center">
                             <i class="fas fa-cloud-sun mr-2 icon-weather"></i>
@@ -677,7 +659,6 @@
                 </div>
             </div>
 
-            <!-- Detailed Band Conditions -->
             <div class="mb-8">
                 <h2 class="text-2xl font-heading mb-4 flex items-center">
                     <i class="fas fa-signal mr-3 section-icon icon-band text-2xl"></i>
@@ -688,7 +669,6 @@
                 </div>
             </div>
 
-            <!-- Solar Cycle Analysis -->
             <div class="mb-8">
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
@@ -699,7 +679,6 @@
                 </div>
             </div>
 
-            <!-- Conditions Trend Chart -->
             <div class="mb-8">
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
@@ -718,7 +697,6 @@
         <!-- ============ TAB 2: ACTIVITY ============ -->
         <div id="tab-activity" class="tab-panel">
 
-            <!-- Live Activity -->
             <div class="mb-8 mt-6">
                 <h2 class="text-2xl font-heading mb-4 flex items-center">
                     <i class="fas fa-broadcast-tower mr-3 section-icon icon-spots text-2xl"></i>
@@ -776,7 +754,6 @@
                 </div>
             </div>
 
-            <!-- POTA/SOTA Activations -->
             <div id="activations-section" class="mb-8" style="display:none;">
                 <h2 class="text-2xl font-heading mb-4 flex items-center">
                     <i class="fas fa-mountain-sun mr-3 section-icon text-green-400 text-2xl"></i>
@@ -784,7 +761,6 @@
                 </h2>
 
                 <div class="card rounded-lg p-6">
-                    <!-- Summary Cards -->
                     <div id="activations-summary" class="grid grid-cols-3 gap-4 mb-6">
                         <div class="data-card text-center">
                             <div class="text-gray-400 font-body text-sm mb-1">Total</div>
@@ -800,7 +776,6 @@
                         </div>
                     </div>
 
-                    <!-- Activations Table -->
                     <div class="overflow-x-auto">
                         <table class="table-professional min-w-full">
                             <thead>
@@ -836,7 +811,6 @@
                     <span id="contests-loading" class="loading-spinner ml-3" style="display:none;"></span>
                 </h2>
 
-                <!-- Contest sub-tabs -->
                 <div class="flex gap-2 mb-4 border-b border-gray-700">
                     <button id="ctab-today" class="contest-tab-btn active px-4 py-2 text-sm font-heading border-b-2 text-white" onclick="switchContestTab('today')">
                         <i class="fas fa-calendar-day mr-1"></i>Today
@@ -876,7 +850,6 @@
         <!-- ============ TAB 4: STRATEGY ============ -->
         <div id="tab-strategy" class="tab-panel">
 
-            <!-- Executive Summary -->
             <div class="mb-8 mt-6">
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
@@ -889,7 +862,6 @@
                 </div>
             </div>
 
-            <!-- Operating Strategy & Recommendations -->
             <div class="mb-8">
                 <div class="card future-predictions rounded-lg p-6">
                     <h3 class="text-xl font-heading mb-4 flex items-center">
@@ -902,7 +874,6 @@
 
         </div><!-- /tab-strategy -->
 
-        <!-- Footer -->
         <footer class="mt-16 pt-8 border-t border-gray-800">
             <div class="container mx-auto px-4">
                 <div class="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
@@ -929,10 +900,8 @@
     </div>
 
     <script>
-        // Global Safari detection
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-        // Tab switching
         function switchTab(tabId) {
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -949,7 +918,6 @@
             }
         }
 
-        // Cache DOM elements
         const timestampEl = document.getElementById('timestamp');
         const locationEl = document.getElementById('location');
         const solarDiv = document.getElementById('solar-conditions');
@@ -963,7 +931,6 @@
         const summaryDiv = document.getElementById('activity-summary');
         const tableBody = document.getElementById('spots-table-body');
 
-        // Helper: Safely set innerHTML
         function safeSetHTML(el, html) {
             if (el) el.innerHTML = html;
         }
@@ -980,7 +947,6 @@
             }
         }
 
-        // Helper: Format value
         function formatValue(key, value) {
             if (key === 'sfi') {
                 const cleanValue = value.toString().replace(' SFI', '');
@@ -997,7 +963,6 @@
             return value;
         }
 
-        // Helper: Condition class
         function updateConditionClass(condition) {
             if (typeof condition !== 'string') return '';
             condition = condition.toLowerCase();
@@ -1007,7 +972,6 @@
             return '';
         }
 
-        // Helper: Propagation quality class
         function getPropagationQualityClass(quality) {
             if (typeof quality !== 'string') return '';
             quality = quality.toLowerCase();
@@ -1018,14 +982,12 @@
             return '';
         }
 
-        // Helper: Get priority class
         function getPriorityClass(priority) {
             if (priority >= 8) return 'priority-high';
             if (priority >= 5) return 'priority-medium';
             return 'priority-low';
         }
 
-        // Location input elements
         const changeLocationBtn = document.getElementById('change-location-btn');
         const zipInputContainer = document.getElementById('zip-input-container');
         const zipInput = document.getElementById('zip-input');
@@ -1036,7 +998,6 @@
         const locationCity = document.getElementById('location-city');
         const locationGrid = document.getElementById('location-grid');
 
-        // Toggle ZIP input visibility
         if (changeLocationBtn) {
             changeLocationBtn.addEventListener('click', () => {
                 zipInputContainer.classList.toggle('hidden');
@@ -1046,7 +1007,6 @@
             });
         }
 
-        // Cancel ZIP input
         if (zipCancelBtn) {
             zipCancelBtn.addEventListener('click', () => {
                 zipInputContainer.classList.add('hidden');
@@ -1056,7 +1016,6 @@
             });
         }
 
-        // Preview ZIP on input
         if (zipInput) {
             let previewTimeout;
             zipInput.addEventListener('input', (e) => {
@@ -1079,7 +1038,6 @@
             });
         }
 
-        // Submit ZIP
         if (zipSubmitBtn) {
             zipSubmitBtn.addEventListener('click', () => {
                 if (zipInput.value.length === 5) {
@@ -1090,7 +1048,6 @@
             });
         }
 
-        // Lookup ZIP for preview
         async function lookupZip(zip) {
             try {
                 const response = await fetch(`/api/location/lookup?zip=${zip}`);
@@ -1106,7 +1063,6 @@
             }
         }
 
-        // Update location
         async function updateLocation(zip) {
             try {
                 zipSubmitBtn.disabled = true;
@@ -1121,16 +1077,13 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Update display
                     locationCity.textContent = `${data.city}, ${data.state}`;
                     locationGrid.textContent = data.grid_square;
 
-                    // Hide input
                     zipInputContainer.classList.add('hidden');
                     zipInput.value = '';
                     zipPreview.classList.add('hidden');
 
-                    // Refresh conditions data
                     fetchConditions();
                 } else {
                     showZipError(data.error || 'Failed to update location');
@@ -1148,11 +1101,9 @@
             zipError.classList.remove('hidden');
         }
 
-        // UI update functions
         function updateTimestampAndLocation(data) {
             if (timestampEl) timestampEl.textContent = `Last Updated: ${data.timestamp}`;
 
-            // Update location display
             if (data.location) {
                 const loc = data.location;
                 if (locationCity) {
@@ -1163,7 +1114,6 @@
                 }
             }
 
-            // Update data confidence indicator
             const confidenceDiv = document.getElementById('data-confidence');
             const badge = document.getElementById('data-source-badge');
             if (confidenceDiv && badge) {
@@ -1218,7 +1168,6 @@
                     `;
                 }).join(''));
 
-            // Fetch and render sparklines after DOM is updated
             fetchAndRenderSparklines();
         }
 
@@ -1228,7 +1177,6 @@
             const summary = data.propagation_summary;
             const params = summary.propagation_parameters || {};
             
-            // Get solar analysis for propagation context
             const solarConditions = data.solar_conditions || {};
             const sfi = parseInt(solarConditions.sfi) || 0;
             const kIndex = parseInt(solarConditions.k_index) || 0;
@@ -1248,7 +1196,6 @@
                         <span class="font-semibold">${summary.day_night || 'N/A'}</span>
                     </div>
                     
-                    <!-- Solar Impact on Propagation -->
                     <div class="mt-2 p-2 bg-blue-900/20 border-l-4 border-blue-500 rounded">
                         <div class="text-blue-200 text-xs font-semibold mb-1">Solar Impact:</div>
                         <div class="text-xs text-gray-300 space-y-1">
@@ -1268,7 +1215,6 @@
             const params = summary.propagation_parameters || {};
             const bestBands = params.best_bands || [];
             
-            // Get solar analysis for band selection context
             const solarConditions = data.solar_conditions || {};
             const sfi = parseInt(solarConditions.sfi) || 0;
             const kIndex = parseInt(solarConditions.k_index) || 0;
@@ -1290,7 +1236,6 @@
                         ).join('')}
                     </div>
                     
-                    <!-- Solar Context for Band Selection -->
                     <div class="mt-3 p-2 bg-yellow-900/20 border-l-4 border-yellow-500 rounded">
                         <div class="text-yellow-200 text-xs font-semibold mb-1">Solar Context:</div>
                         <div class="text-xs text-gray-300 space-y-1">
@@ -1394,7 +1339,6 @@
                 const state = w.state || loc.state || '';
                 const locationStr = city && state ? `${city}, ${state}` : city || state || 'N/A';
 
-                // Format weather fields with units
                 const formatWeather = (key, value) => {
                     switch(key) {
                         case 'temperature': return `${Math.round(value)}°F`;
@@ -1448,14 +1392,12 @@
             const quality = params.quality || 'Unknown';
             const dayNight = summary.day_night || 'Unknown';
             
-            // Set global data for band strategy analysis
             window.currentPhase3Data = summary.enhanced_data_sources?.ionospheric?.phase3_enhancements;
             window.currentSolarConditions = data.solar_conditions;
             
-            // Create a strategic operating plan
             const strategy = createOperatingStrategy({
                 muf, quality, bestBands, dayNight, solarCycle, recommendations,
-                fullData: data  // Pass the full data structure for Phase 3 intelligence
+                fullData: data
             });
             
             safeSetHTML(recommendationsDiv, strategy);
@@ -1464,7 +1406,6 @@
         function createOperatingStrategy(data) {
             const { muf, quality, bestBands, dayNight, solarCycle, recommendations, fullData } = data;
             
-            // Get comprehensive solar analysis data
             const solarConditions = fullData?.solar_conditions || {};
             const enhancedData = fullData?.propagation_summary?.enhanced_data_sources || {};
             const phase3 = fullData?.propagation_summary?.enhanced_data_sources?.ionospheric?.phase3_enhancements;
@@ -1473,10 +1414,8 @@
             const mufSource = fullData?.propagation_summary?.propagation_parameters?.muf_source;
             const mufConfidence = fullData?.propagation_summary?.propagation_parameters?.muf_confidence;
             
-            // Parse MUF as number for proper comparison
             const mufValue = parseFloat(muf) || 0;
             
-            // Determine overall strategy based on conditions and Phase 3 data
             let overallStrategy = '';
             let strategyColor = '';
             let strategyRationale = '';
@@ -1501,13 +1440,11 @@
             
             return `
                 <div class="space-y-6">
-                    <!-- Strategic Overview -->
                     <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-blue-500">
                         <div class="text-sm text-gray-400 mb-2">STRATEGIC ANALYSIS</div>
                         <div class="space-y-3">
                             <div class="text-lg font-bold ${strategyColor} mb-2">${overallStrategy}</div>
                             
-                            <!-- MUF Analysis -->
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">MUF Analysis</div>
                                 <div class="text-xs text-gray-300">
@@ -1531,7 +1468,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Propagation Quality Impact -->
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">Propagation Quality Impact</div>
                                 <div class="text-xs text-gray-300">
@@ -1542,7 +1478,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Time-of-Day Considerations -->
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">Time-of-Day Considerations</div>
                                 <div class="text-xs text-gray-300">
@@ -1551,7 +1486,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Strategic Rationale -->
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">Why This Strategy?</div>
                                 <div class="text-xs text-gray-300">
@@ -1567,7 +1501,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Comprehensive Solar Analysis -->
                             <div class="bg-gray-700 p-3 rounded-lg">
                                 <div class="text-sm text-blue-300 font-semibold mb-1">Solar Analysis Integration</div>
                                 <div class="text-xs text-gray-300">
@@ -1624,7 +1557,6 @@
                         </div>
                     </div>
                     
-                    <!-- Band Strategy Analysis -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">BAND STRATEGY ANALYSIS</div>
                         <div class="bg-gray-800 p-4 rounded-lg">
@@ -1632,7 +1564,6 @@
                         </div>
                     </div>
                     
-                    <!-- Band Strategy -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">BAND STRATEGY</div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1640,14 +1571,12 @@
                         </div>
                     </div>
 
-                    <!-- Enhanced Data Sources Integration -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">ENHANCED DATA SOURCES</div>
                         <div class="bg-gray-800 p-4 rounded-lg border-l-4 border-green-500">
                             <div class="space-y-3">
                                 <div class="text-sm text-green-300 font-semibold mb-2">Multi-Source Data Integration</div>
                                 
-                                <!-- Phase 3 Enhanced Intelligence -->
                                 ${phase3 ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
                                     <div class="text-sm text-purple-200 font-semibold mb-1">Phase 3 Advanced Intelligence</div>
@@ -1659,7 +1588,6 @@
                             </div>
                         ` : ''}
                         
-                                <!-- Enhanced Validation -->
                                 ${enhancedData.enhanced_validation ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
                                     <div class="text-sm text-green-200 font-semibold mb-1">Enhanced Validation</div>
@@ -1671,7 +1599,6 @@
                             </div>
                         ` : ''}
                         
-                                <!-- Geomagnetic Coordinates -->
                                 ${enhancedData.geomagnetic_coordinates ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
                                     <div class="text-sm text-green-200 font-semibold mb-1">Geomagnetic Coordinates</div>
@@ -1683,7 +1610,6 @@
                             </div>
                         ` : ''}
                         
-                                <!-- Additional Sources -->
                                 ${enhancedData.additional_sources ? `
                                 <div class="bg-gray-700 p-3 rounded-lg">
                                     <div class="text-sm text-green-200 font-semibold mb-1">Additional Sources</div>
@@ -1696,7 +1622,6 @@
                         </div>
                         </div>
                         
-                    <!-- Operating Tactics -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">OPERATING TACTICS</div>
                         <div class="space-y-2">
@@ -1704,7 +1629,6 @@
                                 </div>
                             </div>
                     
-                    <!-- Time-Based Strategy -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">TIME-BASED STRATEGY</div>
                         <div class="bg-gray-800 p-3 rounded-lg">
@@ -1712,7 +1636,6 @@
                         </div>
                     </div>
 
-                    <!-- Phase 3 Advanced Intelligence -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">PHASE 3: ADVANCED INTELLIGENCE</div>
                         <div class="bg-gray-800 p-4 rounded-lg">
@@ -1720,7 +1643,6 @@
                                     </div>
                                 </div>
                     
-                    <!-- Success Metrics -->
                     <div class="space-y-3">
                         <div class="text-sm text-gray-400 font-semibold">SUCCESS METRICS</div>
                         <div class="grid grid-cols-2 gap-3 text-sm">
@@ -1746,13 +1668,12 @@
             const primaryBands = bestBands.slice(0, 3);
             const secondaryBands = bestBands.slice(3, 5);
             
-            // Create band frequency mapping
             const bandFreqs = {
                 '160m': 1.8, '80m': 3.5, '40m': 7.0, '30m': 10.1,
                 '20m': 14.0, '17m': 18.1, '15m': 21.0, '12m': 24.9, '10m': 28.0, '6m': 50.0
             };
             
-            // Analyze why bands are ranked as they are
+            // Explain each band's ranking
             const analyzeBand = (band) => {
                 const freq = bandFreqs[band];
                 if (!freq || !muf) return '';
@@ -1801,7 +1722,6 @@
         function createOperatingTactics(muf, quality, dayNight, solarCycle) {
             const tactics = [];
             
-            // MUF-based tactics
             if (muf > 20) {
                 tactics.push({
                     tactic: 'High Power DX Operation',
@@ -1832,7 +1752,6 @@
                 });
             }
             
-            // Time-based tactics
             if (dayNight === 'Day') {
                 tactics.push({
                     tactic: 'F2 Layer Exploitation',
@@ -1849,7 +1768,6 @@
                 });
             }
             
-            // Solar cycle tactics
             if (solarCycle.phase && solarCycle.phase.includes('Maximum')) {
                 tactics.push({
                     tactic: 'Solar Maximum Advantage',
@@ -1891,7 +1809,6 @@
                 });
             }
             
-            // Add MUF-based time adjustments
             if (muf > 20) {
                 timeStrategy.push({
                     period: 'High MUF Conditions',
@@ -1924,11 +1841,9 @@
         }
 
         function createBandStrategyAnalysis(bestBands, muf, dayNight) {
-            // Get comprehensive data for enhanced analysis
-            const phase3 = window.currentPhase3Data; // We'll set this globally
-            const solarConditions = window.currentSolarConditions; // We'll set this globally
+            const phase3 = window.currentPhase3Data;
+            const solarConditions = window.currentSolarConditions;
             
-            // Define band characteristics and scoring factors
             const bandInfo = {
                 '160m': { freq: 1.8, day_optimal: false, night_optimal: true, weather_impact: 'low' },
                 '80m': { freq: 3.5, day_optimal: false, night_optimal: true, weather_impact: 'low' },
@@ -1942,7 +1857,6 @@
                 '6m': { freq: 50.0, day_optimal: true, night_optimal: false, weather_impact: 'very_high' }
             };
             
-            // Calculate strategic analysis for each band
             const analysis = Object.keys(bandInfo).map(band => {
                 const info = bandInfo[band];
                 const mufRatio = info.freq / muf;
@@ -1950,7 +1864,6 @@
                 const timeOptimal = (dayNight === 'Day' && info.day_optimal) || 
                                    (dayNight === 'Night' && info.night_optimal);
                 
-                // Calculate strategic score components
                 let mufScore = 0;
                 let timeScore = 0;
                 let weatherScore = 0;
@@ -1966,13 +1879,11 @@
                 else if (mufRatio <= 1.5) mufScore = 15; // Above MUF
                 else mufScore = 5;                        // Well above MUF
                 
-                // Time optimization scoring
                 if (timeOptimal) timeScore = 40;
                 else if (dayNight === 'Day' && info.day_optimal === false) timeScore = 20;
                 else if (dayNight === 'Night' && info.night_optimal === false) timeScore = 20;
                 else timeScore = 30;
                 
-                // Weather impact scoring
                 switch(info.weather_impact) {
                     case 'very_high': weatherScore = 35; break;
                     case 'high': weatherScore = 30; break;
@@ -1996,7 +1907,6 @@
                 };
             }).sort((a, b) => b.totalScore - a.totalScore);
             
-            // Generate analysis display
             let phase3Explanation = '';
             let solarExplanation = '';
             
@@ -2134,12 +2044,10 @@
 
         function createPhase3Intelligence(data) {
             try {
-                // Debug: Log what data we're receiving
                 console.log('createPhase3Intelligence called with data:', data);
                 console.log('Data keys:', Object.keys(data || {}));
                 console.log('Data structure:', JSON.stringify(data, null, 2));
                 
-                // Look for Phase 3 data in the correct location: enhanced_data_sources.ionospheric.phase3_enhancements
                 const phase3 = data.propagation_summary?.enhanced_data_sources?.ionospheric?.phase3_enhancements;
                 
                 console.log('Phase3 data found:', phase3);
@@ -2150,7 +2058,6 @@
                     return '<div class="text-gray-400 text-sm">Phase 3 data not available</div>';
                 }
                 
-                // Check if we have detailed Phase 3 data or just metadata
                 const hasDetailedData = phase3.seasonal_analysis || phase3.auroral_analysis || phase3.storm_prediction || phase3.muf_evolution;
                 
                 if (!hasDetailedData) {
@@ -2194,13 +2101,11 @@
                     `;
                 }
                 
-                // Show detailed data when available
                 const seasonal = phase3.seasonal_analysis || {};
                 const auroral = phase3.auroral_analysis || {};
                 const storm = phase3.storm_prediction || {};
                 const mufEvolution = phase3.muf_evolution || {};
                 
-                // Get actual values with fallbacks
                 const currentSeason = seasonal.current_season || 'Unknown';
                 const mufMultiplier = seasonal.seasonal_factors?.muf_multiplier?.toFixed(2) || '1.00';
                 const activityLevel = auroral.activity_level?.replace('_', ' ').toUpperCase() || 'Unknown';
@@ -2215,7 +2120,6 @@
                 
                 return `
                     <div class="space-y-4">
-                        <!-- Seasonal Analysis -->
                                 <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-blue-300 font-semibold mb-2">Seasonal Patterns</div>
                             <div class="grid grid-cols-2 gap-3 text-xs">
@@ -2239,7 +2143,6 @@
                             ` : '') + `
                         </div>
                         
-                        <!-- Auroral Activity -->
                                 <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-purple-300 font-semibold mb-2">Auroral Activity</div>
                             <div class="grid grid-cols-2 gap-3 text-xs">
@@ -2264,7 +2167,6 @@
                                         </div>
                                     </div>
                                 
-                        <!-- Storm Prediction -->
                                     <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-red-300 font-semibold mb-2">Storm Prediction</div>
                             <div class="grid grid-cols-2 gap-3 text-xs">
@@ -2294,7 +2196,6 @@
                             ` : '') + `
                 </div>
                         
-                        <!-- MUF Evolution -->
                         <div class="bg-gray-700 p-3 rounded-lg">
                             <div class="text-sm text-green-300 font-semibold mb-2">MUF Evolution (Phase 3)</div>
                             <div class="space-y-2 text-xs">
@@ -2338,11 +2239,9 @@
             const params = summary.propagation_parameters || {};
             const solarCycle = summary.solar_cycle || {};
             
-            // Get Phase 3 advanced intelligence data
             const phase3 = summary.enhanced_data_sources?.ionospheric?.phase3_enhancements;
             const hasPhase3 = phase3 && (phase3.seasonal_analysis || phase3.auroral_analysis || phase3.storm_prediction);
             
-            // Create a coherent executive summary
             const currentTime = summary.current_time || 'Unknown';
             const dayNight = summary.day_night || 'Unknown';
             const muf = params.muf || 'N/A';
@@ -2352,7 +2251,6 @@
             
             safeSetHTML(executiveSummaryDiv, `
                 <div class="space-y-4">
-                    <!-- Current Status Overview -->
                     <div class="bg-gray-800 p-4 rounded-lg">
                         <div class="text-sm text-gray-400 mb-2">Current Status</div>
                         <div class="grid grid-cols-2 gap-4 text-sm">
@@ -2375,7 +2273,6 @@
                 </div>
                 </div>
                     
-                    <!-- Key Findings -->
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">Key Findings:</div>
                         <div class="text-sm text-gray-300 space-y-1">
@@ -2389,7 +2286,6 @@
                         </div>
                     </div>
                     
-                    <!-- Advanced Intelligence Summary -->
                     ${hasPhase3 ? `
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">Advanced Intelligence:</div>
@@ -2407,7 +2303,6 @@
                     </div>
                     ` : ''}
                     
-                    <!-- Outlook -->
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">Outlook:</div>
                         <div class="text-sm text-gray-300">
@@ -2426,7 +2321,6 @@
             
             safeSetHTML(solarCycleDiv, `
                 <div class="space-y-4">
-                    <!-- Current Status -->
                     <div class="space-y-2">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">Phase:</span>
@@ -2446,7 +2340,6 @@
                     </div>
                 </div>
                 
-                    <!-- Trend Analysis -->
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">Trend Analysis:</div>
                         <div class="flex justify-between items-center">
@@ -2458,7 +2351,6 @@
                     </div>
                         </div>
                         
-                    <!-- Prediction -->
                     <div class="space-y-2">
                         <div class="text-sm text-gray-400 font-semibold">HF Conditions Forecast:</div>
                         <div class="text-sm text-gray-300">
@@ -2469,7 +2361,6 @@
                         </div>
                     </div>
                     
-                    <!-- Calculation Method -->
                     <div class="text-xs text-gray-500 border-t border-gray-700 pt-2">
                         ${solarCycle.calculation_method || 'Calculation method not specified'}
                     </div>
@@ -2486,11 +2377,9 @@
             const solarCycle = summary.solar_cycle || {};
             const aurora = summary.aurora_conditions || {};
             
-            // Analyze risks based on current conditions
             const risks = [];
             const warnings = [];
             
-            // Check geomagnetic activity
             const kIndex = data.solar_conditions?.k_index || 0;
             if (kIndex >= 6) {
                 risks.push({
@@ -2515,7 +2404,6 @@
                 });
             }
             
-            // Check solar flux
             const sfi = parseInt(data.solar_conditions?.sfi) || 0;
             if (sfi < 60) {
                 risks.push({
@@ -2526,7 +2414,6 @@
                 });
             }
             
-            // Check aurora conditions
             const auroraValue = parseInt(data.solar_conditions?.aurora) || 0;
             if (auroraValue >= 5) {
                 warnings.push({
@@ -2537,7 +2424,6 @@
                 });
             }
             
-            // Check X-ray flares
             const xray = data.solar_conditions?.xray || '';
             if (xray.startsWith('M') || xray.startsWith('X')) {
                 risks.push({
@@ -2548,7 +2434,6 @@
                 });
             }
             
-            // Check sunspot activity
             const sunspots = parseInt(data.solar_conditions?.sunspots) || 0;
             if (sunspots < 20) {
                 warnings.push({
@@ -2559,7 +2444,6 @@
                 });
             }
             
-            // If no risks or warnings, show positive status
             if (risks.length === 0 && warnings.length === 0) {
                 safeSetHTML(riskAssessmentDiv, `
                     <div class="space-y-3">
@@ -2573,7 +2457,6 @@
                             </div>
                         </div>
                         
-                        <!-- Solar Analysis Summary -->
                         <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg">
                             <div class="text-sm text-blue-300 font-semibold mb-2">Solar Analysis Summary</div>
                             <div class="text-xs text-gray-300 space-y-1">
@@ -2589,7 +2472,6 @@
                 return;
             }
             
-            // Display risks and warnings
             let riskHtml = '';
             
             if (risks.length > 0) {
@@ -2611,7 +2493,6 @@
                 `;
             }
             
-            // Add comprehensive solar analysis to risk display
             const solarAnalysis = `
                 <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg mt-4">
                     <div class="text-sm text-blue-300 font-semibold mb-2">Comprehensive Solar Analysis</div>
@@ -2645,12 +2526,11 @@
             `;
             }
             
-            // Combine risks, warnings, and solar analysis
             const finalHtml = riskHtml + solarAnalysis;
             safeSetHTML(riskAssessmentDiv, finalHtml);
         }
 
-        // === Feature 2: Band Status Pills ===
+        // === Band status pills ===
         function updateBandStatusPills(data) {
             const container = document.getElementById('band-pills-container');
             if (!container) return;
@@ -2691,7 +2571,7 @@
             }).join('');
         }
 
-        // === Feature 4: Sparklines ===
+        // === Sparklines ===
         let sparklineCache = null;
         let sparklineCacheTime = 0;
 
@@ -2749,7 +2629,7 @@
             renderSparkline('sparkline-kindex', kValues, '#EF4444', 80, 20);
         }
 
-        // === Feature 1: POTA/SOTA Activations ===
+        // === POTA/SOTA activations ===
         function updateActivations(data) {
             const section = document.getElementById('activations-section');
             const tbody = document.getElementById('activations-table-body');
@@ -2855,7 +2735,6 @@
             const hasActive = (ct.active_count || 0) > 0;
             if (badge) badge.classList.toggle('hidden', !hasActive);
 
-            // Update tab counts
             const todayCount = (ct.today || []).length;
             const weekCount = (ct.this_week || []).length;
             const upcomingCount = (ct.upcoming || []).length;
@@ -2891,7 +2770,6 @@
             }
         }
 
-        // Main update function
         function updateAllUI(data) {
             console.log('Updating UI with data:', data);
             console.log('Propagation summary structure:', data.propagation_summary);
@@ -2908,18 +2786,15 @@
 
             updateLiveActivity(data);
 
-            // Render alerts if present
             if (data.alerts) {
                 renderAlerts(data.alerts);
             }
 
-            // New features
             updateBandStatusPills(data);
             updateActivations(data);
             updateContests(data);
         }
 
-        // Error display functions
         function showError(message) {
             const banner = document.getElementById('error-banner');
             const msgEl = document.getElementById('error-message');
@@ -2934,7 +2809,6 @@
             if (banner) banner.classList.add('hidden');
         }
 
-        // Alerts rendering
         function renderAlerts(alerts) {
             const container = document.getElementById('alerts-container');
             if (!container) return;
@@ -2968,7 +2842,7 @@
             container.innerHTML = html;
         }
 
-        // Fetch fresh conditions from API (with promise coalescing)
+        // Fetch conditions; concurrent calls share one in-flight request
         let _fetchInFlight = null;
 
         function fetchConditions() {
@@ -2985,7 +2859,6 @@
             try {
                 const response = await fetch('/api/conditions');
 
-                // Detect stale cache from service worker
                 detectStaleCache(response);
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -2999,7 +2872,6 @@
                 }
                 console.log('Conditions refreshed at', new Date().toLocaleTimeString());
 
-                // Also refresh the chart
                 renderConditionsChart();
             } catch (err) {
                 console.error('Failed to fetch conditions:', err);
@@ -3013,7 +2885,6 @@
             fetchConditions();
         }
 
-        // Initialize UI when page loads
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 const dataElement = document.getElementById('data');
@@ -3028,7 +2899,6 @@
                 console.error('Error parsing initial data:', error);
             }
 
-            // Restore saved tab
             try {
                 const savedTab = localStorage.getItem('activeTab');
                 if (savedTab && document.getElementById('tab-' + savedTab)) {
@@ -3036,17 +2906,14 @@
                 }
             } catch(e) {}
 
-            // Load conditions trend chart
             renderConditionsChart();
         });
 
-        // Live spots functionality
         function updateLiveActivity(data) {
             if (!summaryDiv || !tableBody) return;
             
             console.log('Live activity data:', data.live_activity);
             
-            // Update loading status
             const loadingSpinner = document.getElementById('spots-loading');
             const statusSpan = document.getElementById('spots-status');
             
@@ -3058,7 +2925,6 @@
                 if (statusSpan) statusSpan.textContent = 'Loading spots...';
             }
             
-            // Update activity summary
             if (data.live_activity && data.live_activity.summary) {
                 const summary = data.live_activity.summary;
                 safeSetHTML(summaryDiv, `
@@ -3083,7 +2949,6 @@
                 `);
             }
             
-            // Update spots table
             if (data.live_activity && data.live_activity.spots && data.live_activity.spots.length > 0) {
                 const spots = data.live_activity.spots;
                 const spotsHtml = spots.slice(0, 20).map(spot => `
@@ -3110,15 +2975,12 @@
             }
         }
 
-        // Utility functions
         function checkForUpdates() {
             console.log('Checking for updates...');
-            // Implementation for update checking
         }
 
         function showFullChangelog() {
             console.log('Showing changelog...');
-            // Implementation for changelog display
         }
 
         // Conditions trend chart
@@ -3211,7 +3073,6 @@
             }
         }
 
-        // Stale cache detection
         function detectStaleCache(response) {
             if (response && response.headers && response.headers.get('X-Cache-Stale') === 'true') {
                 showError('Offline — showing cached data');
@@ -3236,12 +3097,10 @@
             }
         }
 
-        // Start auto-refresh when page loads
         document.addEventListener('DOMContentLoaded', function() {
             startAutoRefresh();
         });
 
-        // Stop auto-refresh when page is hidden
         document.addEventListener('visibilitychange', function() {
             if (document.hidden) {
                 stopAutoRefresh();

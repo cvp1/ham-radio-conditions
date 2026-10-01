@@ -19,21 +19,18 @@ def get_conditions():
         if not ham_conditions:
             return jsonify({'error': 'Ham conditions service not available'}), 503
         
-        # Try to get cached conditions first
         cached_conditions = cache_get('conditions', 'current')
         if cached_conditions:
             return jsonify(cached_conditions)
         
-        # Generate new conditions
         conditions = ham_conditions.generate_report()
         
         if conditions:
-            # Ensure JSON safety by converting NaN values
+            # Replace NaN/inf so the response is valid JSON.
             from app_factory import safe_json_serialize
             safe_conditions = safe_json_serialize(conditions)
             
-            # Cache the conditions
-            cache_set('conditions', 'current', safe_conditions, max_age=300)  # 5 minutes
+            cache_set('conditions', 'current', safe_conditions, max_age=300)
             return jsonify(safe_conditions)
         else:
             return jsonify({'error': 'Failed to generate conditions'}), 500
@@ -51,17 +48,14 @@ def get_spots():
         if not ham_conditions:
             return jsonify({'error': 'Ham conditions service not available'}), 503
         
-        # Try to get cached spots first
         cached_spots = cache_get('spots', 'current')
         if cached_spots:
             return jsonify(cached_spots)
         
-        # Get fresh spots data
         spots_data = ham_conditions.get_live_activity()
         
         if spots_data:
-            # Cache the spots data
-            cache_set('spots', 'current', spots_data, max_age=120)  # 2 minutes
+            cache_set('spots', 'current', spots_data, max_age=120)
             return jsonify(spots_data)
         else:
             return jsonify({'error': 'Failed to get spots data'}), 500
@@ -79,17 +73,14 @@ def get_weather():
         if not ham_conditions:
             return jsonify({'error': 'Ham conditions service not available'}), 503
         
-        # Try to get cached weather first
         cached_weather = cache_get('weather', 'current')
         if cached_weather:
             return jsonify(cached_weather)
         
-        # Get fresh weather data
         weather_data = ham_conditions.get_weather_conditions()
         
         if weather_data:
-            # Cache the weather data
-            cache_set('weather', 'current', weather_data, max_age=600)  # 10 minutes
+            cache_set('weather', 'current', weather_data, max_age=600)
             return jsonify(weather_data)
         else:
             return jsonify({'error': 'Failed to get weather data'}), 500
@@ -362,7 +353,7 @@ def clear_cache():
             cache_clear(cache_type)
             return jsonify({'message': f'Cache {cache_type} cleared'})
         else:
-            cache_clear()  # Clear all caches
+            cache_clear()
             return jsonify({'message': 'All caches cleared'})
 
     except Exception as e:

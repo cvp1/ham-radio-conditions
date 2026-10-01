@@ -61,7 +61,6 @@ class CrossValidator:
         try:
             predicted_muf = prediction.get('muf', 0)
             
-            # Get alternative MUF calculations
             alternative_methods = {
                 'traditional': self._calculate_traditional_muf(prediction, location),
                 'simplified': self._calculate_simplified_muf(prediction, location),
@@ -71,7 +70,6 @@ class CrossValidator:
             result['methods_used'] = list(alternative_methods.keys())
             result['details'] = alternative_methods
             
-            # Calculate consistency scores
             muf_values = [predicted_muf] + [m.get('muf', 0) for m in alternative_methods.values()]
             consistency_scores = self._calculate_muf_consistency(muf_values)
             
@@ -79,7 +77,6 @@ class CrossValidator:
             result['overall_consistency'] = np.mean(consistency_scores)
             result['agreement_level'] = self._determine_agreement_level(result['overall_consistency'])
             
-            # Generate recommendations
             result['recommendations'] = self._generate_muf_recommendations(
                 predicted_muf, alternative_methods, result['overall_consistency']
             )
@@ -97,7 +94,6 @@ class CrossValidator:
         try:
             predicted_bands = prediction.get('best_bands', [])
             
-            # Get alternative band selections
             alternative_methods = {
                 'frequency_based': self._select_frequency_bands(prediction, location),
                 'activity_based': self._select_activity_bands(prediction, location),
@@ -107,7 +103,6 @@ class CrossValidator:
             result['methods_used'] = list(alternative_methods.keys())
             result['details'] = alternative_methods
             
-            # Calculate consistency scores
             band_sets = [set(predicted_bands)] + [set(m.get('best_bands', [])) for m in alternative_methods.values()]
             consistency_scores = self._calculate_band_consistency(band_sets)
             
@@ -115,7 +110,6 @@ class CrossValidator:
             result['overall_consistency'] = np.mean(consistency_scores)
             result['agreement_level'] = self._determine_agreement_level(result['overall_consistency'])
             
-            # Generate recommendations
             result['recommendations'] = self._generate_band_recommendations(
                 predicted_bands, alternative_methods, result['overall_consistency']
             )
@@ -130,9 +124,8 @@ class CrossValidator:
     def _calculate_traditional_muf(self, prediction: Dict[str, Any], location: Dict[str, float]) -> Dict[str, Any]:
         """Calculate MUF using traditional foF2 method."""
         try:
-            # Simulate traditional MUF calculation
             sfi = prediction.get('sfi', 100)
-            traditional_muf = 0.85 * 0.4 * (sfi ** 0.5)  # Traditional formula
+            traditional_muf = 0.85 * 0.4 * (sfi ** 0.5)
             
             return {
                 'muf': traditional_muf,
@@ -147,9 +140,8 @@ class CrossValidator:
     def _calculate_simplified_muf(self, prediction: Dict[str, Any], location: Dict[str, float]) -> Dict[str, Any]:
         """Calculate MUF using simplified SFI-based method."""
         try:
-            # Simulate simplified MUF calculation
             sfi = prediction.get('sfi', 100)
-            simplified_muf = sfi * 0.15  # Simplified formula
+            simplified_muf = sfi * 0.15
             
             return {
                 'muf': simplified_muf,
@@ -164,11 +156,9 @@ class CrossValidator:
     def _calculate_geographic_muf(self, prediction: Dict[str, Any], location: Dict[str, float]) -> Dict[str, Any]:
         """Calculate MUF with geographic adjustments."""
         try:
-            # Simulate geographic-adjusted MUF calculation
             base_muf = prediction.get('muf', 15.0)
             lat = location.get('lat', 0)
             
-            # Adjust for latitude (simplified)
             if lat > 60:  # High latitude
                 geographic_muf = base_muf * 0.8
             elif lat < 30:  # Low latitude
@@ -189,7 +179,6 @@ class CrossValidator:
     def _select_frequency_bands(self, prediction: Dict[str, Any], location: Dict[str, float]) -> Dict[str, Any]:
         """Select bands based on frequency analysis."""
         try:
-            # Simulate frequency-based band selection
             muf = prediction.get('muf', 15.0)
             
             bands = []
@@ -215,9 +204,8 @@ class CrossValidator:
     def _select_activity_bands(self, prediction: Dict[str, Any], location: Dict[str, float]) -> Dict[str, Any]:
         """Select bands based on activity analysis."""
         try:
-            # Simulate activity-based band selection
-            # This would normally use real activity data
-            bands = ['20m', '40m', '80m', '15m', '10m']  # Simulated based on typical activity
+            # Simulated: no live activity data.
+            bands = ['20m', '40m', '80m', '15m', '10m']
             
             return {
                 'best_bands': bands,
@@ -232,16 +220,15 @@ class CrossValidator:
     def _select_time_based_bands(self, prediction: Dict[str, Any], location: Dict[str, float]) -> Dict[str, Any]:
         """Select bands based on time of day."""
         try:
-            # Simulate time-based band selection
             current_hour = datetime.now().hour
             
-            if 6 <= current_hour < 12:  # Morning
+            if 6 <= current_hour < 12:
                 bands = ['20m', '15m', '17m', '10m', '12m']
-            elif 12 <= current_hour < 18:  # Afternoon
+            elif 12 <= current_hour < 18:
                 bands = ['20m', '15m', '17m', '12m', '10m']
-            elif 18 <= current_hour < 24:  # Evening
+            elif 18 <= current_hour < 24:
                 bands = ['40m', '20m', '80m', '15m', '30m']
-            else:  # Night
+            else:
                 bands = ['80m', '40m', '160m', '20m', '30m']
             
             return {
@@ -265,7 +252,6 @@ class CrossValidator:
         
         consistency_scores = []
         for muf in muf_values:
-            # Calculate relative deviation from mean
             relative_deviation = abs(muf - mean_muf) / mean_muf
             # Convert to consistency score (lower deviation = higher consistency)
             consistency = max(0, 1 - relative_deviation)
@@ -280,7 +266,6 @@ class CrossValidator:
         
         consistency_scores = []
         for i, band_set in enumerate(band_sets):
-            # Calculate average Jaccard similarity with other sets
             similarities = []
             for j, other_set in enumerate(band_sets):
                 if i != j:
@@ -323,12 +308,11 @@ class CrossValidator:
         else:
             recommendations.append("Low consistency - investigate calculation differences")
         
-        # Check for outliers
         muf_values = [predicted_muf] + [m.get('muf', 0) for m in alternative_methods.values()]
         mean_muf = np.mean(muf_values)
         std_muf = np.std(muf_values)
         
-        if std_muf > mean_muf * 0.2:  # High variation
+        if std_muf > mean_muf * 0.2:
             recommendations.append("High variation in MUF calculations - review input parameters")
         
         return recommendations
@@ -346,7 +330,6 @@ class CrossValidator:
         else:
             recommendations.append("Low agreement - review band selection logic")
         
-        # Check for common bands
         all_bands = [set(predicted_bands)]
         for method in alternative_methods.values():
             all_bands.append(set(method.get('best_bands', [])))

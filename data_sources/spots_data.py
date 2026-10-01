@@ -26,11 +26,10 @@ class SpotsDataProvider:
         self.lat = lat
         self.lon = lon
         self.grid_square = grid_square
-        self.cache_duration = 300  # 5 minutes
+        self.cache_duration = 300
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
 
-        # Data sources
         self.pskreporter_url = "https://retrieve.pskreporter.info/query"
         self.rbn_url = "https://www.reversebeacon.net/raw_data/"
         self.wsprnet_urls = [
@@ -41,12 +40,10 @@ class SpotsDataProvider:
     def get_live_activity(self) -> Dict:
         """Get live activity data with timeout handling."""
         try:
-            # Try to get from cache first
             cached_spots = cache_get('spots', f'live_activity_{self.grid_square}')
             if cached_spots:
                 return cached_spots
             
-            # Fetch new spots data
             spots_data = self._fetch_spots_with_timeout()
             if spots_data:
                 cache_set('spots', f'live_activity_{self.grid_square}', spots_data, self.cache_duration)
@@ -62,7 +59,6 @@ class SpotsDataProvider:
         """Fetch spots data with timeout handling."""
         try:
             with ThreadPoolExecutor(max_workers=3) as executor:
-                # Submit all data source tasks
                 futures = {
                     executor.submit(self._get_pskreporter_spots): 'pskreporter',
                     executor.submit(self._get_rbn_spots): 'rbn',
@@ -70,7 +66,7 @@ class SpotsDataProvider:
                 }
                 
                 results = {}
-                timeout = 15  # 15 second timeout for all sources
+                timeout = 15
 
                 for future in as_completed(futures, timeout=timeout):
                     source = futures[future]
@@ -165,7 +161,7 @@ class SpotsDataProvider:
                 params={
                     'data': 1,
                     'age': 900,  # Last 15 minutes
-                    'order': 3,  # Sort by age
+                    'order': 3,
                 },
                 timeout=8,
                 headers={'Accept': 'application/json'},
@@ -229,7 +225,6 @@ class SpotsDataProvider:
     def _get_wsprnet_spots(self) -> Optional[Dict]:
         """Get WSPRNet spots."""
         try:
-            # Try to fetch from WSPRNet
             response = self.session.get(
                 "https://wsprnet.org/drupal/wsprnet/spots/json",
                 timeout=5,
@@ -241,7 +236,7 @@ class SpotsDataProvider:
                     spots = data if isinstance(data, list) else []
                     return {
                         'source': 'wsprnet',
-                        'spots': spots[:50],  # Limit to 50 most recent
+                        'spots': spots[:50],
                         'count': len(spots),
                         'status': 'ok'
                     }
@@ -282,11 +277,9 @@ class SpotsDataProvider:
                     'status': data.get('status', 'unknown')
                 }
 
-        # Analyze spots for band/mode activity
         band_activity = self._analyze_band_activity(all_spots)
         mode_activity = self._analyze_mode_activity(all_spots)
 
-        # Count unique DXCC entities
         dxcc_set = set()
         for spot in all_spots:
             dxcc = spot.get('dxcc', '')
@@ -297,7 +290,7 @@ class SpotsDataProvider:
             'timestamp': datetime.now().isoformat(),
             'sources': source_status,
             'total_spots': total_spots,
-            'spots': all_spots[:100],  # Limit to 100 spots
+            'spots': all_spots[:100],
             'band_activity': band_activity,
             'mode_activity': mode_activity,
             'active_bands': len(band_activity),

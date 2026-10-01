@@ -24,14 +24,13 @@ class SolarDataProvider:
     def __init__(self):
         self.hamqsl_url = "https://www.hamqsl.com/solarxml.php"
         self.noaa_url = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
-        self.cache_duration = 300  # 5 minutes
+        self.cache_duration = 300
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
         
     def get_solar_conditions(self) -> Dict[str, Any]:
-        """Get enhanced solar conditions with multiple data sources."""
+        """Get solar conditions merged from multiple data sources."""
         try:
-            # Get base solar data from HamQSL
             solar_data = cache_get('default', 'solar_conditions')
             if not solar_data:
                 solar_data = self._fetch_hamqsl_data()
@@ -40,7 +39,6 @@ class SolarDataProvider:
                 else:
                     return self._get_fallback_solar_data()
             
-            # Enhance with additional data sources
             enhanced_data = self._enhance_solar_data(solar_data)
             return enhanced_data
             
@@ -55,7 +53,6 @@ class SolarDataProvider:
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
                 
-                # Safely extract values with fallbacks
                 def safe_extract(element_path: str, default: str = '0') -> str:
                     element = root.find(element_path)
                     return element.text if element is not None and element.text else default
@@ -124,7 +121,6 @@ class SolarDataProvider:
                     latest = data[-1]
                     kp = float(latest[1])
 
-                    # Classify storm level
                     if kp >= 8:
                         storm_level = 'Severe Storm (G4+)'
                     elif kp == 7:
@@ -138,7 +134,6 @@ class SolarDataProvider:
                     else:
                         storm_level = 'Quiet'
 
-                    # Determine storm probability
                     if kp >= 5:
                         probability = 'high'
                     elif kp >= 4:
@@ -146,7 +141,7 @@ class SolarDataProvider:
                     else:
                         probability = 'low'
 
-                    # Try to fetch active alert count (only last 24 hours)
+                    # Count alerts issued in the last 24 hours.
                     storm_alerts = 0
                     try:
                         alerts_resp = self.session.get(
@@ -155,7 +150,6 @@ class SolarDataProvider:
                         )
                         if alerts_resp.status_code == 200:
                             alerts_data = alerts_resp.json()
-                            # Only count alerts from the last 24 hours
                             cutoff = datetime.now() - timedelta(hours=24)
                             for alert in alerts_data:
                                 try:

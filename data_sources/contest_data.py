@@ -19,7 +19,7 @@ class ContestDataProvider:
     """Provider for ham radio contest calendar data."""
 
     def __init__(self):
-        self.cache_duration = 1800  # 30 minutes
+        self.cache_duration = 1800
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
 

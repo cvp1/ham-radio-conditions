@@ -29,24 +29,18 @@ class PredictionValidator:
         try:
             validation_id = f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
-            # Record prediction for tracking
             prediction_id = self.accuracy_tracker.record_prediction(prediction, prediction_type)
             
-            # Perform real-time validation
             real_time_result = self._perform_real_time_validation(prediction, prediction_type, location)
             
-            # Perform historical validation
             historical_result = self._perform_historical_validation(prediction, prediction_type)
             
-            # Perform cross-validation
             cross_validation_result = self._perform_cross_validation(prediction, prediction_type, location)
             
-            # Calculate overall validation score
             overall_score = self._calculate_overall_validation_score(
                 real_time_result, historical_result, cross_validation_result
             )
             
-            # Generate validation report
             validation_report = {
                 'validation_id': validation_id,
                 'prediction_id': prediction_id,
@@ -62,7 +56,6 @@ class PredictionValidator:
                 'status': 'completed'
             }
             
-            # Store validation report
             self._store_validation_report(validation_report)
             
             logger.info(f"Prediction validation completed: {overall_score:.2f} overall score")
@@ -94,7 +87,7 @@ class PredictionValidator:
             
             elif prediction_type == 'propagation_score':
                 predicted_score = prediction.get('propagation_score', 0)
-                return self.real_time_validator.validate_propagation_quality('Good', location)  # Simplified
+                return self.real_time_validator.validate_propagation_quality('Good', location)
             
             elif prediction_type == 'best_bands':
                 predicted_bands = prediction.get('best_bands', [])
@@ -128,26 +121,21 @@ class PredictionValidator:
                 'details': {}
             }
             
-            # Use different prediction methods for cross-validation
             if prediction_type == 'muf':
-                # Compare with alternative MUF calculation methods
                 alternative_methods = self._get_alternative_muf_methods(prediction, location)
                 cross_validation_result['methods_used'] = list(alternative_methods.keys())
                 cross_validation_result['details'] = alternative_methods
                 
-                # Calculate consistency
                 muf_values = [prediction.get('muf', 0)] + [m.get('muf', 0) for m in alternative_methods.values()]
                 consistency = self._calculate_consistency(muf_values)
                 cross_validation_result['consistency_score'] = consistency
                 cross_validation_result['agreement_level'] = self._determine_agreement_level(consistency)
             
             elif prediction_type == 'best_bands':
-                # Compare with alternative band selection methods
                 alternative_methods = self._get_alternative_band_methods(prediction, location)
                 cross_validation_result['methods_used'] = list(alternative_methods.keys())
                 cross_validation_result['details'] = alternative_methods
                 
-                # Calculate band agreement
                 band_sets = [set(prediction.get('best_bands', []))] + [set(m.get('best_bands', [])) for m in alternative_methods.values()]
                 agreement = self._calculate_band_agreement(band_sets)
                 cross_validation_result['consistency_score'] = agreement
@@ -163,16 +151,15 @@ class PredictionValidator:
                                    location: Dict[str, float]) -> Dict[str, Any]:
         """Get alternative MUF calculation methods for comparison."""
         try:
-            # This would implement alternative MUF calculation methods
-            # For now, return simulated alternatives
+            # Placeholder: simulated data.
             return {
                 'traditional_method': {
-                    'muf': prediction.get('muf', 0) * 0.9,  # Simulate 10% difference
+                    'muf': prediction.get('muf', 0) * 0.9,
                     'method': 'Traditional foF2 calculation',
                     'confidence': 0.7
                 },
                 'simplified_method': {
-                    'muf': prediction.get('muf', 0) * 1.1,  # Simulate 10% difference
+                    'muf': prediction.get('muf', 0) * 1.1,
                     'method': 'Simplified SFI-based calculation',
                     'confidence': 0.6
                 }
@@ -185,8 +172,7 @@ class PredictionValidator:
                                     location: Dict[str, float]) -> Dict[str, Any]:
         """Get alternative band selection methods for comparison."""
         try:
-            # This would implement alternative band selection methods
-            # For now, return simulated alternatives
+            # Placeholder: simulated data.
             original_bands = prediction.get('best_bands', [])
             
             return {
@@ -210,7 +196,6 @@ class PredictionValidator:
         if len(values) < 2:
             return 1.0
         
-        # Calculate coefficient of variation (lower = more consistent)
         mean_val = sum(values) / len(values)
         if mean_val == 0:
             return 1.0
@@ -219,7 +204,7 @@ class PredictionValidator:
         std_dev = variance ** 0.5
         cv = std_dev / mean_val
         
-        # Convert to consistency score (0-1, higher = more consistent)
+        # Map to a 0-1 score; higher is more consistent.
         return max(0, 1 - cv)
     
     def _calculate_band_agreement(self, band_sets: List[set]) -> float:
@@ -227,7 +212,6 @@ class PredictionValidator:
         if len(band_sets) < 2:
             return 1.0
         
-        # Calculate average Jaccard similarity
         similarities = []
         for i in range(len(band_sets)):
             for j in range(i + 1, len(band_sets)):
@@ -263,25 +247,21 @@ class PredictionValidator:
             scores = []
             weights = []
             
-            # Real-time validation score
             if 'validation_score' in real_time_result:
                 scores.append(real_time_result['validation_score'])
-                weights.append(0.4)  # 40% weight for real-time validation
+                weights.append(0.4)
             
-            # Historical validation confidence
             if 'confidence' in historical_result:
                 scores.append(historical_result['confidence'])
-                weights.append(0.3)  # 30% weight for historical validation
+                weights.append(0.3)
             
-            # Cross-validation consistency
             if 'consistency_score' in cross_validation_result:
                 scores.append(cross_validation_result['consistency_score'])
-                weights.append(0.3)  # 30% weight for cross-validation
+                weights.append(0.3)
             
             if not scores:
                 return 0.5  # Default score if no validation data
             
-            # Calculate weighted average
             total_weight = sum(weights)
             if total_weight == 0:
                 return sum(scores) / len(scores)
@@ -330,12 +310,11 @@ class PredictionValidator:
     def _store_validation_report(self, validation_report: Dict[str, Any]):
         """Store validation report for future analysis."""
         try:
-            # Store in cache for immediate access
             from utils.cache_manager import cache_set
             cache_set('validation_reports', validation_report['validation_id'], 
-                     validation_report, max_age=86400 * 7)  # 7 days
+                     validation_report, max_age=86400 * 7)
             
-            # In a real implementation, this would also store in a database
+            # Cache only; not persisted to the database.
             logger.info(f"Validation report stored: {validation_report['validation_id']}")
             
         except Exception as e:
@@ -344,7 +323,6 @@ class PredictionValidator:
     def get_validation_summary(self, days: int = 7) -> Dict[str, Any]:
         """Get validation summary for the specified period."""
         try:
-            # Get accuracy summary from tracker
             accuracy_summary = self.accuracy_tracker.get_accuracy_summary(days=days)
             
             return {

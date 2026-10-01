@@ -27,20 +27,15 @@ class BandOptimizer:
             k_index = self._extract_k_index(solar_data)
             is_daytime = time_data.get('is_day', True)
 
-            # Use provided MUF or estimate from SFI
             if muf is None:
                 muf = 0.75 * (sfi ** 0.5) * 3.0  # Estimate MUF(3000)
 
-            # Get base band recommendations using MUF
             bands = self._get_base_band_recommendations(muf, sfi, k_index, is_daytime)
 
-            # Apply time-of-day adjustments
             bands = self._apply_time_adjustments(bands, time_data)
 
-            # Apply weather adjustments
             bands = self._apply_weather_adjustments(bands, weather_data)
 
-            # Sort bands by quality score
             sorted_bands = self._sort_bands_by_quality(bands)
 
             return {
@@ -76,7 +71,6 @@ class BandOptimizer:
         """Get base band recommendations based on MUF and solar conditions."""
         bands = {}
 
-        # Define band quality based on MUF and K-index
         for band, freq in self.band_frequencies.items():
             quality = self._calculate_band_quality(band, freq, muf, k_index, is_daytime)
             bands[band] = {
@@ -90,12 +84,10 @@ class BandOptimizer:
 
     def _calculate_band_quality(self, band: str, freq: float, muf: float, k_index: float, is_daytime: bool) -> str:
         """Calculate quality for a specific band based on MUF."""
-        # Calculate how close the frequency is to MUF
-        # Bands well below MUF = good, near MUF = fair, above MUF = poor
+        # Score by how close the frequency sits to the MUF.
         freq_ratio = freq / muf if muf > 0 else 1.0
 
-        # K-index penalty
-        k_penalty = max(0, k_index - 2) * 0.1  # 10% penalty per K above 2
+        k_penalty = max(0, k_index - 2) * 0.1
 
         if freq_ratio <= 0.5:
             # Well below MUF - reliable but may have absorption
@@ -109,7 +101,6 @@ class BandOptimizer:
                 # Nighttime: lower bands are excellent
                 return "Excellent" if k_index <= 2 else "Very Good"
         elif freq_ratio <= 0.75:
-            # Good operating range
             if k_index <= 2:
                 return "Excellent"
             elif k_index <= 4:
@@ -164,19 +155,15 @@ class BandOptimizer:
         """Apply time-of-day adjustments to band recommendations."""
         period = time_data.get('period', 'unknown')
         
-        # Time-based adjustments
         if period in ['dawn', 'dusk']:
-            # Dawn/dusk favors mid-range bands
             for band in ['40m', '30m', '20m']:
                 if band in bands:
                     bands[band]['score'] *= 1.2
         elif period in ['midday']:
-            # Midday favors higher bands
             for band in ['20m', '17m', '15m', '12m']:
                 if band in bands:
                     bands[band]['score'] *= 1.3
         elif period in ['night']:
-            # Night favors lower bands
             for band in ['80m', '160m', '40m']:
                 if band in bands:
                     bands[band]['score'] *= 1.2
@@ -192,15 +179,13 @@ class BandOptimizer:
         pressure = self._parse_numeric(weather_data.get('pressure', 1013))
         cloud_cover = self._parse_numeric(weather_data.get('cloud_cover', 0))
 
-        # High humidity + low pressure = increased atmospheric noise (QRN)
-        # Penalize lower bands which are more susceptible to static
+        # High humidity with low pressure raises QRN on the low bands.
         if humidity > 80 and pressure < 1005:
             for band in ['160m', '80m', '40m']:
                 if band in bands:
                     bands[band]['score'] *= 0.85
                     bands[band]['notes'] += ' (QRN likely)'
 
-        # Thunderstorm conditions - heavy penalty on low bands
         conditions = str(weather_data.get('conditions', '')).lower()
         if 'thunder' in conditions or 'storm' in conditions:
             for band in ['160m', '80m', '40m', '30m']:
@@ -208,7 +193,6 @@ class BandOptimizer:
                     bands[band]['score'] *= 0.6
                     bands[band]['notes'] = 'Thunderstorm QRN'
 
-        # Clear skies + high pressure = stable, small boost
         if cloud_cover < 20 and pressure > 1020:
             for band in bands:
                 bands[band]['score'] *= 1.05
@@ -233,7 +217,6 @@ class BandOptimizer:
         """Calculate confidence in band recommendations."""
         confidence = 0.7
         
-        # Adjust based on K-index stability
         if k_index <= 2:
             confidence += 0.2
         elif k_index <= 4:
@@ -241,7 +224,6 @@ class BandOptimizer:
         else:
             confidence -= 0.1
         
-        # Adjust based on SFI level
         if 80 <= sfi <= 150:
             confidence += 0.1
         

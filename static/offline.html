@@ -61,12 +61,10 @@
     </div>
 
     <script>
-        // Check for online status
         window.addEventListener('online', () => {
             window.location.reload();
         });
 
-        // Auto-retry every 30 seconds
         setInterval(() => {
             if (navigator.onLine) {
                 window.location.reload();

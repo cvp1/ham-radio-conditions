@@ -10,12 +10,12 @@ import sys
 def detect_docker_compose_command():
     """Detect which Docker Compose command is available."""
     try:
-        # Try the new 'docker compose' command first
+        # Prefer the 'docker compose' plugin.
         result = subprocess.run(['docker', 'compose', 'version'], capture_output=True, text=True, check=True)
         return 'docker compose'
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
-            # Fall back to the old 'docker-compose' command
+            # Fall back to standalone 'docker-compose'.
             result = subprocess.run(['docker-compose', '--version'], capture_output=True, text=True, check=True)
             return 'docker-compose'
         except (subprocess.CalledProcessError, FileNotFoundError):

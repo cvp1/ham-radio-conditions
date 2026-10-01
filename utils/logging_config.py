@@ -28,40 +28,32 @@ def setup_logging(
     """
     config = get_config()
     
-    # Determine log level
     if level is None:
         level = 'DEBUG' if config.DEBUG else 'INFO'
     
-    # Create logger
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
     
-    # Clear existing handlers
     logger.handlers.clear()
     
-    # Create formatter
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(getattr(logging, level.upper()))
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-    # File handler (if log_file is specified)
     if log_file:
-        # Ensure log directory exists
         log_dir = os.path.dirname(log_file)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir)
         
-        # Create rotating file handler
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
-            maxBytes=10*1024*1024,  # 10MB
+            maxBytes=10*1024*1024,
             backupCount=5
         )
         file_handler.setLevel(getattr(logging, level.upper()))
@@ -83,7 +75,6 @@ def get_logger(name: str = __name__) -> logging.Logger:
     """
     config = get_config()
     
-    # Set up logging if not already configured
     if not logging.getLogger(name).handlers:
         log_file = None
         if config.is_production():
@@ -94,5 +85,4 @@ def get_logger(name: str = __name__) -> logging.Logger:
     return logging.getLogger(name)
 
 
-# Create default logger
 logger = get_logger(__name__) 

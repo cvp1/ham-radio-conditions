@@ -20,19 +20,17 @@ class WeatherDataProvider:
     def __init__(self, lat: float, lon: float):
         self.lat = lat
         self.lon = lon
-        self.cache_duration = 1800  # 30 minutes
+        self.cache_duration = 1800
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'ham-radio-conditions/1.0'})
         
     def get_weather_conditions(self) -> Dict:
         """Get weather conditions with caching."""
         try:
-            # Try to get from cache first
             cached_weather = cache_get('weather', f'conditions_{self.lat}_{self.lon}')
             if cached_weather:
                 return cached_weather
             
-            # Fetch new weather data
             weather_data = self._fetch_weather_data()
             if weather_data:
                 cache_set('weather', f'conditions_{self.lat}_{self.lon}', weather_data, self.cache_duration)

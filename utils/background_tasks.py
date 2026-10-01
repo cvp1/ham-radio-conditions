@@ -96,10 +96,8 @@ class TaskManager:
         try:
             start_time = time.time()
             
-            # Execute the task
             task_info['func']()
             
-            # Update task info
             with self.lock:
                 task_info['last_run'] = time.time()
                 task_info['next_run'] = time.time() + task_info['interval']
@@ -151,13 +149,10 @@ def setup_background_tasks(conditions_updater: Callable, database_cleanup: Calla
     """
     task_manager = TaskManager()
     
-    # Add conditions update task (every 10 minutes for production)
     task_manager.add_task('conditions_update', conditions_updater, 600)
     
-    # Add database cleanup task (every hour)
     task_manager.add_task('database_cleanup', database_cleanup, 3600)
     
-    # Add cache cleanup task (every 15 minutes)
     task_manager.add_task('cache_cleanup', cache_cleanup_task, 900)
     
     return task_manager
@@ -178,12 +173,10 @@ def create_conditions_updater(ham_conditions, lock: threading.Lock) -> Callable:
         """Update the conditions cache."""
         try:
             with lock:
-                # Generate new conditions
                 new_conditions = ham_conditions.generate_report()
                 
                 if new_conditions:
-                    # Cache the new conditions with production-optimized duration
-                    cache_set('conditions', 'current', new_conditions, max_age=600)  # 10 minutes
+                    cache_set('conditions', 'current', new_conditions, max_age=600)
                     logger.info("Conditions cache updated successfully")
                 else:
                     logger.warning("Failed to generate new conditions")
@@ -207,7 +200,6 @@ def create_database_cleanup(database) -> Callable:
     def cleanup_database():
         """Clean up old database entries."""
         try:
-            # Clean up old spots and QRZ cache
             cleanup_result = database.cleanup_old_data()
             
             if cleanup_result:
@@ -225,8 +217,7 @@ def create_database_cleanup(database) -> Callable:
 def cache_cleanup_task():
     """Clean up expired cache entries."""
     try:
-        # The cache manager handles cleanup automatically, but we can add additional logic here
-        # For now, just log that cleanup is happening
+        # Expiry is handled by the cache manager's own cleanup thread.
         pass
         
     except Exception as e:
@@ -235,8 +226,7 @@ def cache_cleanup_task():
 
 def get_task_manager_status() -> dict:
     """Get status of the task manager."""
-    # This would need to be called from a context where we have access to the task manager
-    # For now, return a placeholder
+    # Placeholder: the running TaskManager is not reachable from here.
     return {
         'running': False,
         'tasks': {},

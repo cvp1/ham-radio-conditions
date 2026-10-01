@@ -44,7 +44,6 @@ def zip_to_coordinates(zip_code: str) -> Optional[Dict]:
         logger.warning(f"Invalid ZIP code format: {zip_code}")
         return None
 
-    # Check local cache first
     if zip_code in COMMON_ZIPS:
         lat, lon, city, state, tz = COMMON_ZIPS[zip_code]
         return {
@@ -58,7 +57,7 @@ def zip_to_coordinates(zip_code: str) -> Optional[Dict]:
             'source': 'cache'
         }
 
-    # Try free geocoding API (Zippopotam.us - no API key required)
+    # Zippopotam.us needs no API key.
     result = _fetch_from_zippopotamus(zip_code)
     if result:
         return result
@@ -86,7 +85,6 @@ def _fetch_from_zippopotamus(zip_code: str) -> Optional[Dict]:
             city = place.get('place name', 'Unknown')
             state = place.get('state abbreviation', 'XX')
 
-            # Determine timezone from state
             timezone = _state_to_timezone(state)
 
             return {
@@ -177,7 +175,6 @@ def _estimate_from_zip_prefix(zip_code: str) -> Optional[Dict]:
                 'source': 'estimated'
             }
 
-    # Default fallback
     return {
         'zip_code': zip_code,
         'lat': 39.8283,
@@ -217,7 +214,7 @@ def _state_to_timezone(state: str) -> str:
 
 def latlon_to_grid(lat: float, lon: float) -> str:
     """Convert latitude/longitude to Maidenhead grid square (6 character)."""
-    # Adjust longitude and latitude
+    # Shift to non-negative ranges.
     lon = lon + 180
     lat = lat + 90
 

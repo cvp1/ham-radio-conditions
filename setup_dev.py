@@ -104,23 +104,18 @@ def main():
     print("🚀 Setting up Ham Radio Conditions development environment")
     print("=" * 60)
     
-    # Check Python version
     if not check_python_version():
         return 1
     
-    # Create directories
     if not create_directories():
         return 1
     
-    # Create .env file
     if not create_env_file():
         return 1
     
-    # Install dependencies
     if not install_dependencies():
         return 1
     
-    # Run tests
     if not run_tests():
         print("⚠️  Tests failed, but setup completed. Please check the errors above.")
     

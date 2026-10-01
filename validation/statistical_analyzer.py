@@ -42,14 +42,12 @@ class StatisticalAnalyzer:
                 analysis_result['error'] = 'No accuracy data provided'
                 return analysis_result
             
-            # Extract accuracy values
             accuracy_values = [entry.get('accuracy', 0) for entry in accuracy_data if 'accuracy' in entry]
             
             if not accuracy_values:
                 analysis_result['error'] = 'No accuracy values found in data'
                 return analysis_result
             
-            # Perform statistical analysis
             if analysis_type == 'comprehensive':
                 analysis_result['statistical_analysis'] = self._comprehensive_analysis(accuracy_values, accuracy_data)
             elif analysis_type == 'trend':
@@ -62,7 +60,6 @@ class StatisticalAnalyzer:
                 analysis_result['error'] = f'Unknown analysis type: {analysis_type}'
                 return analysis_result
             
-            # Generate recommendations
             analysis_result['recommendations'] = self._generate_statistical_recommendations(
                 analysis_result['statistical_analysis']
             )
@@ -83,7 +80,6 @@ class StatisticalAnalyzer:
         try:
             analysis = {}
             
-            # Basic statistics
             analysis['basic_stats'] = {
                 'mean': np.mean(accuracy_values),
                 'median': np.median(accuracy_values),
@@ -95,22 +91,16 @@ class StatisticalAnalyzer:
                 'q75': np.percentile(accuracy_values, 75)
             }
             
-            # Distribution analysis
             analysis['distribution'] = self._analyze_distribution(accuracy_values)
             
-            # Trend analysis
             analysis['trend'] = self._analyze_trend(accuracy_values, accuracy_data)
             
-            # Correlation analysis
             analysis['correlation'] = self._analyze_correlation(accuracy_values, accuracy_data)
             
-            # Seasonality analysis
             analysis['seasonality'] = self._analyze_seasonality(accuracy_values, accuracy_data)
             
-            # Anomaly detection
             analysis['anomalies'] = self._detect_anomalies(accuracy_values, accuracy_data)
             
-            # Confidence analysis
             analysis['confidence'] = self._analyze_confidence_distribution(accuracy_values, accuracy_data)
             
             return analysis
@@ -122,14 +112,11 @@ class StatisticalAnalyzer:
     def _analyze_distribution(self, accuracy_values: List[float]) -> Dict[str, Any]:
         """Analyze the distribution of accuracy values."""
         try:
-            # Normality test
             shapiro_stat, shapiro_p = stats.shapiro(accuracy_values)
             
-            # Skewness and kurtosis
             skewness = stats.skew(accuracy_values)
             kurtosis = stats.kurtosis(accuracy_values)
             
-            # Distribution shape
             if abs(skewness) < 0.5:
                 shape = 'approximately normal'
             elif skewness > 0.5:
@@ -160,11 +147,9 @@ class StatisticalAnalyzer:
             if len(accuracy_values) < 2:
                 return {'error': 'Insufficient data for trend analysis'}
             
-            # Linear trend
             x = np.arange(len(accuracy_values))
             slope, intercept, r_value, p_value, std_err = stats.linregress(x, accuracy_values)
             
-            # Moving average trends
             window_size = min(7, len(accuracy_values) // 3)  # 7-point or 1/3 of data
             if window_size > 1:
                 moving_avg = np.convolve(accuracy_values, np.ones(window_size)/window_size, mode='valid')
@@ -172,7 +157,6 @@ class StatisticalAnalyzer:
             else:
                 moving_trend = slope
             
-            # Trend classification
             if abs(slope) < 0.001:
                 trend_direction = 'stable'
             elif slope > 0:
@@ -204,7 +188,6 @@ class StatisticalAnalyzer:
         try:
             correlations = {}
             
-            # Time-based correlations
             if len(accuracy_data) > 1:
                 timestamps = []
                 for entry in accuracy_data:
@@ -234,7 +217,6 @@ class StatisticalAnalyzer:
                         'significant': day_p < 0.05
                     }
             
-            # Prediction type correlations
             prediction_types = defaultdict(list)
             for i, entry in enumerate(accuracy_data):
                 if 'prediction_type' in entry and i < len(accuracy_values):
@@ -261,10 +243,9 @@ class StatisticalAnalyzer:
                            accuracy_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze seasonal patterns in accuracy."""
         try:
-            if len(accuracy_values) < 30:  # Need at least 30 data points
+            if len(accuracy_values) < 30:
                 return {'error': 'Insufficient data for seasonality analysis'}
             
-            # Extract time components
             timestamps = []
             for entry in accuracy_data:
                 if 'timestamp' in entry:
@@ -277,7 +258,6 @@ class StatisticalAnalyzer:
             if len(timestamps) != len(accuracy_values):
                 return {'error': 'Timestamp mismatch in data'}
             
-            # Monthly patterns
             monthly_accuracy = defaultdict(list)
             for i, ts in enumerate(timestamps):
                 month = ts.month
@@ -292,7 +272,6 @@ class StatisticalAnalyzer:
                         'count': len(values)
                     }
             
-            # Seasonal trend
             months = [ts.month for ts in timestamps]
             seasonal_corr, seasonal_p = stats.pearsonr(months, accuracy_values)
             
@@ -337,7 +316,6 @@ class StatisticalAnalyzer:
             iqr_anomalies = [i for i, acc in enumerate(accuracy_values) 
                            if acc < lower_bound or acc > upper_bound]
             
-            # Combine anomaly detection methods
             all_anomalies = list(set(anomalies + iqr_anomalies))
             
             return {
@@ -366,7 +344,6 @@ class StatisticalAnalyzer:
                                        accuracy_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze the distribution of confidence levels."""
         try:
-            # Extract confidence values if available
             confidence_values = []
             for entry in accuracy_data:
                 if 'confidence' in entry:
@@ -377,7 +354,6 @@ class StatisticalAnalyzer:
             if not confidence_values:
                 return {'error': 'No confidence data available'}
             
-            # Analyze confidence distribution
             confidence_stats = {
                 'mean': np.mean(confidence_values),
                 'std': np.std(confidence_values),
@@ -385,7 +361,6 @@ class StatisticalAnalyzer:
                 'max': np.max(confidence_values)
             }
             
-            # Confidence vs accuracy correlation
             if len(confidence_values) == len(accuracy_values):
                 corr, p_value = stats.pearsonr(confidence_values, accuracy_values)
                 confidence_stats['accuracy_correlation'] = {
@@ -405,7 +380,6 @@ class StatisticalAnalyzer:
         recommendations = []
         
         try:
-            # Basic statistics recommendations
             if 'basic_stats' in analysis:
                 basic = analysis['basic_stats']
                 mean_acc = basic['mean']
@@ -421,7 +395,6 @@ class StatisticalAnalyzer:
                 elif std_acc < 0.1:
                     recommendations.append("Low variability - predictions are consistent")
             
-            # Trend recommendations
             if 'trend' in analysis and 'error' not in analysis['trend']:
                 trend = analysis['trend']
                 if trend['trend_direction'] == 'declining':
@@ -429,19 +402,16 @@ class StatisticalAnalyzer:
                 elif trend['trend_direction'] == 'improving':
                     recommendations.append("Accuracy is improving - continue current approach")
             
-            # Distribution recommendations
             if 'distribution' in analysis and 'error' not in analysis['distribution']:
                 dist = analysis['distribution']
                 if not dist['normality_test']['is_normal']:
                     recommendations.append("Accuracy distribution is not normal - consider data transformation")
             
-            # Anomaly recommendations
             if 'anomalies' in analysis and 'error' not in analysis['anomalies']:
                 anomalies = analysis['anomalies']
                 if anomalies['combined_anomalies']['count'] > 0:
                     recommendations.append(f"Found {anomalies['combined_anomalies']['count']} anomalies - investigate outliers")
             
-            # Correlation recommendations
             if 'correlation' in analysis and 'error' not in analysis['correlation']:
                 corr = analysis['correlation']
                 if 'hour_of_day' in corr and corr['hour_of_day']['significant']:

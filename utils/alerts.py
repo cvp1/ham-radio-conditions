@@ -27,7 +27,6 @@ class AlertsManager:
         alerts = []
 
         try:
-            # Extract key values
             k_index = self._parse_float(solar_data.get('k_index', '2'))
             sfi_str = str(solar_data.get('sfi', '100')).replace(' SFI', '').strip()
             sfi = self._parse_float(sfi_str, 100.0)
@@ -35,7 +34,7 @@ class AlertsManager:
             storm_activity = solar_data.get('storm_activity', 'quiet')
             flare_class = solar_data.get('latest_flare_class', 'None')
 
-            # 1. Geomagnetic storm alert (K >= 5)
+            # Geomagnetic storm
             if k_index >= 5:
                 severity = 'critical' if k_index >= 7 else 'warning'
                 alerts.append({
@@ -56,7 +55,7 @@ class AlertsManager:
                     'timestamp': datetime.now().isoformat(),
                 })
 
-            # 2. Solar flare alert
+            # Solar flare
             if flare_class and flare_class != 'None':
                 first_char = flare_class[0].upper()
                 if first_char in ('M', 'X'):
@@ -70,7 +69,7 @@ class AlertsManager:
                         'timestamp': datetime.now().isoformat(),
                     })
 
-            # 3. Band opening alert (MUF > 28 MHz = 10m is open)
+            # Band opening: MUF above 28 MHz means 10m is open.
             if muf and muf > 28:
                 alerts.append({
                     'type': 'band_opening',
@@ -90,7 +89,7 @@ class AlertsManager:
                     'timestamp': datetime.now().isoformat(),
                 })
 
-            # 4. Best operating time (greyline + quiet K)
+            # Best operating time: greyline with a quiet K-index.
             is_day = time_data.get('is_day', True)
             period = time_data.get('period', '')
             sunrise = time_data.get('sunrise', '')
@@ -115,7 +114,7 @@ class AlertsManager:
                     'timestamp': datetime.now().isoformat(),
                 })
 
-            # 5. Quiet conditions = good time to operate
+            # Quiet conditions
             if k_index <= 1 and sfi >= 100 and not alerts:
                 alerts.append({
                     'type': 'best_time',

@@ -1,9 +1,4 @@
-"""
-Refactored Ham Radio Conditions - Main Application Class
-
-This is a simplified, refactored version of the original HamRadioConditions class
-that uses extracted data source and calculation modules.
-"""
+"""HamRadioConditions: gathers solar, weather and spot data and builds the conditions report."""
 
 import os
 import time
@@ -14,7 +9,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 from dotenv import load_dotenv
 
-# Import our refactored modules
 from data_sources import SolarDataProvider, WeatherDataProvider, SpotsDataProvider, GeomagneticDataProvider, ActivationsDataProvider, ContestDataProvider
 from calculations import MUFCalculator, PropagationCalculator, BandOptimizer, TimeAnalyzer
 from utils.cache_manager import cache_get, cache_set, cache_clear
@@ -22,14 +16,12 @@ from utils.alerts import AlertsManager
 from utils.geocoding import zip_to_coordinates, latlon_to_grid
 from dxcc_data import get_dxcc_by_grid, grid_to_latlon as dxcc_grid_to_latlon
 
-# Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
 
-# Load environment variables
 load_dotenv()
 
 
@@ -38,7 +30,6 @@ class HamRadioConditions:
     
     def __init__(self, zip_code: Optional[str] = None):
         """Initialize the ham radio conditions system."""
-        # Version information
         self.version = "2.1.0"
         self.build_date = "2024-12-19"
         self.changelog = {
@@ -52,25 +43,20 @@ class HamRadioConditions:
             }
         }
         
-        # Update checking
         self.last_update_check = 0
-        self.update_check_interval = 3600  # 1 hour
+        self.update_check_interval = 3600
         self.update_status = {
             'status': 'idle',
             'progress': 0,
             'message': ''
         }
         
-        # Location setup
         self._setup_location(zip_code)
         
-        # Initialize data providers
         self._initialize_data_providers()
         
-        # Initialize calculators
         self._initialize_calculators()
         
-        # Initialize state
         self._initialize_state()
         
         logger.info(f"HamRadioConditions initialized for {self.grid_square}")
@@ -78,9 +64,8 @@ class HamRadioConditions:
     def _setup_location(self, zip_code: Optional[str]):
         """Setup location data from ZIP code."""
         if not zip_code:
-            zip_code = "85630"  # Default to St. David, AZ
+            zip_code = "85630"
 
-        # Convert ZIP to coordinates using geocoding
         location = zip_to_coordinates(zip_code)
 
         if location:
@@ -94,7 +79,6 @@ class HamRadioConditions:
             self.location_source = location.get('source', 'unknown')
             logger.info(f"Location set to {self.city}, {self.state} ({self.grid_square})")
         else:
-            # Fallback to defaults
             self.zip_code = zip_code
             self.lat = 31.8973
             self.lon = -110.2154
@@ -115,7 +99,6 @@ class HamRadioConditions:
         cache_clear('weather')
         cache_clear('spots')
 
-        # Reinitialize providers with new location
         self._initialize_data_providers()
 
         return {
@@ -159,7 +142,6 @@ class HamRadioConditions:
     def generate_report(self) -> Optional[Dict]:
         """Generate complete conditions report with caching."""
         try:
-            # Try to get from cache first
             cached_report = cache_get('conditions', 'current')
             if cached_report:
                 cached_report['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
@@ -167,7 +149,7 @@ class HamRadioConditions:
 
             start_time = time.time()
 
-            # Phase 1: Fetch all independent data sources in parallel
+            # Fetch independent sources in parallel.
             fetch_results = {}
             with ThreadPoolExecutor(max_workers=5) as executor:
                 futures = {
@@ -188,7 +170,7 @@ class HamRadioConditions:
             solar_data = fetch_results.get('solar') or self.solar_provider._get_fallback_solar_data()
             weather_data = fetch_results.get('weather') or {}
 
-            # Phase 2: Compute derived values using pre-fetched data (no re-fetching)
+            # Derive values from the fetched data.
             time_data = self.time_analyzer.analyze_current_time(self.lat, self.timezone, self.lon)
             location_data = {'lat': self.lat, 'lon': self.lon, 'grid_square': self.grid_square}
             muf_data = self.muf_calculator.calculate_muf(solar_data, location_data)
@@ -228,8 +210,7 @@ class HamRadioConditions:
                 'alerts': alerts,
             }
 
-            # Cache the report
-            cache_set('conditions', 'current', report, max_age=600)  # 10 minutes
+            cache_set('conditions', 'current', report, max_age=600)
             elapsed = time.time() - start_time
             logger.info(f"Generated and cached new conditions report in {elapsed:.2f}s")
 
@@ -297,7 +278,7 @@ class HamRadioConditions:
 
             solar_cycle_info = self._get_solar_cycle_info(solar_data)
 
-            # Build band_conditions for frontend (day_rating / night_rating format)
+            # Frontend expects day_rating / night_rating per band.
             is_day = time_data.get('is_day', True)
             band_conditions = {}
             raw_bands = band_conditions_raw.get('bands', band_conditions_raw) if isinstance(band_conditions_raw, dict) else {}
@@ -387,7 +368,7 @@ class HamRadioConditions:
                 skip_distances[band] = 'No propagation'
                 continue
 
-            # Calculate skip distance using F2 layer reflection geometry
+            # Skip distance from F2-layer reflection geometry.
             # Critical angle: sin(ic) = freq / muf
             ratio = freq / muf
             if ratio >= 1.0:
@@ -396,8 +377,7 @@ class HamRadioConditions:
 
             critical_angle = math.asin(ratio)
 
-            # Skip distance = 2 * Earth_radius * arctan(cos(ic) * h / (R + h * sin(ic)))
-            # Simplified: skip ≈ 2 * sqrt(2 * R * h) * cos(ic) for single hop
+            # Single-hop approximation: skip ≈ 2 * sqrt(2 * R * h) * cos(ic)
             skip_km = 2 * math.sqrt(2 * EARTH_RADIUS * F2_HEIGHT) * math.cos(critical_angle)
             max_single_hop = 2 * EARTH_RADIUS * math.acos(EARTH_RADIUS / (EARTH_RADIUS + F2_HEIGHT))
 
@@ -409,12 +389,10 @@ class HamRadioConditions:
     def _get_solar_cycle_info(self, solar_data: Dict) -> Dict:
         """Get solar cycle information derived from SFI."""
         try:
-            # Extract SFI value
             sfi_str = str(solar_data.get('sfi', '100')).replace(' SFI', '').strip()
             sfi = float(sfi_str)
             sunspots = solar_data.get('sunspots', 'N/A')
 
-            # Determine solar cycle phase based on SFI
             if sfi >= 150:
                 phase = "Solar Maximum"
                 prediction = "Excellent HF conditions expected across all bands"
@@ -446,7 +424,6 @@ class HamRadioConditions:
                 phase_description = "Minimal solar activity, F2 layer weak"
                 cycle_position = "Minimum (0-20%)"
 
-            # Determine SFI trend
             if sfi > 120:
                 sfi_trend = "Strongly Rising"
                 trend_description = "SFI > 120 indicates excellent solar activity"
@@ -536,7 +513,6 @@ class HamRadioConditions:
             }
         }
         
-        # Collect status from providers
         if hasattr(self.solar_provider, 'check_status'):
             solar_status = self.solar_provider.check_status()
             status['apis'].update(solar_status.get('sources', {}))
@@ -605,7 +581,7 @@ class HamRadioConditions:
             'version': self.version,
             'build_date': self.build_date,
             'current_version': self.version,
-            'latest_version': self.version,  # For now, same as current
+            'latest_version': self.version,  # No remote version source
             'update_available': False,
             'last_check': self.last_update_check
         }
@@ -615,7 +591,6 @@ class HamRadioConditions:
         try:
             current_time = time.time()
             
-            # Check if we should perform update check
             if (not force_check and 
                 self.last_update_check and 
                 current_time - self.last_update_check < self.update_check_interval):
@@ -623,7 +598,7 @@ class HamRadioConditions:
             
             self.last_update_check = current_time
             
-            # Simulate update check (replace with actual logic if needed)
+            # No remote update source; report the current version.
             return self.get_version_info()
             
         except Exception as e:
@@ -636,7 +611,7 @@ class HamRadioConditions:
 
     def mark_version_notified(self, version: str):
         """Mark a version as notified to the user."""
-        # In a real app, this would store preference in DB
+        # Not persisted.
         pass
 
     def install_update(self, update_type: str = 'manual') -> Dict:
@@ -662,14 +637,12 @@ class HamRadioConditions:
         print("📊 HAM RADIO CONDITIONS REPORT")
         print("="*60)
         
-        # Solar conditions
         if 'solar_conditions' in report:
             solar = report['solar_conditions']
             print(f"☀️  Solar Flux: {solar.get('sfi', 'N/A')}")
             print(f"📡 K-Index: {solar.get('k_index', 'N/A')}")
             print(f"🌡️  A-Index: {solar.get('a_index', 'N/A')}")
         
-        # Propagation summary
         if 'propagation_summary' in report:
             prop = report['propagation_summary']
             print(f"\n📈 MUF: {prop.get('muf', 'N/A')} MHz")
@@ -684,15 +657,13 @@ def main():
     print("🔧 Ham Radio Conditions - Refactored Version")
     print("=" * 60)
     
-    # Get location from user
     zip_code = input("Enter your ZIP code (or press Enter for default): ").strip()
     if not zip_code:
-        zip_code = "85630"  # Default to St. David, AZ
+        zip_code = "85630"
     
     print(f"📍 Location: {zip_code}")
     print("🔄 Initializing system...")
     
-    # Create conditions instance
     hrc = HamRadioConditions(zip_code=zip_code)
     
     def update_report():
@@ -701,7 +672,6 @@ def main():
             print(f"\n⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("-" * 60)
             
-            # Generate report
             report = hrc.generate_report()
             
             if report:
@@ -712,7 +682,6 @@ def main():
         except Exception as e:
             print(f"❌ Error updating report: {e}")
     
-    # Generate initial report
     print("📋 Generating initial report...")
     update_report()
 
@@ -721,11 +690,10 @@ def main():
         last_update = time.time()
         while True:
             current_time = time.time()
-            # Update every hour
-            if current_time - last_update >= 3600:  # 1 hour
+            if current_time - last_update >= 3600:
                 update_report()
                 last_update = current_time
-            time.sleep(60)  # Check every minute
+            time.sleep(60)
     except KeyboardInterrupt:
         print("\n👋 Shutting down...")
 

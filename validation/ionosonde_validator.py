@@ -42,21 +42,17 @@ class IonosondeValidator:
             with urllib.request.urlopen(req, timeout=self.timeout) as response:
                 data = json.loads(response.read().decode('utf-8'))
 
-            # Filter for valid, recent measurements with high confidence
             valid_stations = []
             cutoff_time = datetime.now() - timedelta(hours=1)
 
             for station in data:
-                # Check for required fields
                 if not station.get('fof2') or not station.get('mufd'):
                     continue
 
-                # Check confidence score (cs)
                 cs = station.get('cs', 0)
-                if cs < 50:  # Skip low-confidence measurements
+                if cs < 50:
                     continue
 
-                # Check timestamp freshness
                 time_str = station.get('time', '')
                 try:
                     measurement_time = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
@@ -94,7 +90,6 @@ class IonosondeValidator:
         Returns:
             Validation report with accuracy metrics
         """
-        # Fetch real ionosonde data
         ionosonde_data = self.fetch_ionosonde_data()
 
         if not ionosonde_data:
@@ -104,16 +99,14 @@ class IonosondeValidator:
                 'timestamp': datetime.now().isoformat()
             }
 
-        # Calculate our predicted values
         location_data = {'lat': 40.0, 'lon': -100.0}  # Mid-latitude reference
         calculated = self.muf_calculator.calculate_muf(solar_data, location_data)
 
-        # Extract our calculated foF2 for comparison (using new coefficients)
+        # Our foF2 for comparison.
         sfi = self.muf_calculator._extract_sfi(solar_data)
         our_fof2 = self.muf_calculator.FOF2_COEFFICIENT * math.sqrt(sfi)
         our_muf = calculated['muf']
 
-        # Compare against each ionosonde station
         comparisons = []
         fof2_errors = []
         muf_errors = []
@@ -122,7 +115,6 @@ class IonosondeValidator:
             measured_fof2 = station['fof2']
             measured_muf = station['mufd']
 
-            # Calculate errors
             fof2_error = abs(our_fof2 - measured_fof2)
             fof2_pct_error = (fof2_error / measured_fof2 * 100) if measured_fof2 > 0 else 0
 
@@ -146,7 +138,6 @@ class IonosondeValidator:
                 'timestamp': station['timestamp']
             })
 
-        # Calculate summary statistics
         avg_fof2_error = sum(fof2_errors) / len(fof2_errors) if fof2_errors else 0
         avg_muf_error = sum(muf_errors) / len(muf_errors) if muf_errors else 0
 
@@ -207,7 +198,6 @@ class IonosondeValidator:
 
     def run_validation_report(self, solar_data: Optional[Dict] = None) -> str:
         """Run validation and return a formatted report."""
-        # Use default solar data if not provided
         if solar_data is None:
             solar_data = {'sfi': '150 SFI', 'k_index': '2', 'a_index': '8'}
 
@@ -262,7 +252,7 @@ class IonosondeValidator:
             "-" * 70,
         ])
 
-        for c in result['comparisons'][:15]:  # Show top 15 stations
+        for c in result['comparisons'][:15]:
             lines.append(
                 f"{c['station'][:29]:<30} {c['measured_fof2']:>10.2f} {c['calculated_fof2']:>10.2f} {c['fof2_error_pct']:>5.1f}% | "
                 f"{c['measured_muf']:>10.2f} {c['calculated_muf']:>10.2f} {c['muf_error_pct']:>5.1f}%"

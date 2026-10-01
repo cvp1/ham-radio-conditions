@@ -6,7 +6,7 @@ This module contains the DXCC entity list and functions to work with DXCC data.
 import math
 from typing import Dict, List, Optional, Tuple
 
-# DXCC Entity List (complete list of current entities)
+# DXCC entities keyed by entity number.
 DXCC_ENTITIES = {
     '1': {'name': 'Canada', 'continent': 'NA', 'itu_zone': '2', 'cq_zone': '4', 'prefixes': ['VA', 'VE', 'VO', 'VY'], 'timezone': 'UTC-3.5'},
     '2': {'name': 'Abu Dhabi', 'continent': 'AS', 'itu_zone': '39', 'cq_zone': '21', 'prefixes': ['A6'], 'timezone': 'UTC+4'},
@@ -19,10 +19,9 @@ DXCC_ENTITIES = {
     '9': {'name': 'American Samoa', 'continent': 'OC', 'itu_zone': '62', 'cq_zone': '32', 'prefixes': ['KH8'], 'timezone': 'UTC-11'},
     '10': {'name': 'Amsterdam & St. Paul Is.', 'continent': 'AF', 'itu_zone': '68', 'cq_zone': '39', 'prefixes': ['FT5Z'], 'timezone': 'UTC+5'},
     '110': {'name': 'United States', 'continent': 'NA', 'itu_zone': '2', 'cq_zone': '4', 'prefixes': ['K', 'N', 'W'], 'timezone': 'UTC-5'},
-    # Add more entities as needed
 }
 
-# Grid square to DXCC mapping with more precise boundaries
+# Two-letter grid field to DXCC entity number.
 GRID_TO_DXCC = {
     # North America
     'CN': '1',  # Canada
@@ -225,7 +224,7 @@ GRID_TO_DXCC = {
     'ZH': '9',  # American Samoa
 }
 
-# More precise grid mappings for overlapping regions
+# Four-character grid overrides for fields shared by several entities.
 GRID_TO_DXCC_PRECISE = {
     # Indian Ocean - Agalega & St. Brandon
     'LH00': '4',  # Agalega & St. Brandon
@@ -443,18 +442,17 @@ def grid_to_latlon(grid_square: str) -> Tuple[float, float]:
         tuple: (latitude, longitude) in degrees
     """
     try:
-        # Convert to uppercase and ensure we have at least 4 characters
         grid = grid_square.upper()[:4]
         
-        # First two characters (A-R)
+        # Field (A-R)
         lon = (ord(grid[0]) - ord('A')) * 20 - 180
         lat = (ord(grid[1]) - ord('A')) * 10 - 90
         
-        # Next two characters (0-9)
+        # Square (0-9)
         lon += (ord(grid[2]) - ord('0')) * 2
         lat += (ord(grid[3]) - ord('0'))
         
-        # If we have 6 characters, add more precision
+        # Subsquare (a-x), when present
         if len(grid_square) >= 6:
             lon += (ord(grid_square[4].upper()) - ord('A')) * (2/24)
             lat += (ord(grid_square[5].upper()) - ord('A')) * (1/24)
@@ -478,10 +476,9 @@ def calculate_distance(grid1: str, grid2: str) -> float:
     lat1, lon1 = grid_to_latlon(grid1)
     lat2, lon2 = grid_to_latlon(grid2)
     
-    # Convert to radians
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     
-    # Haversine formula
+    # Haversine
     dlon = lon2 - lon1
     dlat = lat2 - lat1
     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
@@ -547,14 +544,13 @@ def get_dxcc_by_grid(grid_square: str) -> Optional[Dict]:
         Optional[Dict]: DXCC entity information or None if not found
     """
     try:
-        # First check precise mapping for 4-character grid squares
+        # Four-character overrides take precedence.
         if len(grid_square) >= 4:
             precise_key = grid_square[:4].upper()
             if precise_key in GRID_TO_DXCC_PRECISE:
                 dxcc_number = GRID_TO_DXCC_PRECISE[precise_key]
                 return get_dxcc_info(dxcc_number)
         
-        # Then check general mapping for 2-character grid squares
         general_key = grid_square[:2].upper()
         if general_key in GRID_TO_DXCC:
             dxcc_number = GRID_TO_DXCC[general_key]
@@ -579,23 +575,18 @@ def get_nearby_dxcc(grid_square: str, max_distance: float = 2000.0) -> List[Dict
     if not grid_square or len(grid_square) < 2:
         return []
         
-    # Get the reference coordinates
     ref_lat, ref_lon = grid_to_latlon(grid_square)
     
-    # Get the current DXCC entity
     current_dxcc = get_dxcc_by_grid(grid_square)
     if not current_dxcc:
         return []
     
-    # Calculate distances to all other entities
     nearby = []
     for dxcc_number, entity in DXCC_ENTITIES.items():
-        # Skip the current entity
         if entity['name'] == current_dxcc['name']:
             continue
             
-        # For simplicity, use a rough distance calculation
-        # In a real implementation, you would use the actual coordinates of each entity
+        # Rough: treats the entity name's first two letters as a grid field.
         distance = calculate_distance(grid_square, f"{entity['name'][:2]}00")
         
         if distance <= max_distance:
@@ -609,7 +600,6 @@ def get_nearby_dxcc(grid_square: str, max_distance: float = 2000.0) -> List[Dict
                 'distance': round(distance)
             })
     
-    # Sort by distance
     nearby.sort(key=lambda x: x['distance'])
     return nearby
 
@@ -623,11 +613,10 @@ def get_propagation_conditions(grid_square: str) -> Dict:
     Returns:
         dict: Propagation conditions including best bands, times, and directions
     """
-    # This is a simplified implementation
-    # In a real implementation, you would use actual propagation prediction models
+    # Placeholder: static values, not a propagation model.
     return {
         'best_bands': ['20m', '40m', '80m'],
         'best_times': ['Dawn', 'Dusk'],
         'best_directions': ['North', 'South'],
-        'distance': 0  # This would be calculated based on the target location
+        'distance': 0
     } 

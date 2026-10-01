@@ -33,21 +33,16 @@ class TimeAnalyzer:
     def analyze_current_time(self, lat: float, timezone_str: str, lon: float = 0.0) -> Dict:
         """Analyze current time and determine propagation period."""
         try:
-            # Get current time in specified timezone
             tz = pytz.timezone(timezone_str)
             now = datetime.now(tz)
             current_hour = now.hour
             
-            # Calculate sunrise/sunset times (simplified)
             sunrise_hour, sunset_hour, sunrise_time, sunset_time = self._calculate_sunrise_sunset(lat, lon, timezone_str)
             
-            # Determine if it's daytime
             is_day = sunrise_hour <= current_hour < sunset_hour
             
-            # Determine time period
             period = self._determine_time_period(current_hour, sunrise_hour, sunset_hour)
             
-            # Get period description
             period_info = self.time_periods.get(period, {})
             
             return {
@@ -89,7 +84,7 @@ class TimeAnalyzer:
     
     def _determine_time_period(self, current_hour: int, sunrise_hour: int, sunset_hour: int) -> str:
         """Determine time period based on current hour."""
-        # Handle late night period (crosses midnight)
+        # Late night wraps past midnight.
         if current_hour >= 23 or current_hour < 5:
             return 'late_night'
         elif current_hour < sunrise_hour:

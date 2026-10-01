@@ -1,19 +1,17 @@
-// Service Worker with improved cache management and update handling
+// Service worker: offline caching with per-endpoint strategies.
 const APP_VERSION = '3.0.1';
 const CACHE_VERSION = 'v4';
 const STATIC_CACHE = `ham-radio-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `ham-radio-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `ham-radio-api-${CACHE_VERSION}`;
 
-// Cache configuration
 const CACHE_CONFIG = {
-  maxAge: 24 * 60 * 60 * 1000, // 24 hours for dynamic content
-  maxSize: 50, // Maximum number of items in dynamic cache
-  maxApiAge: 5 * 60 * 1000, // 5 minutes for API responses
-  maxApiSize: 20 // Maximum number of API responses to cache
+  maxAge: 24 * 60 * 60 * 1000,
+  maxSize: 50,
+  maxApiAge: 5 * 60 * 1000,
+  maxApiSize: 20
 };
 
-// Files to cache immediately (critical resources)
 const STATIC_FILES = [
   '/',
   '/static/manifest.json',
@@ -22,19 +20,17 @@ const STATIC_FILES = [
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
 ];
 
-// API endpoints to cache with their cache strategies
 const API_ENDPOINTS = {
-  '/api/spots': { strategy: 'network-first', maxAge: 2 * 60 * 1000 }, // 2 minutes
-  '/api/spots/history': { strategy: 'cache-first', maxAge: 10 * 60 * 1000 }, // 10 minutes
-  '/api/spots/status': { strategy: 'network-first', maxAge: 1 * 60 * 1000 }, // 1 minute
-  '/api/conditions': { strategy: 'network-first', maxAge: 5 * 60 * 1000 }, // 5 minutes
-  '/api/update-location': { strategy: 'network-only', maxAge: 0 }, // No caching for POST requests
-  '/api/cache/clear': { strategy: 'network-only', maxAge: 0 }, // No caching for cache clear
-  '/api/activations': { strategy: 'network-first', maxAge: 3 * 60 * 1000 }, // 3 minutes
-  '/api/contests': { strategy: 'cache-first', maxAge: 30 * 60 * 1000 } // 30 minutes
+  '/api/spots': { strategy: 'network-first', maxAge: 2 * 60 * 1000 },
+  '/api/spots/history': { strategy: 'cache-first', maxAge: 10 * 60 * 1000 },
+  '/api/spots/status': { strategy: 'network-first', maxAge: 1 * 60 * 1000 },
+  '/api/conditions': { strategy: 'network-first', maxAge: 5 * 60 * 1000 },
+  '/api/update-location': { strategy: 'network-only', maxAge: 0 },
+  '/api/cache/clear': { strategy: 'network-only', maxAge: 0 },
+  '/api/activations': { strategy: 'network-first', maxAge: 3 * 60 * 1000 },
+  '/api/contests': { strategy: 'cache-first', maxAge: 30 * 60 * 1000 }
 };
 
-// Safari-specific detection
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 // Install event - cache static files and skip waiting
@@ -59,12 +55,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - handle requests with improved strategies
+// Fetch event - route API, static and page requests.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Handle different types of requests
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(handleApiRequest(request));
   } else if (request.method === 'GET') {
@@ -72,7 +67,6 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Cache static files
 async function cacheStaticFiles() {
   try {
     const cache = await caches.open(STATIC_CACHE);
@@ -94,7 +88,6 @@ async function cacheStaticFiles() {
   }
 }
 
-// Clean up old caches
 async function cleanupOldCaches() {
   try {
     const cacheNames = await caches.keys();
@@ -117,7 +110,6 @@ async function cleanupOldCaches() {
   }
 }
 
-// Clear specific cache entries that might cause issues
 async function clearSpecificCacheEntries() {
   try {
     const cache = await caches.open(API_CACHE);
@@ -140,7 +132,6 @@ async function clearSpecificCacheEntries() {
   }
 }
 
-// Handle API requests with configurable strategies
 async function handleApiRequest(request) {
   const url = new URL(request.url);
   const endpoint = url.pathname;
@@ -160,18 +151,14 @@ async function handleApiRequest(request) {
   }
 }
 
-// Network-first strategy
 async function handleNetworkFirst(request, maxAge, cacheName) {
   try {
-    // Try network first
     const networkResponse = await fetch(request);
     
     if (networkResponse.ok) {
-      // Cache the response
       const cache = await caches.open(cacheName);
       const responseToCache = networkResponse.clone();
       
-      // Add cache metadata
       const metadata = {
         timestamp: Date.now(),
         maxAge: maxAge,
@@ -209,7 +196,6 @@ async function handleNetworkFirst(request, maxAge, cacheName) {
     return staleResponse;
   }
 
-  // Return offline response
   return new Response(
     JSON.stringify({
       error: 'Offline - No cached data available',
@@ -224,16 +210,13 @@ async function handleNetworkFirst(request, maxAge, cacheName) {
   );
 }
 
-// Cache-first strategy
 async function handleCacheFirst(request, maxAge, cacheName) {
-  // Try cache first
   const cachedResponse = await getValidCachedResponse(request, maxAge, cacheName);
   if (cachedResponse) {
     return cachedResponse;
   }
   
   try {
-    // Fall back to network
     const networkResponse = await fetch(request);
     
     if (networkResponse.ok) {
@@ -267,11 +250,9 @@ async function handleCacheFirst(request, maxAge, cacheName) {
   }
 }
 
-// Stale-while-revalidate strategy
 async function handleStaleWhileRevalidate(request, maxAge, cacheName) {
   const cachedResponse = await getValidCachedResponse(request, maxAge, cacheName);
   
-  // Return cached response immediately if available
   if (cachedResponse) {
     // Update cache in background
     fetch(request).then(async (networkResponse) => {
@@ -305,7 +286,6 @@ async function handleStaleWhileRevalidate(request, maxAge, cacheName) {
     return cachedResponse;
   }
   
-  // If no cache, try network
   try {
     const networkResponse = await fetch(request);
     
@@ -340,7 +320,6 @@ async function handleStaleWhileRevalidate(request, maxAge, cacheName) {
   }
 }
 
-// Network-only strategy (no caching)
 async function handleNetworkOnly(request) {
   try {
     const networkResponse = await fetch(request);
@@ -351,7 +330,6 @@ async function handleNetworkOnly(request) {
   }
 }
 
-// Get valid cached response (not expired)
 async function getValidCachedResponse(request, maxAge, cacheName) {
   try {
     const cache = await caches.open(cacheName);
@@ -368,7 +346,6 @@ async function getValidCachedResponse(request, maxAge, cacheName) {
         if (age < maxAgeMs) {
           return response;
         } else {
-          // Remove expired cache entry
           await cache.delete(request);
         }
       }
@@ -403,14 +380,12 @@ async function getStaleCachedResponse(request, cacheName) {
   return null;
 }
 
-// Clean up cache to maintain size limits
 async function cleanupCache(cacheName, maxSize) {
   try {
     const cache = await caches.open(cacheName);
     const keys = await cache.keys();
     
     if (keys.length > maxSize) {
-      // Get cache entries with their timestamps
       const entries = await Promise.all(
         keys.map(async (key) => {
           const response = await cache.match(key);
@@ -419,10 +394,8 @@ async function cleanupCache(cacheName, maxSize) {
         })
       );
       
-      // Sort by timestamp (oldest first)
       entries.sort((a, b) => a.timestamp - b.timestamp);
       
-      // Remove oldest entries
       const toDelete = entries.slice(0, entries.length - maxSize);
       await Promise.all(toDelete.map(entry => cache.delete(entry.key)));
       
@@ -433,7 +406,6 @@ async function cleanupCache(cacheName, maxSize) {
   }
 }
 
-// Handle static file requests with cache-first strategy
 async function handleStaticRequest(request) {
   const cachedResponse = await caches.match(request);
   
@@ -453,7 +425,6 @@ async function handleStaticRequest(request) {
   } catch (error) {
     console.log('Network failed for static file:', request.url);
     
-    // Return offline page for HTML requests
     if (request.headers.get('accept')?.includes('text/html')) {
       return caches.match('/offline.html');
     }
@@ -462,7 +433,6 @@ async function handleStaticRequest(request) {
   }
 }
 
-// Message handling for updates and cache management
 self.addEventListener('message', (event) => {
   const { data } = event;
   
@@ -504,7 +474,6 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Clear all caches
 async function clearAllCaches() {
   try {
     const cacheNames = await caches.keys();
@@ -523,12 +492,10 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-// Update cached data in background
 async function updateCachedData() {
   try {
     const cache = await caches.open(API_CACHE);
     
-    // Update API endpoints
     for (const [endpoint, config] of Object.entries(API_ENDPOINTS)) {
       try {
         const response = await fetch(endpoint);
@@ -565,7 +532,6 @@ async function updateCachedData() {
   }
 }
 
-// Push notification handling
 self.addEventListener('push', (event) => {
   console.log('Push notification received');
   
@@ -597,7 +563,6 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Notification click handling
 self.addEventListener('notificationclick', (event) => {
   console.log('Notification clicked');
   

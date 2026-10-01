@@ -37,13 +37,10 @@ class PropagationCalculator:
             sfi = self._extract_sfi(solar_data)
             k_index = self._extract_k_index(solar_data)
 
-            # Calculate propagation quality
             quality = self._calculate_quality(muf, sfi, k_index)
 
-            # Calculate best bands
             best_bands = self._calculate_best_bands(muf, sfi, k_index)
 
-            # Calculate confidence
             confidence = self._calculate_confidence(muf, sfi, k_index)
 
             result = {
@@ -55,12 +52,10 @@ class PropagationCalculator:
                 'k_index': k_index
             }
 
-            # Add D-layer absorption and greyline info if time_data is provided
             if time_data:
                 is_daytime = time_data.get('is_daytime', True)
                 zenith_angle = time_data.get('zenith_angle', 45.0)
 
-                # Calculate D-layer absorption for each band
                 d_layer_absorption = {}
                 for band, freq in self.band_frequencies.items():
                     d_layer_absorption[band] = self._calculate_d_layer_absorption(
@@ -68,7 +63,6 @@ class PropagationCalculator:
                     )
                 result['d_layer_absorption'] = d_layer_absorption
 
-                # Detect greyline conditions
                 lat = time_data.get('lat', 0.0)
                 lon = time_data.get('lon', 0.0)
                 sunrise_hour = time_data.get('sunrise_hour', 6.0)
@@ -117,7 +111,6 @@ class PropagationCalculator:
         """Calculate best bands based on MUF and conditions."""
         bands = []
         
-        # Add bands based on MUF
         if muf >= 28.0:
             bands.extend(['10m', '12m', '15m', '17m', '20m'])
         elif muf >= 21.0:
@@ -129,19 +122,16 @@ class PropagationCalculator:
         else:
             bands.extend(['80m', '160m'])
         
-        # Adjust based on K-index
         if k_index >= 4:
-            # High K-index - remove higher bands
+            # Storm conditions close the higher bands.
             bands = [b for b in bands if b in ['40m', '80m', '160m']]
         
-        return bands[:5]  # Return top 5 bands
+        return bands[:5]
     
     def _calculate_confidence(self, muf: float, sfi: float, k_index: float) -> float:
         """Calculate confidence in propagation prediction."""
-        # Base confidence on data quality
         confidence = 0.7
         
-        # Adjust based on K-index stability
         if k_index <= 2:
             confidence += 0.2
         elif k_index <= 4:
@@ -149,7 +139,6 @@ class PropagationCalculator:
         else:
             confidence -= 0.1
         
-        # Adjust based on SFI level
         if 80 <= sfi <= 150:
             confidence += 0.1
         elif sfi < 60 or sfi > 200:

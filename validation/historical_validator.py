@@ -36,14 +36,12 @@ class HistoricalValidator:
                 'errors': []
             }
             
-            # Get historical data for comparison
             historical_data = self._get_historical_data(prediction_type)
             
             if not historical_data:
                 validation_result['errors'].append('No historical data available')
                 return validation_result
             
-            # Perform different types of validation
             if prediction_type == 'muf':
                 validation_result.update(self._validate_muf_against_history(prediction, historical_data))
             elif prediction_type == 'band_quality':
@@ -53,7 +51,6 @@ class HistoricalValidator:
             elif prediction_type == 'best_bands':
                 validation_result.update(self._validate_bands_against_history(prediction, historical_data))
             
-            # Calculate overall confidence
             validation_result['confidence'] = self._calculate_historical_confidence(validation_result)
             
             return validation_result
@@ -72,29 +69,23 @@ class HistoricalValidator:
         """Validate MUF prediction against historical MUF data."""
         pred_muf = prediction.get('muf', 0)
         
-        # Extract historical MUF values
         historical_mufs = [entry.get('muf', 0) for entry in historical_data if 'muf' in entry]
         
         if not historical_mufs:
             return {'historical_validation': {'error': 'No historical MUF data'}}
         
-        # Calculate statistics
         mean_muf = np.mean(historical_mufs)
         std_muf = np.std(historical_mufs)
         min_muf = np.min(historical_mufs)
         max_muf = np.max(historical_mufs)
         
-        # Check if prediction is within historical range
         within_range = min_muf <= pred_muf <= max_muf
         
-        # Check if prediction is within 1 standard deviation
         within_1std = abs(pred_muf - mean_muf) <= std_muf
         
-        # Check if prediction follows recent trend
-        recent_trend = self._calculate_recent_trend(historical_mufs[-24:])  # Last 24 hours
+        recent_trend = self._calculate_recent_trend(historical_mufs[-24:])
         trend_consistency = self._check_trend_consistency(pred_muf, recent_trend, historical_mufs[-1])
         
-        # Calculate seasonal pattern consistency
         seasonal_consistency = self._check_seasonal_consistency(pred_muf, historical_data)
         
         return {
@@ -126,7 +117,6 @@ class HistoricalValidator:
         """Validate band quality prediction against historical data."""
         pred_bands = prediction.get('bands', {})
         
-        # Extract historical band quality data
         historical_bands = defaultdict(list)
         for entry in historical_data:
             if 'bands' in entry:
@@ -140,7 +130,6 @@ class HistoricalValidator:
                 pred_quality = quality_data.get('quality', 'Unknown')
                 historical_qualities = historical_bands[band]
                 
-                # Calculate quality consistency
                 quality_counts = defaultdict(int)
                 for q in historical_qualities:
                     quality_counts[q] += 1
@@ -148,8 +137,7 @@ class HistoricalValidator:
                 most_common_quality = max(quality_counts, key=quality_counts.get)
                 consistency = pred_quality == most_common_quality
                 
-                # Calculate quality trend
-                quality_trend = self._calculate_band_quality_trend(historical_qualities[-7:])  # Last 7 days
+                quality_trend = self._calculate_band_quality_trend(historical_qualities[-7:])
                 
                 validation_results[band] = {
                     'predicted_quality': pred_quality,
@@ -171,23 +159,18 @@ class HistoricalValidator:
         """Validate propagation score prediction against historical data."""
         pred_score = prediction.get('propagation_score', 0)
         
-        # Extract historical propagation scores
         historical_scores = [entry.get('propagation_score', 0) for entry in historical_data if 'propagation_score' in entry]
         
         if not historical_scores:
             return {'historical_validation': {'error': 'No historical propagation data'}}
         
-        # Calculate statistics
         mean_score = np.mean(historical_scores)
         std_score = np.std(historical_scores)
         
-        # Check consistency with historical patterns
         within_1std = abs(pred_score - mean_score) <= std_score
         
-        # Check time-of-day consistency
         time_consistency = self._check_time_of_day_consistency(pred_score, historical_data)
         
-        # Check solar cycle consistency
         solar_consistency = self._check_solar_cycle_consistency(pred_score, historical_data)
         
         return {
@@ -206,19 +189,16 @@ class HistoricalValidator:
         """Validate best bands prediction against historical data."""
         pred_bands = prediction.get('best_bands', [])
         
-        # Extract historical best bands
         historical_bands = [entry.get('best_bands', []) for entry in historical_data if 'best_bands' in entry]
         
         if not historical_bands:
             return {'historical_validation': {'error': 'No historical bands data'}}
         
-        # Calculate band frequency in historical data
         band_frequency = defaultdict(int)
         for bands in historical_bands:
             for band in bands:
                 band_frequency[band] += 1
         
-        # Calculate frequency scores for predicted bands
         frequency_scores = []
         for band in pred_bands:
             if band in band_frequency:
@@ -226,8 +206,7 @@ class HistoricalValidator:
             else:
                 frequency_scores.append(0)
         
-        # Calculate consistency with recent patterns
-        recent_bands = historical_bands[-7:]  # Last 7 entries
+        recent_bands = historical_bands[-7:]
         recent_consistency = self._calculate_bands_consistency(pred_bands, recent_bands)
         
         return {
@@ -242,16 +221,13 @@ class HistoricalValidator:
     def _get_historical_data(self, prediction_type: str) -> List[Dict[str, Any]]:
         """Get historical data for the specified prediction type."""
         try:
-            # Try to get from cache first
             cached_data = cache_get('historical_validation', prediction_type)
             if cached_data:
                 return cached_data
             
-            # Generate simulated historical data for demonstration
-            # In a real implementation, this would fetch from a database
+            # Placeholder: simulated data.
             historical_data = self._generate_simulated_historical_data(prediction_type)
             
-            # Cache the data
             cache_set('historical_validation', prediction_type, historical_data, max_age=3600)
             
             return historical_data
@@ -265,11 +241,10 @@ class HistoricalValidator:
         data = []
         base_time = datetime.now() - timedelta(days=self.lookback_days)
         
-        for i in range(self.lookback_days * 24):  # Hourly data
+        for i in range(self.lookback_days * 24):
             timestamp = base_time + timedelta(hours=i)
             
             if prediction_type == 'muf':
-                # Simulate MUF data with daily and seasonal patterns
                 hour = timestamp.hour
                 day_of_year = timestamp.timetuple().tm_yday
                 
@@ -291,12 +266,10 @@ class HistoricalValidator:
                 })
             
             elif prediction_type == 'band_quality':
-                # Simulate band quality data
                 bands = ['20m', '40m', '80m', '15m', '10m']
                 band_data = {}
                 
                 for band in bands:
-                    # Simulate quality with some randomness
                     quality_scores = ['Poor', 'Fair', 'Good', 'Very Good', 'Excellent']
                     quality = np.random.choice(quality_scores, p=[0.1, 0.2, 0.4, 0.2, 0.1])
                     
@@ -311,7 +284,6 @@ class HistoricalValidator:
                 })
             
             elif prediction_type == 'propagation_score':
-                # Simulate propagation score data
                 score = 50 + 30 * np.random.random() + 20 * np.sin(2 * np.pi * timestamp.hour / 24)
                 data.append({
                     'timestamp': timestamp.isoformat(),
@@ -319,7 +291,6 @@ class HistoricalValidator:
                 })
             
             elif prediction_type == 'best_bands':
-                # Simulate best bands data
                 all_bands = ['20m', '40m', '80m', '15m', '10m', '17m', '12m', '30m']
                 num_bands = np.random.randint(3, 6)
                 best_bands = np.random.choice(all_bands, num_bands, replace=False).tolist()
@@ -339,7 +310,6 @@ class HistoricalValidator:
         x = np.arange(len(values))
         y = np.array(values)
         
-        # Calculate linear trend
         slope = np.polyfit(x, y, 1)[0]
         return slope
     
@@ -354,8 +324,7 @@ class HistoricalValidator:
     
     def _check_seasonal_consistency(self, prediction: float, historical_data: List[Dict[str, Any]]) -> bool:
         """Check if prediction is consistent with seasonal patterns."""
-        # This would implement more sophisticated seasonal analysis
-        # For now, return True as a placeholder
+        # Placeholder: always passes.
         return True
     
     def _calculate_band_quality_trend(self, qualities: List[str]) -> str:
@@ -377,14 +346,12 @@ class HistoricalValidator:
     
     def _check_time_of_day_consistency(self, prediction: float, historical_data: List[Dict[str, Any]]) -> bool:
         """Check if prediction is consistent with time-of-day patterns."""
-        # This would implement time-of-day analysis
-        # For now, return True as a placeholder
+        # Placeholder: always passes.
         return True
     
     def _check_solar_cycle_consistency(self, prediction: float, historical_data: List[Dict[str, Any]]) -> bool:
         """Check if prediction is consistent with solar cycle patterns."""
-        # This would implement solar cycle analysis
-        # For now, return True as a placeholder
+        # Placeholder: always passes.
         return True
     
     def _calculate_bands_consistency(self, pred_bands: List[str], historical_bands: List[List[str]]) -> float:
@@ -395,7 +362,6 @@ class HistoricalValidator:
         consistency_scores = []
         for historical_set in historical_bands:
             if historical_set:
-                # Calculate Jaccard similarity
                 pred_set = set(pred_bands)
                 hist_set = set(historical_set)
                 intersection = len(pred_set.intersection(hist_set))
@@ -418,13 +384,11 @@ class HistoricalValidator:
     def _calculate_historical_confidence(self, validation_result: Dict[str, Any]) -> float:
         """Calculate overall confidence based on historical validation."""
         try:
-            confidence = 0.5  # Base confidence
+            confidence = 0.5
             
-            # Adjust based on historical validation results
             if 'historical_validation' in validation_result:
                 hist_val = validation_result['historical_validation']
                 
-                # Check various consistency measures
                 if hist_val.get('within_1std', False):
                     confidence += 0.2
                 if hist_val.get('trend_consistency', False):
@@ -434,13 +398,11 @@ class HistoricalValidator:
                 if hist_val.get('time_consistency', False):
                     confidence += 0.1
             
-            # Adjust based on pattern analysis
             if 'pattern_analysis' in validation_result:
                 pattern = validation_result['pattern_analysis']
                 if pattern.get('overall_consistency', 0) > 0.7:
                     confidence += 0.1
             
-            # Adjust based on anomaly detection
             if 'anomaly_detection' in validation_result:
                 anomaly = validation_result['anomaly_detection']
                 if anomaly.get('anomaly_severity') == 'none':

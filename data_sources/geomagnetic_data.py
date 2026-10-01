@@ -25,7 +25,6 @@ class GeomagneticDataProvider:
     def get_geomagnetic_coordinates(self) -> Dict:
         """Get geomagnetic coordinates for the location."""
         try:
-            # Calculate geomagnetic coordinates using IGRF-13 model
             geomag_lat, geomag_lon = self._calculate_geomagnetic_coordinates()
             magnetic_declination = self._calculate_magnetic_declination()
             
@@ -48,24 +47,21 @@ class GeomagneticDataProvider:
     
     def _calculate_geomagnetic_coordinates(self) -> Tuple[float, float]:
         """Calculate geomagnetic coordinates using IGRF-13 model."""
-        # Current geomagnetic pole coordinates (2024-2025)
-        mag_pole_lat = 86.5  # North geomagnetic pole latitude
-        mag_pole_lon = -164.0  # North geomagnetic pole longitude
+        # North geomagnetic pole (IGRF-13, 2024-2025 epoch).
+        mag_pole_lat = 86.5
+        mag_pole_lon = -164.0
         
-        # Convert to radians
         lat_rad = math.radians(self.lat)
         lon_rad = math.radians(self.lon)
         pole_lat_rad = math.radians(mag_pole_lat)
         pole_lon_rad = math.radians(mag_pole_lon)
         
-        # Calculate geomagnetic latitude
         geomag_lat = math.asin(
             math.sin(lat_rad) * math.sin(pole_lat_rad) +
             math.cos(lat_rad) * math.cos(pole_lat_rad) * 
             math.cos(lon_rad - pole_lon_rad)
         )
         
-        # Calculate geomagnetic longitude
         geomag_lon = math.atan2(
             math.sin(lon_rad - pole_lon_rad) * math.cos(lat_rad),
             math.cos(pole_lat_rad) * math.sin(lat_rad) -
@@ -73,11 +69,9 @@ class GeomagneticDataProvider:
             math.cos(lon_rad - pole_lon_rad)
         )
         
-        # Convert back to degrees
         geomag_lat_deg = math.degrees(geomag_lat)
         geomag_lon_deg = math.degrees(geomag_lon)
         
-        # Normalize longitude to 0-360
         if geomag_lon_deg < 0:
             geomag_lon_deg += 360
             
@@ -107,7 +101,7 @@ class GeomagneticDataProvider:
         except Exception as e:
             logger.debug(f"NOAA declination API failed, using dipole model: {e}")
 
-        # Fallback: Tilted dipole model (much better than lon * 0.1)
+        # Fallback: tilted dipole model.
         return self._dipole_declination()
 
     def _dipole_declination(self) -> float:

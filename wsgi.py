@@ -7,10 +7,8 @@ import os
 from app_factory import create_app
 from config import Config
 
-# Set production environment
 os.environ['FLASK_ENV'] = 'production'
 
-# Create the application
 app = create_app(Config)
 
 if __name__ == '__main__':

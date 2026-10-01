@@ -11,7 +11,6 @@ class Database:
     def __init__(self, db_path: str = None):
         """Initialize SQLite database"""
         if db_path is None:
-            # Create data directory if it doesn't exist
             data_dir = os.path.join(os.getcwd(), 'data')
             os.makedirs(data_dir, exist_ok=True)
             self.db_path = os.path.join(data_dir, "ham_radio.db")
@@ -26,7 +25,6 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Create spots table
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS spots (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +40,6 @@ class Database:
                     )
                 ''')
                 
-                # Create user_preferences table
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS user_preferences (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,7 +49,6 @@ class Database:
                     )
                 ''')
                 
-                # Create conditions_history table
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS conditions_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,7 +62,6 @@ class Database:
                     )
                 ''')
 
-                # Create indexes for better performance
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_timestamp ON spots(timestamp)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_callsign ON spots(callsign)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_spots_frequency ON spots(frequency)')
@@ -114,7 +109,6 @@ class Database:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-                # Calculate time threshold
                 threshold = datetime.now() - timedelta(hours=hours)
                 
                 cursor.execute('''
@@ -150,24 +144,20 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Calculate time threshold
                 threshold = datetime.now() - timedelta(hours=hours)
                 
-                # Get total spots
                 cursor.execute('''
                     SELECT COUNT(*) FROM spots 
                     WHERE timestamp >= ?
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'),))
                 total_spots = cursor.fetchone()[0]
                 
-                # Get unique modes
                 cursor.execute('''
                     SELECT DISTINCT mode FROM spots 
                     WHERE timestamp >= ? AND mode != 'Unknown'
                 ''', (threshold.strftime('%Y-%m-%d %H:%M:%S'),))
                 modes = [row[0] for row in cursor.fetchall()]
                 
-                # Get unique DXCC entities
                 cursor.execute('''
                     SELECT DISTINCT dxcc FROM spots 
                     WHERE timestamp >= ? AND dxcc != ''
@@ -263,17 +253,14 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Calculate cutoff date
                 cutoff = datetime.now() - timedelta(days=days)
                 
-                # Clean up old spots
                 cursor.execute('''
                     DELETE FROM spots
                     WHERE timestamp < ?
                 ''', (cutoff.strftime('%Y-%m-%d %H:%M:%S'),))
                 spots_deleted = cursor.rowcount
 
-                # Clean up old conditions history (keep 7 days)
                 cursor.execute('''
                     DELETE FROM conditions_history
                     WHERE timestamp < ?
@@ -292,14 +279,12 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
-                # Get table sizes
                 cursor.execute('SELECT COUNT(*) FROM spots')
                 total_spots = cursor.fetchone()[0]
                 
                 cursor.execute('SELECT COUNT(*) FROM user_preferences')
                 total_preferences = cursor.fetchone()[0]
                 
-                # Get database file size
                 file_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
                 
                 return {
@@ -312,7 +297,6 @@ class Database:
             logger.error(f"Error getting database stats: {e}")
             return {}
 
-# Global database instance
 _db_instance = None
 
 def init_database():
